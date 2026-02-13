@@ -17,7 +17,7 @@ const app = express();
 // ────────────────────────────────────────────────
 
 app.use(cors({
-  origin: true,                          // allow all for dev; tighten later
+  origin: process.env.FRONTEND_URL || true,  // Allow all in dev, specific URL in prod
   credentials: true,
 }));
 
@@ -28,12 +28,22 @@ app.use(express.json());
 // Database
 // ────────────────────────────────────────────────
 
-mongoose.connect('mongodb://admin:secret@localhost:27017/todo-app?authSource=admin')
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => {
+// MongoDB connection - use environment variable for Vercel
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://admin:secret@localhost:27017/todo-app?authSource=admin';
+
+let isConnected = false;
+
+const connectDB = async () => {
+  if (isConnected) return;
+  
+  try {
+    await mongoose.connect(MONGODB_URI);
+    isConnected = true;
+    console.log('MongoDB connected');
+  } catch (err) {
     console.error('MongoDB connection failed:', err);
-    process.exit(1);
-  });
+  }
+};
 
 // ────────────────────────────────────────────────
 // Routes
@@ -72,7 +82,20 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
+// Connect to database on startup
+connectDB();
+
+// ────────────────────────────────────────────────
+// Vercel Serverless Export
+// ────────────────────────────────────────────────
+
+// For local development
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+// Export for Vercel serverless
+export default app;

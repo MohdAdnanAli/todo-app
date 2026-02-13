@@ -8,6 +8,9 @@ interface Todo {
   createdAt: string;
 }
 
+// Use environment variable or fallback to localhost for development
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 function App() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
@@ -22,12 +25,12 @@ function App() {
   useEffect(() => {
     const checkAuthAndFetch = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/me', {
+        const res = await axios.get(`${API_URL}/api/me`, {
           withCredentials: true,
         });
         setUser(res.data.user || null);
 
-        const todosRes = await axios.get('http://localhost:5000/api/todos', {
+        const todosRes = await axios.get(`${API_URL}/api/todos`, {
           withCredentials: true,
         });
         setTodos(todosRes.data);
@@ -44,14 +47,14 @@ function App() {
   const handleLogin = async () => {
     try {
       const response = await axios.post(
-        'http://localhost:5000/api/auth/login',
+        `${API_URL}/api/auth/login`,
         { email, password },
         { withCredentials: true }
       );
       setUser(response.data.user);
       setMessage('Login successful');
 
-      const todosRes = await axios.get('http://localhost:5000/api/todos', {
+      const todosRes = await axios.get(`${API_URL}/api/todos`, {
         withCredentials: true,
       });
       setTodos(todosRes.data);
@@ -68,14 +71,14 @@ function App() {
 
     try {
       const response = await axios.post(
-        'http://localhost:5000/api/auth/register',
+        `${API_URL}/api/auth/register`,
         { email, password, displayName },
         { withCredentials: true }
       );
       setUser(response.data.user);
       setMessage('Account created and logged in');
       
-      const todosRes = await axios.get('http://localhost:5000/api/todos', {
+      const todosRes = await axios.get(`${API_URL}/api/todos`, {
         withCredentials: true,
       });
       setTodos(todosRes.data);
@@ -86,7 +89,7 @@ function App() {
 
   const handleLogout = async () => {
     try {
-      await axios.post('http://localhost:5000/api/auth/logout', {}, {
+      await axios.post(`${API_URL}/api/auth/logout`, {}, {
         withCredentials: true,
       });
       setMessage('Logged out successfully');
@@ -108,7 +111,7 @@ function App() {
     setMessage('Adding...');
     try {
       const res = await axios.post(
-        'http://localhost:5000/api/todos',
+        `${API_URL}/api/todos`,
         { text: newTodoText },
         { withCredentials: true }
       );
@@ -123,7 +126,7 @@ function App() {
   const handleToggle = async (todo: Todo) => {
     try {
       const res = await axios.put(
-        `http://localhost:5000/api/todos/${todo._id}`,
+        `${API_URL}/api/todos/${todo._id}`,
         { completed: !todo.completed },
         { withCredentials: true }
       );
@@ -140,7 +143,7 @@ function App() {
     if (!window.confirm('Delete this task?')) return;
 
     try {
-      await axios.delete(`http://localhost:5000/api/todos/${todoId}`, {
+      await axios.delete(`${API_URL}/api/todos/${todoId}`, {
         withCredentials: true,
       });
 
