@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { Todo } from '../models/Todo';
 import { z } from 'zod';
 
