@@ -1,0 +1,13 @@
+{
+  "name": "todo-app",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build:frontend": "cd frontend && bun install && bun run build",
+    "start": "bun run api/index.ts"
+  },
+  "devDependencies": {
+    "bun-types": "^1.0.0"
+  }
+}
+
