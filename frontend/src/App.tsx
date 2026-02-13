@@ -9,7 +9,8 @@ interface Todo {
 }
 
 // Use environment variable or fallback to localhost for development
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// In production, use relative paths (Vercel handles routing)
+const API_URL = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:5000');
 
 function App() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
