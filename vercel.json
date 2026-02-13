@@ -1,14 +1,14 @@
 {
   "version": 2,
   "installCommand": "bun install",
-  "buildCommand": "bun run build",
+  "buildCommand": "cd frontend && bun install && bun run build",
   "builds": [
     {
       "src": "api/index.ts",
       "use": "@vercel/node"
     },
     {
-      "src": "frontend/**/*",
+      "src": "frontend/dist/**/*",
       "use": "@vercel/static"
     }
   ],
@@ -19,7 +19,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "frontend/index.html"
+      "dest": "frontend/dist/index.html"
     }
   ]
 }
