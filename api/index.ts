@@ -82,8 +82,16 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
-// Connect to database on startup
-connectDB();
+// Connect to database lazily on first request (for Vercel serverless)
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('Database connection error:', err);
+    res.status(500).json({ error: 'Database connection failed' });
+  }
+});
 
 // ────────────────────────────────────────────────
 // Vercel Serverless Export
