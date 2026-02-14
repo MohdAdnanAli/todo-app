@@ -24,6 +24,10 @@ app.use(cors({
 app.use(cookieParser());                 // ← MUST be here, before routes
 app.use(express.json());
 
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '8.8.4.4']); // Google DNS
+// or ['1.1.1.1', '1.0.0.1'] for Cloudflare
+
 // ────────────────────────────────────────────────
 // Database
 // ────────────────────────────────────────────────
