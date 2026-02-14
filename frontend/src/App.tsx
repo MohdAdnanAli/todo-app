@@ -16,6 +16,7 @@ function App() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [message, setMessage] = useState('');
   const [user, setUser] = useState<{ email: string; displayName: string } | null>(null);
@@ -180,6 +181,26 @@ function App() {
     backgroundColor: '#ffffff',
     color: '#1f2937',
     transition: 'all 0.2s ease',
+  };
+
+  const passwordInputContainerStyle: React.CSSProperties = {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+  };
+
+  const passwordToggleStyle: React.CSSProperties = {
+    position: 'absolute',
+    right: '0.75rem',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: '#6b7280',
+    fontSize: '0.875rem',
+    padding: '0.25rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   };
 
   const buttonPrimaryStyle: React.CSSProperties = {
@@ -479,13 +500,22 @@ function App() {
                 </div>
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={{ display: 'block', marginBottom: '0.5rem', color: '#374151', fontWeight: 500, fontSize: '0.875rem' }}>Password</label>
-                  <input
-                    type="password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    style={inputStyle}
-                  />
+                  <div style={passwordInputContainerStyle}>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      style={{ ...inputStyle, paddingRight: '2.5rem' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={passwordToggleStyle}
+                    >
+                      {showPassword ? '👁️' : '👁️‍🗨️'}
+                    </button>
+                  </div>
                 </div>
                 <button
                   onClick={handleLogin}
@@ -526,13 +556,22 @@ function App() {
                 </div>
                 <div style={{ marginBottom: '1.5rem' }}>
                   <label style={{ display: 'block', marginBottom: '0.5rem', color: '#374151', fontWeight: 500, fontSize: '0.875rem' }}>Password</label>
-                  <input
-                    type="password"
-                    placeholder="Create a password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    style={inputStyle}
-                  />
+                  <div style={passwordInputContainerStyle}>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Create a password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      style={{ ...inputStyle, paddingRight: '2.5rem' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={passwordToggleStyle}
+                    >
+                      {showPassword ? '👁️' : '👁️‍🗨️'}
+                    </button>
+                  </div>
                 </div>
                 <button
                   onClick={handleRegister}
