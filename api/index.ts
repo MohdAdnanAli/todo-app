@@ -35,18 +35,41 @@ dns.setServers(['8.8.8.8', '8.8.4.4']); // Google DNS
 // MongoDB connection - use environment variable for Vercel
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://admin:secret@localhost:27017/todo-app?authSource=admin';
 
-let isConnected = false;
+// Connect to database with retry logic for cold starts
+const connectWithRetry = async (retries = 5, delay = 5000) => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await mongoose.connect(process.env.MONGO_URI || MONGODB_URI, {
+        serverSelectionTimeoutMS: 5000, // fast fail if DB down
+        socketTimeoutMS: 45000,
+        family: 4, // prefer IPv4 (fixes some DNS issues)
+      });
+      console.log('MongoDB connected');
+      return;
+    } catch (err) {
+      console.error(`MongoDB connection attempt ${attempt}/${retries} failed:`, err.message);
+      if (attempt < retries) {
+        console.log(`Retrying in ${delay / 1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  console.error('MongoDB connection failed after all retries');
+};
 
+// Initial connection with retry
+connectWithRetry();
+
+// Lazy connection middleware for Vercel serverless
+let isConnected = false;
 const connectDB = async () => {
   if (isConnected) return;
-  
-  try {
-    await mongoose.connect(MONGODB_URI);
+  if (mongoose.connection.readyState === 1) {
     isConnected = true;
-    console.log('MongoDB connected');
-  } catch (err) {
-    console.error('MongoDB connection failed:', err);
+    return;
   }
+  await connectWithRetry(3, 3000); // Fewer retries for request-level connections
+  isConnected = true;
 };
 
 // ────────────────────────────────────────────────

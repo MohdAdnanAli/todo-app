@@ -24,22 +24,28 @@ function App() {
 
   // Check auth status and fetch todos on mount or user change
   useEffect(() => {
-    const checkAuthAndFetch = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/me`, {
-          withCredentials: true,
-        });
-        setUser(res.data.user || null);
+    const checkAuthAndFetch = async (retries = 3) => {
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          const res = await axios.get(`${API_URL}/api/me`, {
+            withCredentials: true,
+          });
+          setUser(res.data.user || null);
 
-        const todosRes = await axios.get(`${API_URL}/api/todos`, {
-          withCredentials: true,
-        });
-        setTodos(todosRes.data);
-        setMessage('Session active');
-      } catch (err) {
-        setUser(null);
-        setTodos([]);
-        setMessage('');
+          const todosRes = await axios.get(`${API_URL}/api/todos`, {
+            withCredentials: true,
+          });
+          setTodos(todosRes.data);
+          setMessage('Session active');
+          return;
+        } catch (err: any) {
+          console.warn(`Attempt ${attempt} failed:`, err.message);
+          if (attempt === retries) {
+            setMessage('Unable to connect to server. Please try again later.');
+          } else {
+            await new Promise(r => setTimeout(r, 3000 * attempt)); // backoff
+          }
+        }
       }
     };
     checkAuthAndFetch();
