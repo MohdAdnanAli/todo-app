@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "cd frontend && bun install && bun run build",
+    "build": "bun install && bun run build",
     "start": "cd api && bun install && bun run index.ts"
   },
   "devDependencies": {
