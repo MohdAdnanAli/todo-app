@@ -2,12 +2,12 @@
   "version": 2,
   "builds": [
     {
-      "src": "frontend/dist/**",
+      "src": "./dist/**",
       "use": "@vercel/static"
     }
   ],
   "rewrites": [
-    { "source": "/(.*)", "destination": "/frontend/dist/index.html" }
+    { "source": "/(.*)", "destination": "./dist/index.html" }
   ]
 }
 
