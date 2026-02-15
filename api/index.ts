@@ -17,8 +17,14 @@ const app = express();
 // ────────────────────────────────────────────────
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || true,  // Allow all in dev, specific URL in prod
-  credentials: true,
+  origin: [
+    'http://localhost:5173',                  // local dev
+    'https://metb-todo.vercel.app',           // your live Vercel URL
+    'https://*.vercel.app'                    // optional wildcard for previews
+  ],
+  credentials: true,                          // required for cookies
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // explicit methods
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(cookieParser());                 // ← MUST be here, before routes

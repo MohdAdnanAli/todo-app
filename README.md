@@ -10,3 +10,20 @@ Message display: Style it more subtly (smaller, less intrusive)
 Background: Add subtle gradient or off-white background
 
 STATUS: True
+
+Future Implementations:
+
+Security:
+Rate limiting (anti-spam/abuse)
+Input validation/sanitization
+Email verification
+Password strength requirements
+User Experience:
+Password reset functionality
+Email confirmation
+Profile management
+Todo categories/tags
+Anti-Spam Specific:
+Request rate limiting (e.g., max 5 login attempts per minute)
+CAPTCHA for registration
+Account lockout after failed attempts
