@@ -331,14 +331,84 @@ function App() {
 
   return (
     <div style={containerStyle}>
-      <h1 style={{ 
-        textAlign: 'center', 
+      {/* Header with LED Status Indicator */}
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
         marginBottom: '2rem',
-        background: 'linear-gradient(135deg, #4f46e5 0%, #8b5cf6 100%)',
-        WebkitBackgroundClip: 'text',
-        WebkitTextFillColor: 'transparent',
-        backgroundClip: 'text',
-      }}>Todo App</h1>
+        position: 'relative',
+      }}>
+        <h1 style={{ 
+          textAlign: 'center',
+          background: 'linear-gradient(135deg, #4f46e5 0%, #8b5cf6 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          margin: 0,
+        }}>Todo App</h1>
+        
+        {/* LED Status Indicator - positioned top right of header */}
+        <div 
+          onMouseEnter={() => setShowTooltip(true)}
+          onMouseLeave={() => setShowTooltip(false)}
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: '20%',
+            transform: 'translateY(-50%)',
+            cursor: 'pointer',
+          }}
+        >
+          <div
+            style={{
+              width: '16px',
+              height: '16px',
+              borderRadius: '50%',
+              backgroundColor: LED_COLORS[messageType].bg,
+              boxShadow: `0 0 10px ${LED_COLORS[messageType].glow}, 0 0 4px ${LED_COLORS[messageType].bg}`,
+              border: `2px solid ${LED_COLORS[messageType].border}`,
+              transition: 'all 0.3s ease',
+            }}
+          />
+          
+          {/* Tooltip with full message */}
+          {showTooltip && message && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.7rem',
+                padding: '0.5rem 0.75rem',
+                backgroundColor: '#1f2937',
+                color: '#ffffff',
+                borderRadius: '6px',
+                fontSize: '0.75rem',
+                whiteSpace: 'nowrap',
+                zIndex: 100,
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                border: `1px solid ${LED_COLORS[messageType].border}`,
+              }}
+            >
+              {message}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '-5px',
+                  right: '8px',
+                  transform: 'rotate(45deg)',
+                  width: '10px',
+                  height: '10px',
+                  backgroundColor: '#1f2937',
+                  borderLeft: `1px solid ${LED_COLORS[messageType].border}`,
+                  borderTop: `1px solid ${LED_COLORS[messageType].border}`,
+                }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
 
       {user ? (
         <div>
@@ -643,80 +713,6 @@ function App() {
           </div>
         </div>
       )}
-
-      {/* LED Status Indicator with Hover Tooltip */}
-      <div style={{ position: 'relative', marginBottom: '1rem' }}>
-        <div
-          onMouseEnter={() => setShowTooltip(true)}
-          onMouseLeave={() => setShowTooltip(false)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            cursor: 'pointer',
-          }}
-        >
-          <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>
-            Status:
-          </span>
-          <div
-            style={{
-              width: '14px',
-              height: '14px',
-              borderRadius: '50%',
-              backgroundColor: LED_COLORS[messageType].bg,
-              boxShadow: `0 0 8px ${LED_COLORS[messageType].glow}, 0 0 4px ${LED_COLORS[messageType].bg}`,
-              border: `2px solid ${LED_COLORS[messageType].border}`,
-              transition: 'all 0.3s ease',
-            }}
-          />
-          <span style={{ 
-            fontSize: '0.75rem', 
-            color: LED_COLORS[messageType].bg,
-            fontWeight: 600,
-            textTransform: 'capitalize',
-          }}>
-            {messageType}
-          </span>
-        </div>
-        
-        {/* Tooltip with full message */}
-        {showTooltip && message && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              backgroundColor: '#1f2937',
-              color: '#ffffff',
-              borderRadius: '6px',
-              fontSize: '0.75rem',
-              whiteSpace: 'nowrap',
-              zIndex: 100,
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-              border: `1px solid ${LED_COLORS[messageType].border}`,
-            }}
-          >
-            {message}
-            <div
-              style={{
-                position: 'absolute',
-                top: '-5px',
-                left: '50%',
-                transform: 'translateX(-50%) rotate(45deg)',
-                width: '10px',
-                height: '10px',
-                backgroundColor: '#1f2937',
-                borderLeft: `1px solid ${LED_COLORS[messageType].border}`,
-                borderTop: `1px solid ${LED_COLORS[messageType].border}`,
-              }}
-            />
-          </div>
-        )}
-      </div>
     </div>
   );
 }
