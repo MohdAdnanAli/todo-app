@@ -39,25 +39,7 @@ const LED_COLORS: Record<MessageType, { bg: string; glow: string; border: string
   pending:   { bg: '#f59e0b', glow: 'rgba(245, 158, 11, 0.5)', border: '#fcd34d' },
 };
 
-// Helper to determine message type from message content
-const getMessageType = (message: string): MessageType => {
-  const lowerMsg = message.toLowerCase();
-  
-  if (lowerMsg.startsWith('error')) return 'error';
-  if (lowerMsg.includes('successful') || lowerMsg.includes('logged in') || lowerMsg.includes('added') || lowerMsg.includes('deleted') || lowerMsg.includes('created')) return 'success';
-  if (lowerMsg.includes('required') || lowerMsg.includes('warning') || lowerMsg.includes('failed') || lowerMsg.includes('cleared locally')) return 'warning';
-  if (lowerMsg.includes('session') || lowerMsg.includes('unable to connect') || lowerMsg.includes('try again')) return 'attention';
-  if (lowerMsg.includes('adding') || lowerMsg.includes('loading')) return 'loading';
-  if (lowerMsg.includes('logout') || lowerMsg.includes('logged out')) return 'info';
-  if (lowerMsg.includes('display name') || lowerMsg.includes('account') || lowerMsg.includes('password')) return 'personal';
-  if (lowerMsg.includes('todo') || lowerMsg.includes('task')) return 'primary';
-  if (lowerMsg.includes('server') || lowerMsg.includes('connect')) return 'system';
-  if (lowerMsg.includes('confirm') || lowerMsg.includes('delete')) return 'pending';
-  
-  return 'info';
-};
-
-// Use environment variable for production backend URL (Render)
+// Use environment variable
 // In development, use localhost
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
 
@@ -89,11 +71,13 @@ function App() {
           });
           setTodos(todosRes.data);
           setMessage('Session active');
+          setMessageType('attention');
           return;
         } catch (err: any) {
           console.warn(`Attempt ${attempt} failed:`, err.message);
           if (attempt === retries) {
             setMessage('Unable to connect to server. Please try again later.');
+            setMessageType('system');
           } else {
             await new Promise(r => setTimeout(r, 3000 * attempt)); // backoff
           }
@@ -112,6 +96,7 @@ function App() {
       );
       setUser(response.data.user);
       setMessage('Login successful');
+      setMessageType('success');
 
       const todosRes = await axios.get(`${API_URL}/api/todos`, {
         withCredentials: true,
@@ -119,12 +104,14 @@ function App() {
       setTodos(todosRes.data);
     } catch (err: any) {
       setMessage('Error: ' + (err.response?.data?.error || err.message));
+      setMessageType('error');
     }
   };
 
   const handleRegister = async () => {
     if (!displayName.trim()) {
       setMessage('Display name is required');
+      setMessageType('warning');
       return;
     }
 
@@ -136,6 +123,7 @@ function App() {
       );
       setUser(response.data.user);
       setMessage('Account created and logged in');
+      setMessageType('success');
       
       const todosRes = await axios.get(`${API_URL}/api/todos`, {
         withCredentials: true,
@@ -143,6 +131,7 @@ function App() {
       setTodos(todosRes.data);
     } catch (err: any) {
       setMessage('Error: ' + (err.response?.data?.error || err.message));
+      setMessageType('error');
     }
   };
 
@@ -152,9 +141,11 @@ function App() {
         withCredentials: true,
       });
       setMessage('Logged out successfully');
+      setMessageType('info');
     } catch (err: any) {
       console.error('Logout failed:', err);
       setMessage('Logout failed, but session cleared locally');
+      setMessageType('warning');
     }
   
     setUser(null);
@@ -164,10 +155,12 @@ function App() {
   const handleAddTodo = async () => {
     if (!newTodoText.trim()) {
       setMessage('Task text is required');
+      setMessageType('warning');
       return;
     }
   
     setMessage('Adding...');
+    setMessageType('loading');
     try {
       const res = await axios.post(
         `${API_URL}/api/todos`,
@@ -177,8 +170,10 @@ function App() {
       setTodos([res.data, ...todos]);
       setNewTodoText('');
       setMessage('Todo added');
+      setMessageType('primary');
     } catch (err: any) {
       setMessage('Error: ' + (err.response?.data?.error || err.message));
+      setMessageType('error');
     }
   };
 
@@ -193,8 +188,11 @@ function App() {
       setTodos(todos.map(t =>
         t._id === todo._id ? res.data : t
       ));
+      setMessage(todo.completed ? 'Task marked as pending' : 'Task completed');
+      setMessageType(todo.completed ? 'pending' : 'success');
     } catch (err: any) {
       setMessage('Error updating todo: ' + (err.response?.data?.error || err.message));
+      setMessageType('error');
     }
   };
 
@@ -208,8 +206,10 @@ function App() {
 
       setTodos(todos.filter(t => t._id !== todoId));
       setMessage('Todo deleted');
+      setMessageType('accent');
     } catch (err: any) {
       setMessage('Error deleting todo: ' + (err.response?.data?.error || err.message));
+      setMessageType('error');
     }
   };
 
@@ -644,34 +644,79 @@ function App() {
         </div>
       )}
 
-      {message && (
-        <p style={{ 
-          marginTop: '1.5rem', 
-          padding: '0.75rem 1rem',
-          borderRadius: '8px',
-          fontSize: '0.875rem',
-          textAlign: 'center',
-          background: message.startsWith('Error') 
-            ? '#fef2f2' 
-            : message.includes('successful') || message.includes('active')
-              ? '#f0fdf4'
-              : '#fef9c3',
-          color: message.startsWith('Error') 
-            ? '#dc2626' 
-            : message.includes('successful') || message.includes('active')
-              ? '#16a34a'
-              : '#a16207',
-          border: `1px solid ${
-            message.startsWith('Error') 
-              ? '#fecaca' 
-              : message.includes('successful') || message.includes('active')
-                ? '#bbf7d0'
-                : '#fef08a'
-          }`,
-        }}>
-          {message}
-        </p>
-      )}
+      {/* LED Status Indicator with Hover Tooltip */}
+      <div style={{ position: 'relative', marginBottom: '1rem' }}>
+        <div
+          onMouseEnter={() => setShowTooltip(true)}
+          onMouseLeave={() => setShowTooltip(false)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            cursor: 'pointer',
+          }}
+        >
+          <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: 500 }}>
+            Status:
+          </span>
+          <div
+            style={{
+              width: '14px',
+              height: '14px',
+              borderRadius: '50%',
+              backgroundColor: LED_COLORS[messageType].bg,
+              boxShadow: `0 0 8px ${LED_COLORS[messageType].glow}, 0 0 4px ${LED_COLORS[messageType].bg}`,
+              border: `2px solid ${LED_COLORS[messageType].border}`,
+              transition: 'all 0.3s ease',
+            }}
+          />
+          <span style={{ 
+            fontSize: '0.75rem', 
+            color: LED_COLORS[messageType].bg,
+            fontWeight: 600,
+            textTransform: 'capitalize',
+          }}>
+            {messageType}
+          </span>
+        </div>
+        
+        {/* Tooltip with full message */}
+        {showTooltip && message && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              marginTop: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              backgroundColor: '#1f2937',
+              color: '#ffffff',
+              borderRadius: '6px',
+              fontSize: '0.75rem',
+              whiteSpace: 'nowrap',
+              zIndex: 100,
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+              border: `1px solid ${LED_COLORS[messageType].border}`,
+            }}
+          >
+            {message}
+            <div
+              style={{
+                position: 'absolute',
+                top: '-5px',
+                left: '50%',
+                transform: 'translateX(-50%) rotate(45deg)',
+                width: '10px',
+                height: '10px',
+                backgroundColor: '#1f2937',
+                borderLeft: `1px solid ${LED_COLORS[messageType].border}`,
+                borderTop: `1px solid ${LED_COLORS[messageType].border}`,
+              }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
