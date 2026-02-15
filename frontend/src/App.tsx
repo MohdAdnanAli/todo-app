@@ -8,6 +8,55 @@ interface Todo {
   createdAt: string;
 }
 
+// Message type for LED status
+type MessageType = 
+  | 'error' 
+  | 'success' 
+  | 'warning' 
+  | 'info' 
+  | 'loading' 
+  | 'idle'
+  | 'attention'
+  | 'primary'
+  | 'accent'
+  | 'system'
+  | 'personal'
+  | 'pending';
+
+// LED color configuration
+const LED_COLORS: Record<MessageType, { bg: string; glow: string; border: string }> = {
+  error:     { bg: '#ef4444', glow: 'rgba(239, 68, 68, 0.5)', border: '#fca5a5' },
+  success:   { bg: '#22c55e', glow: 'rgba(34, 197, 94, 0.5)', border: '#86efac' },
+  warning:   { bg: '#eab308', glow: 'rgba(234, 179, 8, 0.5)', border: '#fde047' },
+  info:      { bg: '#3b82f6', glow: 'rgba(59, 130, 246, 0.5)', border: '#93c5fd' },
+  loading:   { bg: '#8b5cf6', glow: 'rgba(139, 92, 246, 0.5)', border: '#c4b5fd' },
+  idle:      { bg: '#9ca3af', glow: 'rgba(156, 163, 175, 0.3)', border: '#d1d5db' },
+  attention: { bg: '#f97316', glow: 'rgba(249, 115, 22, 0.5)', border: '#fdba74' },
+  primary:   { bg: '#6366f1', glow: 'rgba(99, 102, 241, 0.5)', border: '#a5b4fc' },
+  accent:    { bg: '#a855f7', glow: 'rgba(168, 85, 247, 0.5)', border: '#d8b4fe' },
+  system:    { bg: '#06b6d4', glow: 'rgba(6, 182, 212, 0.5)', border: '#67e8f9' },
+  personal:  { bg: '#ec4899', glow: 'rgba(236, 72, 153, 0.5)', border: '#f9a8d4' },
+  pending:   { bg: '#f59e0b', glow: 'rgba(245, 158, 11, 0.5)', border: '#fcd34d' },
+};
+
+// Helper to determine message type from message content
+const getMessageType = (message: string): MessageType => {
+  const lowerMsg = message.toLowerCase();
+  
+  if (lowerMsg.startsWith('error')) return 'error';
+  if (lowerMsg.includes('successful') || lowerMsg.includes('logged in') || lowerMsg.includes('added') || lowerMsg.includes('deleted') || lowerMsg.includes('created')) return 'success';
+  if (lowerMsg.includes('required') || lowerMsg.includes('warning') || lowerMsg.includes('failed') || lowerMsg.includes('cleared locally')) return 'warning';
+  if (lowerMsg.includes('session') || lowerMsg.includes('unable to connect') || lowerMsg.includes('try again')) return 'attention';
+  if (lowerMsg.includes('adding') || lowerMsg.includes('loading')) return 'loading';
+  if (lowerMsg.includes('logout') || lowerMsg.includes('logged out')) return 'info';
+  if (lowerMsg.includes('display name') || lowerMsg.includes('account') || lowerMsg.includes('password')) return 'personal';
+  if (lowerMsg.includes('todo') || lowerMsg.includes('task')) return 'primary';
+  if (lowerMsg.includes('server') || lowerMsg.includes('connect')) return 'system';
+  if (lowerMsg.includes('confirm') || lowerMsg.includes('delete')) return 'pending';
+  
+  return 'info';
+};
+
 // Use environment variable for production backend URL (Render)
 // In development, use localhost
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
@@ -19,6 +68,8 @@ function App() {
   const [showPassword, setShowPassword] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState<MessageType>('idle');
+  const [showTooltip, setShowTooltip] = useState(false);
   const [user, setUser] = useState<{ email: string; displayName: string } | null>(null);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTodoText, setNewTodoText] = useState('');
