@@ -41,6 +41,72 @@ const LED_COLORS: Record<MessageType, { bg: string; glow: string; border: string
   pending:   { bg: '#f59e0b', glow: 'rgba(245, 158, 11, 0.5)', border: '#fcd34d' },
 };
 
+// Message Banner Component - displays messages prominently
+const MessageBanner: React.FC<{ message: string; messageType: MessageType; onClose?: () => void }> = ({ 
+  message, 
+  messageType,
+  onClose 
+}) => {
+  if (!message) return null;
+  
+  const colors = LED_COLORS[messageType];
+  
+  return (
+    <div
+      style={{
+        padding: '0.75rem 1rem',
+        marginBottom: '1rem',
+        borderRadius: '8px',
+        backgroundColor: colors.bg,
+        color: 'white',
+        fontWeight: 500,
+        fontSize: '0.9rem',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        boxShadow: `0 2px 8px ${colors.glow}`,
+        border: `1px solid ${colors.border}`,
+        animation: 'fadeIn 0.3s ease',
+      }}
+    >
+      <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        {messageType === 'error' && <span>⚠️</span>}
+        {messageType === 'success' && <span>✅</span>}
+        {messageType === 'warning' && <span>⚡</span>}
+        {messageType === 'loading' && <span>⏳</span>}
+        {messageType === 'info' && <span>ℹ️</span>}
+        {messageType === 'attention' && <span>🔔</span>}
+        {messageType === 'primary' && <span>✨</span>}
+        {messageType === 'accent' && <span>💜</span>}
+        {messageType === 'system' && <span>🔧</span>}
+        {messageType === 'personal' && <span>👤</span>}
+        {messageType === 'pending' && <span>⏰</span>}
+        {messageType === 'idle' && <span>💤</span>}
+        {message}
+      </span>
+      {onClose && (
+        <button
+          onClick={onClose}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'white',
+            cursor: 'pointer',
+            padding: '0.25rem',
+            fontSize: '1rem',
+            opacity: 0.8,
+            transition: 'opacity 0.2s',
+          }}
+          onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
+          onMouseOut={(e) => e.currentTarget.style.opacity = '0.8'}
+        >
+          ✕
+        </button>
+      )}
+    </div>
+  );
+};
+
 // Use environment variable
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
 
@@ -264,6 +330,8 @@ function App() {
           const res = await axios.get(`${API_URL}/api/me`, {
             withCredentials: true,
           });
+          
+          // If we get here, user is authenticated
           setUser(res.data.user || null);
 
           const todosRes = await axios.get(`${API_URL}/api/todos`, {
@@ -275,13 +343,26 @@ function App() {
           setIsLoading(false);
           return;
         } catch (err: any) {
+          const status = err.response?.status;
+          
+          // 401 means user is not authenticated - show login page immediately
+          if (status === 401) {
+            setUser(null);
+            setTodos([]);
+            setMessage('');
+            setMessageType('idle');
+            setIsLoading(false);
+            return;
+          }
+          
+          // For other errors (network issues), retry with backoff
           console.warn(`Attempt ${attempt} failed:`, err.message);
           if (attempt === retries) {
             setMessage('Unable to connect to server. Please try again later.');
             setMessageType('system');
             setIsLoading(false);
           } else {
-            await new Promise(r => setTimeout(r, 3000 * attempt));
+            await new Promise(r => setTimeout(r, 1000 * attempt));
           }
         }
       }
@@ -637,6 +718,16 @@ function App() {
           )}
         </div>
       </div>
+
+      {/* Message Banner - displays messages prominently */}
+      <MessageBanner 
+        message={message} 
+        messageType={messageType} 
+        onClose={() => {
+          setMessage('');
+          setMessageType('idle');
+        }}
+      />
 
       {user ? (
         <div>
