@@ -2,10 +2,42 @@ import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
-import { registerSchema, loginSchema } from '../schemas/auth';
+import { registerSchema, loginSchema, passwordResetSchema, resetPasswordSchema, updateProfileSchema, verifyEmailSchema } from '../schemas/auth';
+import { sanitizeInput, generateVerificationToken, generateResetToken, validatePasswordStrength } from '../utils/security';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/email';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-in-production-very-long-random-string';
 const COOKIE_NAME = 'auth_token';
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCK_TIME = 15 * 60 * 1000; // 15 minutes
+
+// Helper: Check if account is locked
+const isAccountLocked = (user: any): boolean => {
+  return user.accountLockedUntil && new Date(user.accountLockedUntil) > new Date();
+};
+
+// Helper: Lock account
+const lockAccount = async (user: any): Promise<void> => {
+  user.accountLockedUntil = new Date(Date.now() + LOCK_TIME);
+  await user.save();
+};
+
+// Helper: Reset login attempts
+const resetLoginAttempts = async (user: any): Promise<void> => {
+  user.failedLoginAttempts = 0;
+  user.accountLockedUntil = null;
+  await user.save();
+};
+
+// Helper: Increment failed attempts
+const incrementFailedAttempts = async (user: any): Promise<void> => {
+  user.failedLoginAttempts += 1;
+  if (user.failedLoginAttempts >= MAX_LOGIN_ATTEMPTS) {
+    await lockAccount(user);
+  } else {
+    await user.save();
+  }
+};
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -23,26 +55,53 @@ export const register = async (req: Request, res: Response) => {
 
     const salt = await bcrypt.genSalt(12);
     const hashed = await bcrypt.hash(password, salt);
+    const verificationToken = generateVerificationToken();
 
     const user = await User.create({
       email,
       password: hashed,
-      displayName: displayName || email.split('@')[0],
+      displayName: sanitizeInput(displayName || email.split('@')[0]),
+      emailVerificationToken: verificationToken,
+      emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
     });
 
-    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '7d' });
-
-    res.cookie(COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    // Send verification email
+    await sendVerificationEmail(email, verificationToken);
 
     return res.status(201).json({
-      message: 'Account created',
+      message: 'Account created. Please check your email to verify.',
       user: { id: user._id, email: user.email, displayName: user.displayName },
     });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const verifyEmail = async (req: Request, res: Response) => {
+  try {
+    const result = verifyEmailSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error?.issues?.[0]?.message ?? 'Invalid input' });
+    }
+
+    const { token } = result.data;
+
+    const user = await User.findOne({
+      emailVerificationToken: token,
+      emailVerificationExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired verification token' });
+    }
+
+    user.emailVerified = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
+    await user.save();
+
+    return res.json({ message: 'Email verified successfully' });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -63,10 +122,21 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Check if account is locked
+    if (isAccountLocked(user)) {
+      return res.status(429).json({ error: 'Account temporarily locked due to too many failed attempts. Try again later.' });
+    }
+
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
+      await incrementFailedAttempts(user);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+
+    // Reset failed attempts on successful login
+    await resetLoginAttempts(user);
+    user.lastLoginAt = new Date();
+    await user.save();
 
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '7d' });
 
@@ -81,6 +151,128 @@ export const login = async (req: Request, res: Response) => {
       message: 'Logged in',
       user: { id: user._id, email: user.email, displayName: user.displayName },
     });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const requestPasswordReset = async (req: Request, res: Response) => {
+  try {
+    const result = passwordResetSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error?.issues?.[0]?.message ?? 'Invalid input' });
+    }
+
+    const { email } = result.data;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      // Don't reveal if email exists
+      return res.json({ message: 'If email exists, password reset link has been sent' });
+    }
+
+    const resetToken = generateResetToken();
+    user.passwordResetToken = resetToken;
+    user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await user.save();
+
+    await sendPasswordResetEmail(email, resetToken);
+
+    return res.json({ message: 'Password reset link sent to email' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const result = resetPasswordSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error?.issues?.[0]?.message ?? 'Invalid input' });
+    }
+
+    const { token, password } = result.data;
+
+    const user = await User.findOne({
+      passwordResetToken: token,
+      passwordResetExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+
+    const salt = await bcrypt.genSalt(12);
+    const hashed = await bcrypt.hash(password, salt);
+
+    user.password = hashed;
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+    user.failedLoginAttempts = 0;
+    user.accountLockedUntil = null;
+    await user.save();
+
+    return res.json({ message: 'Password reset successfully' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const updateProfile = async (req: Request & { user?: { id: string } }, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const result = updateProfileSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error?.issues?.[0]?.message ?? 'Invalid input' });
+    }
+
+    const { displayName, bio, avatar } = result.data;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      {
+        ...(displayName && { displayName: sanitizeInput(displayName) }),
+        ...(bio && { bio: sanitizeInput(bio) }),
+        ...(avatar && { avatar }),
+      },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json({
+      message: 'Profile updated',
+      user: { id: user._id, email: user.email, displayName: user.displayName, bio: user.bio },
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const getProfile = async (req: Request & { user?: { id: string } }, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const user = await User.findById(userId).select('-password -emailVerificationToken -passwordResetToken');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json(user);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });

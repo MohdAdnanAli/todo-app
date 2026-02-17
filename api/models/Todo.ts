@@ -15,7 +15,22 @@ const todoSchema = new Schema({
     type: Types.ObjectId,
     ref: 'User',
     required: true,
-    index: true,           // faster queries when filtering by user
+    index: true,
+  },
+  category: {
+    type: String,
+    enum: ['work', 'personal', 'shopping', 'health', 'other'],
+    default: 'other',
+  },
+  tags: [{
+    type: String,
+    trim: true,
+    maxlength: 50,
+  }],
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high'],
+    default: 'medium',
   },
 }, {
   timestamps: true,
