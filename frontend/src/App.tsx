@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { useTheme, presetThemes } from './theme';
+import type { ThemeId, CustomThemeColors } from './theme/types';
 
 interface Todo {
   _id: string;
@@ -40,10 +42,207 @@ const LED_COLORS: Record<MessageType, { bg: string; glow: string; border: string
 };
 
 // Use environment variable
-// In development, use localhost
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
 
+// Theme Selector Component
+const ThemeSelector: React.FC = () => {
+  const { themeId, setThemeId, currentTheme, customColors, setCustomColors, isCustomizing, setIsCustomizing } = useTheme();
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setIsCustomizing(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [setIsCustomizing]);
+
+  const handleThemeSelect = (id: ThemeId) => {
+    setThemeId(id);
+    if (id !== 'custom') {
+      setIsOpen(false);
+      setIsCustomizing(false);
+    }
+  };
+
+  const handleCustomColorChange = (key: keyof CustomThemeColors, value: string) => {
+    setCustomColors({ ...customColors, [key]: value });
+  };
+
+  const saveCustomTheme = () => {
+    setThemeId('custom');
+    setIsOpen(false);
+    setIsCustomizing(false);
+  };
+
+  return (
+    <div className="theme-selector" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          position: 'absolute',
+          top: '0.75rem',
+          right: '0.75rem',
+          padding: '0.5rem 0.75rem',
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border-primary)',
+          borderRadius: '8px',
+          cursor: 'pointer',
+          fontSize: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          color: 'var(--text-primary)',
+          transition: 'all 0.2s ease',
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.background = 'var(--hover-bg)';
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.background = 'var(--bg-secondary)';
+        }}
+      >
+        <span>{currentTheme.icon}</span>
+        <span style={{ fontSize: '0.75rem' }}>▼</span>
+      </button>
+
+      {isOpen && (
+        <div className="theme-dropdown">
+          <div className="theme-section-title">Base Themes</div>
+          <button
+            className={`theme-option ${themeId === 'system' ? 'active' : ''}`}
+            onClick={() => handleThemeSelect('system')}
+          >
+            <span className="theme-option-icon">⚙️</span>
+            <span>System</span>
+          </button>
+          
+          <div className="theme-divider" />
+          <div className="theme-section-title">Presets</div>
+          
+          {presetThemes.map((theme) => (
+            <button
+              key={theme.id}
+              className={`theme-option ${themeId === theme.id ? 'active' : ''}`}
+              onClick={() => handleThemeSelect(theme.id)}
+            >
+              <span className="theme-option-icon">{theme.icon}</span>
+              <span>{theme.name}</span>
+            </button>
+          ))}
+
+          <div className="theme-divider" />
+          <div className="theme-section-title">Customize</div>
+          
+          <button
+            className={`theme-option ${themeId === 'custom' || isCustomizing ? 'active' : ''}`}
+            onClick={() => {
+              setIsCustomizing(true);
+              setThemeId('custom');
+            }}
+          >
+            <span className="theme-option-icon">🎨</span>
+            <span>Custom Theme</span>
+          </button>
+
+          {isCustomizing && (
+            <div className="custom-theme-editor">
+              <h4>Customize Colors</h4>
+              <div className="color-picker-row">
+                <div className="color-picker-group">
+                  <label>Background</label>
+                  <input
+                    type="color"
+                    value={customColors.bgPrimary}
+                    onChange={(e) => handleCustomColorChange('bgPrimary', e.target.value)}
+                  />
+                </div>
+                <div className="color-picker-group">
+                  <label>Surface</label>
+                  <input
+                    type="color"
+                    value={customColors.bgSecondary}
+                    onChange={(e) => handleCustomColorChange('bgSecondary', e.target.value)}
+                  />
+                </div>
+                <div className="color-picker-group">
+                  <label>Primary</label>
+                  <input
+                    type="color"
+                    value={customColors.accentPrimary}
+                    onChange={(e) => handleCustomColorChange('accentPrimary', e.target.value)}
+                  />
+                </div>
+                <div className="color-picker-group">
+                  <label>Secondary</label>
+                  <input
+                    type="color"
+                    value={customColors.accentSecondary}
+                    onChange={(e) => handleCustomColorChange('accentSecondary', e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="color-picker-row">
+                <div className="color-picker-group">
+                  <label>Text</label>
+                  <input
+                    type="color"
+                    value={customColors.textPrimary}
+                    onChange={(e) => handleCustomColorChange('textPrimary', e.target.value)}
+                  />
+                </div>
+                <div className="color-picker-group">
+                  <label>Muted</label>
+                  <input
+                    type="color"
+                    value={customColors.textSecondary}
+                    onChange={(e) => handleCustomColorChange('textSecondary', e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="custom-theme-buttons">
+                <button
+                  onClick={saveCustomTheme}
+                  style={{
+                    background: 'var(--accent-gradient)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.5rem',
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                  }}
+                >
+                  Apply
+                </button>
+                <button
+                  onClick={() => setIsCustomizing(false)}
+                  style={{
+                    background: 'var(--bg-tertiary)',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border-primary)',
+                    borderRadius: '6px',
+                    padding: '0.5rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 function App() {
+  useTheme(); // Initialize theme context
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -79,7 +278,7 @@ function App() {
             setMessage('Unable to connect to server. Please try again later.');
             setMessageType('system');
           } else {
-            await new Promise(r => setTimeout(r, 3000 * attempt)); // backoff
+            await new Promise(r => setTimeout(r, 3000 * attempt));
           }
         }
       }
@@ -213,24 +412,26 @@ function App() {
     }
   };
 
+  // Dynamic styles using CSS variables
   const containerStyle: React.CSSProperties = {
-    background: '#ffffff',
+    background: 'var(--bg-primary)',
     borderRadius: '16px',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+    boxShadow: 'var(--shadow)',
     padding: '2.5rem',
     maxWidth: '560px',
     width: '100%',
     margin: 'auto',
+    position: 'relative',
   };
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
     padding: '0.75rem 1rem',
     fontSize: '1rem',
-    border: '1px solid #e5e7eb',
+    border: '1px solid var(--border-primary)',
     borderRadius: '8px',
-    backgroundColor: '#ffffff',
-    color: '#1f2937',
+    backgroundColor: 'var(--input-bg)',
+    color: 'var(--text-primary)',
     transition: 'all 0.2s ease',
   };
 
@@ -246,7 +447,7 @@ function App() {
     background: 'none',
     border: 'none',
     cursor: 'pointer',
-    color: '#6b7280',
+    color: 'var(--text-muted)',
     fontSize: '0.875rem',
     padding: '0.25rem',
     display: 'flex',
@@ -256,7 +457,7 @@ function App() {
 
   const buttonPrimaryStyle: React.CSSProperties = {
     padding: '0.75rem 1.5rem',
-    background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+    background: 'var(--accent-gradient)',
     color: 'white',
     border: 'none',
     borderRadius: '8px',
@@ -264,7 +465,7 @@ function App() {
     fontWeight: 500,
     fontSize: '0.95rem',
     transition: 'all 0.2s ease',
-    boxShadow: '0 2px 4px rgba(79, 70, 229, 0.2)',
+    boxShadow: 'var(--glow)',
   };
 
   const buttonSecondaryStyle: React.CSSProperties = {
@@ -296,19 +497,19 @@ function App() {
   const todoItemStyle: React.CSSProperties = {
     padding: '1rem',
     marginBottom: '0.75rem',
-    background: '#f9fafb',
+    background: 'var(--card-bg)',
     borderRadius: '10px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     transition: 'all 0.2s ease',
-    border: '1px solid #f3f4f6',
+    border: '1px solid var(--border-secondary)',
   };
 
   const toggleActiveStyle: React.CSSProperties = {
     padding: '0.6rem 1.2rem',
     marginRight: '0.5rem',
-    background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+    background: 'var(--accent-gradient)',
     color: 'white',
     border: 'none',
     borderRadius: '8px 8px 0 0',
@@ -320,8 +521,8 @@ function App() {
   const toggleInactiveStyle: React.CSSProperties = {
     padding: '0.6rem 1.2rem',
     marginRight: '0.5rem',
-    background: '#f3f4f6',
-    color: '#6b7280',
+    background: 'var(--bg-tertiary)',
+    color: 'var(--text-secondary)',
     border: 'none',
     borderRadius: '8px 8px 0 0',
     cursor: 'pointer',
@@ -331,6 +532,8 @@ function App() {
 
   return (
     <div style={containerStyle}>
+      <ThemeSelector />
+      
       {/* Header with LED Status Indicator */}
       <div style={{ 
         display: 'flex', 
@@ -341,7 +544,7 @@ function App() {
       }}>
         <h1 style={{ 
           textAlign: 'center',
-          background: 'linear-gradient(135deg, #4f46e5 0%, #8b5cf6 100%)',
+          background: 'var(--accent-gradient)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
           backgroundClip: 'text',
@@ -354,7 +557,7 @@ function App() {
           onMouseLeave={() => setShowTooltip(false)}
           style={{
             position: 'absolute',
-            right: 0,
+            right: '4rem',
             top: '20%',
             transform: 'translateY(-50%)',
             cursor: 'pointer',
@@ -381,13 +584,13 @@ function App() {
                 right: 0,
                 marginTop: '0.7rem',
                 padding: '0.5rem 0.75rem',
-                backgroundColor: '#1f2937',
-                color: '#ffffff',
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
                 borderRadius: '6px',
                 fontSize: '0.75rem',
                 whiteSpace: 'nowrap',
                 zIndex: 100,
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                boxShadow: 'var(--shadow)',
                 border: `1px solid ${LED_COLORS[messageType].border}`,
               }}
             >
@@ -400,7 +603,7 @@ function App() {
                   transform: 'rotate(45deg)',
                   width: '10px',
                   height: '10px',
-                  backgroundColor: '#1f2937',
+                  backgroundColor: 'var(--bg-secondary)',
                   borderLeft: `1px solid ${LED_COLORS[messageType].border}`,
                   borderTop: `1px solid ${LED_COLORS[messageType].border}`,
                 }}
@@ -415,7 +618,7 @@ function App() {
           <p style={{ 
             fontWeight: 600, 
             marginBottom: '1.5rem',
-            color: '#374151',
+            color: 'var(--text-primary)',
             fontSize: '1.1rem',
             display: 'flex',
             alignItems: 'center',
@@ -428,7 +631,7 @@ function App() {
               width: '32px',
               height: '32px',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+              background: 'var(--accent-gradient)',
               color: 'white',
               fontSize: '0.875rem',
             }}>
@@ -443,9 +646,9 @@ function App() {
             display: 'flex', 
             gap: '0.75rem',
             padding: '1.25rem',
-            background: '#f9fafb',
+            background: 'var(--bg-secondary)',
             borderRadius: '12px',
-            border: '1px solid #f3f4f6',
+            border: '1px solid var(--border-secondary)',
           }}>
             <input
               type="text"
@@ -474,12 +677,12 @@ function App() {
           {/* Todo List */}
           {todos.length === 0 ? (
             <p style={{ 
-              color: '#9ca3af', 
+              color: 'var(--text-muted)', 
               textAlign: 'center',
               padding: '2rem',
-              background: '#f9fafb',
+              background: 'var(--bg-secondary)',
               borderRadius: '12px',
-              border: '2px dashed #e5e7eb',
+              border: '2px dashed var(--border-primary)',
             }}>
               No tasks yet. Add one above! ✨
             </p>
@@ -490,13 +693,13 @@ function App() {
                   key={todo._id}
                   style={todoItemStyle}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.background = '#f3f4f6';
-                    e.currentTarget.style.borderColor = '#e5e7eb';
+                    e.currentTarget.style.background = 'var(--hover-bg)';
+                    e.currentTarget.style.borderColor = 'var(--border-primary)';
                     e.currentTarget.style.transform = 'translateX(2px)';
                   }}
                   onMouseOut={(e) => {
-                    e.currentTarget.style.background = '#f9fafb';
-                    e.currentTarget.style.borderColor = '#f3f4f6';
+                    e.currentTarget.style.background = 'var(--card-bg)';
+                    e.currentTarget.style.borderColor = 'var(--border-secondary)';
                     e.currentTarget.style.transform = 'translateX(0)';
                   }}
                 >
@@ -511,7 +714,7 @@ function App() {
                       style={{
                         flex: 1,
                         textDecoration: todo.completed ? 'line-through' : 'none',
-                        color: todo.completed ? '#9ca3af' : '#374151',
+                        color: todo.completed ? 'var(--text-muted)' : 'var(--text-primary)',
                         fontSize: '0.95rem',
                         transition: 'all 0.2s ease',
                       }}
@@ -565,19 +768,19 @@ function App() {
             marginBottom: '1.5rem', 
             display: 'flex', 
             gap: '0',
-            borderBottom: '2px solid #f3f4f6',
+            borderBottom: '2px solid var(--border-secondary)',
           }}>
             <button
               onClick={() => setMode('login')}
               style={mode === 'login' ? toggleActiveStyle : toggleInactiveStyle}
               onMouseOver={(e) => {
                 if (mode !== 'login') {
-                  e.currentTarget.style.background = '#e5e7eb';
+                  e.currentTarget.style.background = 'var(--hover-bg)';
                 }
               }}
               onMouseOut={(e) => {
                 if (mode !== 'login') {
-                  e.currentTarget.style.background = '#f3f4f6';
+                  e.currentTarget.style.background = 'var(--bg-tertiary)';
                 }
               }}
             >
@@ -588,12 +791,12 @@ function App() {
               style={mode === 'register' ? toggleActiveStyle : toggleInactiveStyle}
               onMouseOver={(e) => {
                 if (mode !== 'register') {
-                  e.currentTarget.style.background = '#e5e7eb';
+                  e.currentTarget.style.background = 'var(--hover-bg)';
                 }
               }}
               onMouseOut={(e) => {
                 if (mode !== 'register') {
-                  e.currentTarget.style.background = '#f3f4f6';
+                  e.currentTarget.style.background = 'var(--bg-tertiary)';
                 }
               }}
             >
@@ -603,14 +806,14 @@ function App() {
 
           <div style={{ 
             padding: '1.5rem', 
-            background: '#f9fafb', 
+            background: 'var(--bg-secondary)', 
             borderRadius: '12px',
-            border: '1px solid #f3f4f6',
+            border: '1px solid var(--border-secondary)',
           }}>
             {mode === 'login' ? (
               <>
                 <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: '#374151', fontWeight: 500, fontSize: '0.875rem' }}>Email</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>Email</label>
                   <input
                     type="email"
                     placeholder="Enter your email"
@@ -620,7 +823,7 @@ function App() {
                   />
                 </div>
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: '#374151', fontWeight: 500, fontSize: '0.875rem' }}>Password</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>Password</label>
                   <div style={passwordInputContainerStyle}>
                     <input
                       type={showPassword ? 'text' : 'password'}
@@ -643,11 +846,11 @@ function App() {
                   style={{ ...buttonPrimaryStyle, width: '100%' }}
                   onMouseOver={(e) => {
                     e.currentTarget.style.transform = 'translateY(-1px)';
-                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(79, 70, 229, 0.3)';
+                    e.currentTarget.style.boxShadow = '0 4px 8px var(--glow)';
                   }}
                   onMouseOut={(e) => {
                     e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(79, 70, 229, 0.2)';
+                    e.currentTarget.style.boxShadow = 'var(--glow)';
                   }}
                 >
                   Login
@@ -656,7 +859,7 @@ function App() {
             ) : (
               <>
                 <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: '#374151', fontWeight: 500, fontSize: '0.875rem' }}>Display Name</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>Display Name</label>
                   <input
                     type="text"
                     placeholder="Choose a display name"
@@ -666,7 +869,7 @@ function App() {
                   />
                 </div>
                 <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: '#374151', fontWeight: 500, fontSize: '0.875rem' }}>Email</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>Email</label>
                   <input
                     type="email"
                     placeholder="Enter your email"
@@ -676,7 +879,7 @@ function App() {
                   />
                 </div>
                 <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: '#374151', fontWeight: 500, fontSize: '0.875rem' }}>Password</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>Password</label>
                   <div style={passwordInputContainerStyle}>
                     <input
                       type={showPassword ? 'text' : 'password'}
