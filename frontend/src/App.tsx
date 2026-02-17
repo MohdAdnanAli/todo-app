@@ -243,6 +243,7 @@ const ThemeSelector: React.FC = () => {
 
 function App() {
   useTheme(); // Initialize theme context
+  const [isLoading, setIsLoading] = useState(true);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -271,12 +272,14 @@ function App() {
           setTodos(todosRes.data);
           setMessage('Session active');
           setMessageType('attention');
+          setIsLoading(false);
           return;
         } catch (err: any) {
           console.warn(`Attempt ${attempt} failed:`, err.message);
           if (attempt === retries) {
             setMessage('Unable to connect to server. Please try again later.');
             setMessageType('system');
+            setIsLoading(false);
           } else {
             await new Promise(r => setTimeout(r, 3000 * attempt));
           }
@@ -529,6 +532,28 @@ function App() {
     fontWeight: 500,
     transition: 'all 0.2s ease',
   };
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div style={{
+        background: 'var(--bg-primary)',
+        borderRadius: '16px',
+        boxShadow: 'var(--shadow)',
+        padding: '3rem',
+        maxWidth: '560px',
+        width: '100%',
+        margin: 'auto',
+        textAlign: 'center',
+      }}>
+        <div style={{
+          fontSize: '2rem',
+          marginBottom: '1rem',
+        }}>⏳</div>
+        <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div style={containerStyle}>

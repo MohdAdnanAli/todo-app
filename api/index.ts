@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import { register, login } from './controllers/auth';
 import { protect } from './middleware/auth';
 import { getTodos, createTodo, updateTodo, deleteTodo } from './controllers/todo';
+import { User } from './models/User';
 
 dotenv.config();
 
@@ -94,8 +95,23 @@ app.post('/api/todos', protect, createTodo);
 app.put('/api/todos/:id', protect, updateTodo);
 app.delete('/api/todos/:id', protect, deleteTodo);
 
-app.get('/api/me', protect, (req: any, res) => {
-  res.json({ userId: req.user?.id });
+app.get('/api/me', protect, async (req: any, res) => {
+  try {
+    const user = await User.findById(req.user?.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ 
+      user: { 
+        id: user._id, 
+        email: user.email, 
+        displayName: user.displayName 
+      } 
+    });
+  } catch (err) {
+    console.error('Error fetching user:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Logout route – clears the httpOnly cookie
