@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useTheme } from './theme';
 import type { Todo, User, MessageType } from './types';
 import { API_URL } from './types';
+import { encrypt, decrypt } from './utils/crypto';
 import { 
   AuthForm, 
   LEDIndicator, 
@@ -19,6 +20,28 @@ function App() {
   const [messageType, setMessageType] = useState<MessageType>('idle');
   const [user, setUser] = useState<User | null>(null);
   const [todos, setTodos] = useState<Todo[]>([]);
+  
+  // Encryption state - stored in memory for session
+  const [encryptionSalt, setEncryptionSalt] = useState<string>('');
+  const [userPassword, setUserPassword] = useState<string>('');
+
+  // Helper to decrypt a single todo
+  const decryptTodo = useCallback(async (todo: Todo): Promise<Todo> => {
+    if (!userPassword || !encryptionSalt) return todo;
+    try {
+      const decryptedText = await decrypt(todo.text, userPassword, encryptionSalt);
+      return { ...todo, text: decryptedText };
+    } catch (err) {
+      console.error('Failed to decrypt todo:', err);
+      return todo; // Return original if decryption fails
+    }
+  }, [userPassword, encryptionSalt]);
+
+  // Helper to decrypt all todos
+  const decryptAllTodos = useCallback(async (todosToDecrypt: Todo[]): Promise<Todo[]> => {
+    if (!userPassword || !encryptionSalt) return todosToDecrypt;
+    return Promise.all(todosToDecrypt.map(decryptTodo));
+  }, [userPassword, encryptionSalt]);
 
   // Check auth status and fetch todos on mount or user change
   useEffect(() => {
@@ -31,12 +54,20 @@ function App() {
           
           // If we get here, user is authenticated
           setUser(res.data.user || null);
+          
+          // Store encryption salt for session restoration
+          if (res.data.encryptionSalt) {
+            setEncryptionSalt(res.data.encryptionSalt);
+          }
 
           const todosRes = await axios.get(`${API_URL}/api/todos`, {
             withCredentials: true,
           });
+          
+          // For session restore, we don't have the password, so store encrypted todos
+          // User will need to re-login to decrypt
           setTodos(todosRes.data);
-          setMessage('Session active');
+          setMessage('Session active - please login to decrypt todos');
           setMessageType('attention');
           setIsLoading(false);
           return;
@@ -47,6 +78,8 @@ function App() {
           if (status === 401) {
             setUser(null);
             setTodos([]);
+            setEncryptionSalt('');
+            setUserPassword('');
             setMessage('');
             setMessageType('idle');
             setIsLoading(false);
@@ -76,13 +109,17 @@ function App() {
         { withCredentials: true }
       );
       setUser(response.data.user);
+      setEncryptionSalt(response.data.encryptionSalt || '');
+      setUserPassword(loginPassword);
       setMessage('Login successful');
       setMessageType('success');
 
       const todosRes = await axios.get(`${API_URL}/api/todos`, {
         withCredentials: true,
       });
-      setTodos(todosRes.data);
+      // Decrypt todos after receiving
+      const decryptedTodos = await decryptAllTodos(todosRes.data);
+      setTodos(decryptedTodos);
     } catch (err: any) {
       setMessage('Error: ' + (err.response?.data?.error || err.message));
       setMessageType('error');
@@ -103,13 +140,16 @@ function App() {
         { withCredentials: true }
       );
       setUser(response.data.user);
+      setEncryptionSalt(response.data.encryptionSalt || '');
+      setUserPassword(regPassword);
       setMessage('Account created and logged in');
       setMessageType('success');
       
       const todosRes = await axios.get(`${API_URL}/api/todos`, {
         withCredentials: true,
       });
-      setTodos(todosRes.data);
+      const decryptedTodos = await decryptAllTodos(todosRes.data);
+      setTodos(decryptedTodos);
     } catch (err: any) {
       setMessage('Error: ' + (err.response?.data?.error || err.message));
       setMessageType('error');
@@ -131,6 +171,8 @@ function App() {
   
     setUser(null);
     setTodos([]);
+    setEncryptionSalt('');
+    setUserPassword('');
   };
 
   const handleAddTodo = async (text: string) => {
@@ -143,12 +185,17 @@ function App() {
     setMessage('Adding...');
     setMessageType('loading');
     try {
+      // Encrypt the todo text before sending
+      const encryptedText = await encrypt(text, userPassword, encryptionSalt);
+      
       const res = await axios.post(
         `${API_URL}/api/todos`,
-        { text },
+        { text: encryptedText },
         { withCredentials: true }
       );
-      setTodos([res.data, ...todos]);
+      // Decrypt the returned todo and add to list
+      const decryptedTodo = await decryptTodo(res.data);
+      setTodos([decryptedTodo, ...todos]);
       setMessage('Todo added');
       setMessageType('primary');
     } catch (err: any) {

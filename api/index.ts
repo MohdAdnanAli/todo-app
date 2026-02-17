@@ -106,7 +106,8 @@ app.get('/api/me', protect, async (req: any, res) => {
         id: user._id, 
         email: user.email, 
         displayName: user.displayName 
-      } 
+      },
+      encryptionSalt: user.encryptionSalt || null
     });
   } catch (err) {
     console.error('Error fetching user:', err);

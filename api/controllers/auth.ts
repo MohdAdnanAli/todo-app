@@ -1,11 +1,15 @@
 import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { User } from '../models/User';
 import { registerSchema, loginSchema } from '../schemas/auth';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-in-production-very-long-random-string';
 const COOKIE_NAME = 'auth_token';
+
+// Generate a random salt for encryption key derivation (base64 encoded)
+const generateEncryptionSalt = () => crypto.randomBytes(16).toString('base64');
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -23,11 +27,15 @@ export const register = async (req: Request, res: Response) => {
 
     const salt = await bcrypt.genSalt(12);
     const hashed = await bcrypt.hash(password, salt);
+    
+    // Generate encryption salt for this user
+    const encryptionSalt = generateEncryptionSalt();
 
     const user = await User.create({
       email,
       password: hashed,
       displayName: displayName || email.split('@')[0],
+      encryptionSalt,
     });
 
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '7d' });
@@ -42,6 +50,7 @@ export const register = async (req: Request, res: Response) => {
     return res.status(201).json({
       message: 'Account created',
       user: { id: user._id, email: user.email, displayName: user.displayName },
+      encryptionSalt: user.encryptionSalt, // Send salt to client for encryption
     });
   } catch (err) {
     console.error(err);
@@ -68,6 +77,14 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Generate encryption salt for legacy users who don't have one
+    let encryptionSalt = user.encryptionSalt;
+    if (!encryptionSalt) {
+      encryptionSalt = generateEncryptionSalt();
+      user.encryptionSalt = encryptionSalt;
+      await user.save();
+    }
+
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '7d' });
 
     res.cookie(COOKIE_NAME, token, {
@@ -80,6 +97,7 @@ export const login = async (req: Request, res: Response) => {
     return res.json({
       message: 'Logged in',
       user: { id: user._id, email: user.email, displayName: user.displayName },
+      encryptionSalt: encryptionSalt, // Send salt to client for encryption
     });
   } catch (err) {
     console.error(err);
