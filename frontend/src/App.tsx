@@ -64,8 +64,7 @@ function App() {
             withCredentials: true,
           });
           
-          // For session restore, we don't have the password, so store encrypted todos
-          // User will need to re-login to decrypt
+          // Without password, we can't decrypt - show encrypted todos with message
           setTodos(todosRes.data);
           setMessage('Session active - please login to decrypt todos');
           setMessageType('attention');
@@ -212,8 +211,10 @@ function App() {
         { withCredentials: true }
       );
 
+      // Decrypt the returned todo before updating state
+      const decryptedTodo = await decryptTodo(res.data);
       setTodos(todos.map(t =>
-        t._id === todo._id ? res.data : t
+        t._id === todo._id ? decryptedTodo : t
       ));
       setMessage(todo.completed ? 'Task marked as pending' : 'Task completed');
       setMessageType(todo.completed ? 'pending' : 'success');

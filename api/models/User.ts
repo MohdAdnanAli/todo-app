@@ -19,9 +19,12 @@ const userSchema = new Schema({
   accountLockedUntil: { type: Date, default: null },
   lastLoginAt: { type: Date, default: null },
   
-  // Profile
+// Profile
   bio: { type: String, trim: true, default: null, maxlength: 500 },
   avatar: { type: String, default: null },
+  
+  // Client-side encryption
+  encryptionSalt: { type: String, default: null },
   
 }, { timestamps: true });
 

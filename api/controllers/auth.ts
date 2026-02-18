@@ -1,3 +1,4 @@
+
 import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -57,13 +58,17 @@ export const register = async (req: Request, res: Response) => {
     const salt = await bcrypt.genSalt(12);
     const hashed = await bcrypt.hash(password, salt);
     const verificationToken = generateVerificationToken();
+    
+    // Generate encryption salt for client-side encryption
+    const encryptionSalt = crypto.randomBytes(16).toString('hex');
 
     const user = await User.create({
       email,
       password: hashed,
-      displayName: sanitizeInput(displayName || email.split('@')[0]),
+      displayName: sanitizeInput(displayName || email.split('@')[0] || 'User'),
       emailVerificationToken: verificationToken,
       emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      encryptionSalt,
     });
 
     // Send verification email
@@ -72,7 +77,7 @@ export const register = async (req: Request, res: Response) => {
     return res.status(201).json({
       message: 'Account created. Please check your email to verify.',
       user: { id: user._id, email: user.email, displayName: user.displayName },
-      encryptionSalt: user.encryptionSalt, // Send salt to client for encryption
+      encryptionSalt: user.encryptionSalt,
     });
   } catch (err) {
     console.error(err);
@@ -138,6 +143,12 @@ export const login = async (req: Request, res: Response) => {
     // Reset failed attempts on successful login
     await resetLoginAttempts(user);
     user.lastLoginAt = new Date();
+    
+    // Generate encryptionSalt for existing users who don't have one
+    if (!user.encryptionSalt) {
+      user.encryptionSalt = crypto.randomBytes(16).toString('hex');
+    }
+    
     await user.save();
 
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '7d' });
@@ -152,7 +163,7 @@ export const login = async (req: Request, res: Response) => {
     return res.json({
       message: 'Logged in',
       user: { id: user._id, email: user.email, displayName: user.displayName },
-      encryptionSalt: encryptionSalt, // Send salt to client for encryption
+      encryptionSalt: user.encryptionSalt,
     });
   } catch (err) {
     console.error(err);
@@ -281,3 +292,4 @@ export const getProfile = async (req: Request & { user?: { id: string } }, res: 
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
+

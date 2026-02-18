@@ -8,6 +8,7 @@ import { register, login, verifyEmail, requestPasswordReset, resetPassword, upda
 import { protect } from './middleware/auth';
 import { getTodos, createTodo, updateTodo, deleteTodo } from './controllers/todo';
 import { apiLimiter, loginLimiter, registerLimiter, passwordResetLimiter } from './middleware/rateLimiter';
+import { User } from './models/User';
 
 dotenv.config();
 
@@ -51,8 +52,8 @@ const connectWithRetry = async (retries = 5, delay = 5000) => {
       });
       console.log('MongoDB connected');
       return;
-    } catch (err) {
-      console.error(`MongoDB connection attempt ${attempt}/${retries} failed:`, err.message);
+    } catch (err: any) {
+      console.error(`MongoDB connection attempt ${attempt}/${retries} failed:`, err?.message || err);
       if (attempt < retries) {
         console.log(`Retrying in ${delay / 1000} seconds...`);
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -96,8 +97,26 @@ app.post('/api/todos', protect, createTodo);
 app.put('/api/todos/:id', protect, updateTodo);
 app.delete('/api/todos/:id', protect, deleteTodo);
 
-app.get('/api/me', protect, (req: any, res) => {
-  res.json({ userId: req.user?.id });
+app.get('/api/me', protect, async (req: any, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password -emailVerificationToken -passwordResetToken');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ 
+      user: { 
+        id: user._id, 
+        email: user.email, 
+        displayName: user.displayName,
+        bio: user.bio,
+        avatar: user.avatar 
+      },
+      encryptionSalt: user.encryptionSalt 
+    });
+  } catch (err) {
+    console.error('/api/me error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 app.get('/api/profile', protect, getProfile);

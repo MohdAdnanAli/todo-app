@@ -10,21 +10,18 @@ interface AuthRequest extends Request {
 export const protect = (req: AuthRequest, res: Response, next: NextFunction) => {
   const token = req.cookies?.auth_token;
 
-  console.log('[protect] Token received:', token ? token.substring(0, 20) + '...' : 'MISSING');
-
+  // Only log on actual auth failures to reduce noise
   if (!token) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as unknown as { id: string };
-    console.log('[protect] Decoded successfully – user ID:', decoded.id);
     req.user = { id: decoded.id };
     next();
   } catch (err: unknown) {
     const error = err as Error;
-    console.log('[protect] Verification failed:', error.name, '-', error.message);
+    console.log('[protect] Token verification failed:', error.name);
     return res.status(401).json({ error: 'Invalid token' });
   }
 };
-

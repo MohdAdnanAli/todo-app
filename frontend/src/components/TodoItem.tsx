@@ -3,8 +3,8 @@ import type { Todo } from '../types';
 import { getSmartIcon } from '../utils/todoIcons';
 import type { LucideIcon } from 'lucide-react';
 import { 
-  Circle, 
   CheckCircle2, 
+  Circle,
   Trash2
 } from 'lucide-react';
 
@@ -15,7 +15,12 @@ interface TodoItemProps {
 }
 
 // Color palette for smart icons based on todo content
-function getIconColor(todoText: string): string {
+function getIconColor(todoText: string, isCompleted: boolean): string {
+  // Grey out when completed
+  if (isCompleted) {
+    return '#9ca3af'; // Muted grey
+  }
+  
   const lowerText = todoText.toLowerCase();
   
   // Work - Blue/Indigo
@@ -64,7 +69,7 @@ function getIconColor(todoText: string): string {
 const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) => {
   // Get smart icon based on todo text content
   const SmartIcon: LucideIcon = getSmartIcon(todo.text);
-  const iconColor = getIconColor(todo.text);
+  const iconColor = getIconColor(todo.text, todo.completed);
 
   const buttonDangerStyle: React.CSSProperties = {
     padding: '0.5rem 1rem',
@@ -107,68 +112,66 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) => {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', flex: 1, gap: '0.875rem' }}>
-        {/* Smart Icon - sits beside checkbox */}
-        <div 
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
-            backgroundColor: `${iconColor}15`,
-            border: `1.5px solid ${iconColor}30`,
-            flexShrink: 0,
-            transition: 'all 0.2s ease',
-          }}
-          title="Smart category icon"
-        >
-          <SmartIcon size={18} color={iconColor} strokeWidth={2.5} />
-        </div>
-
-        {/* Custom Toggle Button - replaces checkbox */}
+        {/* Smart Icon - acts as the checkbox (only element) */}
         <button
           onClick={() => onToggle(todo)}
           style={{
             background: 'transparent',
             border: 'none',
             cursor: 'pointer',
-            padding: '0.25rem',
+            padding: '0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            borderRadius: '50%',
+            borderRadius: '8px',
             transition: 'all 0.2s ease',
             flexShrink: 0,
           }}
           onMouseOver={(e) => {
-            e.currentTarget.style.background = 'var(--hover-bg)';
-            e.currentTarget.style.transform = 'scale(1.1)';
+            if (!todo.completed) {
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }
           }}
           onMouseOut={(e) => {
-            e.currentTarget.style.background = 'transparent';
             e.currentTarget.style.transform = 'scale(1)';
           }}
           aria-label={todo.completed ? 'Mark as incomplete' : 'Mark as complete'}
         >
           {todo.completed ? (
-            <CheckCircle2 
-              size={24} 
-              color="#22c55e" 
-              strokeWidth={2.5}
+            <div 
               style={{
-                filter: 'drop-shadow(0 0 6px rgba(34, 197, 94, 0.4))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                backgroundColor: `${iconColor}20`,
+                border: `2px solid ${iconColor}50`,
               }}
-            />
+            >
+              <CheckCircle2 
+                size={22} 
+                color={iconColor} 
+                strokeWidth={2.5}
+              />
+            </div>
           ) : (
-            <Circle 
-              size={24} 
-              color="var(--text-muted)" 
-              strokeWidth={2}
+            <div 
               style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                backgroundColor: `${iconColor}15`,
+                border: `1.5px solid ${iconColor}40`,
                 transition: 'all 0.2s ease',
               }}
-            />
+            >
+              <SmartIcon size={18} color={iconColor} strokeWidth={2.5} />
+            </div>
           )}
         </button>
 
