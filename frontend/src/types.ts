@@ -40,6 +40,9 @@ export interface Todo {
   text: string;
   completed: boolean;
   createdAt: string;
+  category?: 'work' | 'personal' | 'shopping' | 'health' | 'other';
+  priority?: 'low' | 'medium' | 'high';
+  tags?: string[];
 }
 
 // User interface
