@@ -1,4 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
+
+// Only import icons that are actually used
 import { 
   Briefcase, 
   ShoppingCart, 
@@ -12,201 +14,244 @@ import {
   Coffee, 
   DollarSign, 
   CreditCard, 
-  TrendingUp, 
-  PiggyBank,
   Phone, 
   Mail, 
-  MessageSquare, 
   Video, 
-  Calendar,
-  Clock,
-  Star,
-  HeartHandshake,
-  Users,
   PartyPopper,
   Gift,
-  Zap,
   Target,
   Trophy,
   Flame,
-  Activity,
   Dumbbell,
-  Brain,
-  Lightbulb,
   Code,
   Laptop,
   Server,
   Cloud,
-  Database,
   Lock,
-  Shield,
-  Eye,
   FileText,
-  Folder,
-  Archive,
-  Trash2,
-  Edit,
-  Plus,
-  Check,
-  X,
-  AlertTriangle,
-  AlertCircle,
-  Info,
-  HelpCircle,
-  Search,
-  Filter,
-  SortAsc,
-  Download,
-  Upload,
-  Share2,
-  Link,
-  ExternalLink,
-  Bookmark,
-  Flag,
-  MapPin,
-  Camera,
-  Image,
-  Music,
-  Headphones,
-  Mic,
-  Radio,
-  Tv,
-  Gamepad2,
   Palette,
   PenTool,
+  Music,
+  Check,
+  AlertTriangle,
+  Bell,
+  Footprints,
+  Dog,
+  Leaf,
+  Bus,
+  Shield,
+  TrendingUp,
+  PiggyBank,
+  File,
+  Folder,
+  Clock,
+  Calendar,
+  Star,
+  User,
+  Users,
+  MessageSquare,
   Scissors,
+  Moon,
+  Tv,
+  Gamepad2,
+  Camera,
+  Mic,
+  Headphones,
+  Radio,
   Hammer,
   Wrench,
   Bike,
-  Bus,
   Train,
   Ship,
-  Footprints,
-  Dog,
-  Cat,
-  Leaf,
   Flower2,
   TreePine,
   Mountain,
   Sun,
-  Moon,
   CloudRain,
   Snowflake,
-  Thermometer,
   Droplets,
-  Wind,
-  Bell
+  Thermometer,
+  Wind
 } from 'lucide-react';
 
-// Keyword categories with associated keywords and icons
-interface KeywordCategory {
-  keywords: string[];
-  icon: LucideIcon;
-  priority?: number;
-}
-
-const keywordCategories: KeywordCategory[] = [
-  // Work & Career
-  { keywords: ['work', 'job', 'office', 'meeting', 'project', 'task', 'deadline', 'client', 'boss', 'colleague', 'conference', 'presentation', 'report', 'email', 'schedule'], icon: Briefcase, priority: 10 },
-  
-  // Shopping
-  { keywords: ['buy', 'shopping', 'purchase', 'order', 'deliver', 'amazon', 'grocery', 'store', 'cart', 'items', 'supplies'], icon: ShoppingCart, priority: 9 },
-  
-  // Health & Fitness
-  { keywords: ['health', 'doctor', 'medicine', 'pill', 'appointment', 'hospital', 'clinic', 'checkup', 'dentist', 'therapy'], icon: Heart, priority: 10 },
-  { keywords: ['fitness', 'gym', 'workout', 'exercise', 'run', 'running', 'jog', 'yoga', 'stretch', 'train', 'sport', 'match'], icon: Dumbbell, priority: 9 },
-  { keywords: ['diet', 'nutrition', 'food', 'meal', 'recipe', 'cook', 'eating', 'healthy'], icon: Utensils, priority: 8 },
-  
-  // Home & Living
-  { keywords: ['home', 'house', 'clean', 'laundry', 'vacuum', 'repair', 'fix', 'furniture', 'decor', 'garden'], icon: Home, priority: 9 },
-  
-  // Travel & Transport
-  { keywords: ['travel', 'trip', 'vacation', 'flight', 'hotel', 'booking', 'reservation', 'airport', 'tourist'], icon: Plane, priority: 10 },
-  { keywords: ['drive', 'car', 'gas', 'fuel', 'maintenance', 'license', 'traffic'], icon: Car, priority: 8 },
-  { keywords: ['bus', 'train', 'transit', 'commute'], icon: Bus, priority: 7 },
-  
-  // Finance
-  { keywords: ['bill', 'payment', 'invoice', 'rent', 'mortgage', 'utility', 'electric', 'water', 'internet', 'phone bill'], icon: CreditCard, priority: 10 },
-  { keywords: ['money', 'budget', 'save', 'investment', 'stock', 'crypto', 'bank', 'finance'], icon: DollarSign, priority: 9 },
-  { keywords: ['tax', 'irs', 'audit'], icon: FileText, priority: 10 },
-  
-  // Communication
-  { keywords: ['call', 'phone', 'contact'], icon: Phone, priority: 8 },
-  { keywords: ['email', 'message', 'text', 'mail'], icon: Mail, priority: 7 },
-  { keywords: ['zoom', 'meet', 'video call', 'conference call'], icon: Video, priority: 7 },
-  
-  // Events & Social
-  { keywords: ['birthday', 'party', 'celebration', 'event', 'anniversary'], icon: PartyPopper, priority: 9 },
-  { keywords: ['gift', 'present'], icon: Gift, priority: 8 },
-  { keywords: ['friend', 'family', 'date', 'hangout'], icon: Users, priority: 7 },
-  
-  // Education
-  { keywords: ['study', 'learn', 'course', 'class', 'homework', 'assignment', 'exam', 'test', 'quiz'], icon: GraduationCap, priority: 9 },
-  { keywords: ['book', 'read', 'library', 'article', 'blog'], icon: BookOpen, priority: 7 },
-  
-  // Personal Care
-  { keywords: ['haircut', 'barber', 'salon', 'spa', 'massage', 'nails'], icon: Scissors, priority: 7 },
-  { keywords: ['sleep', 'rest', 'relax', 'vacation', 'break'], icon: Moon, priority: 6 },
-  
-  // Tech & Digital
+// Keyword to icon mapping with priority
+// Higher priority = checked first
+const ICON_MAP: Array<{ keywords: string[]; icon: LucideIcon; priority: number }> = [
+  // Priority 10 - High importance
+  { keywords: ['work', 'job', 'office', 'meeting', 'project', 'deadline', 'client', 'boss', 'colleague', 'conference', 'presentation'], icon: Briefcase, priority: 10 },
   { keywords: ['code', 'programming', 'developer', 'software', 'bug', 'deploy', 'git', 'github'], icon: Code, priority: 10 },
+  { keywords: ['urgent', 'important', 'asap', 'emergency', 'critical'], icon: AlertTriangle, priority: 10 },
+  { keywords: ['health', 'doctor', 'medicine', 'hospital', 'clinic', 'checkup', 'dentist', 'therapy'], icon: Heart, priority: 10 },
+  { keywords: ['bill', 'payment', 'invoice', 'rent', 'mortgage', 'utility', 'tax'], icon: CreditCard, priority: 10 },
+  { keywords: ['travel', 'trip', 'vacation', 'flight', 'hotel', 'booking'], icon: Plane, priority: 10 },
+  { keywords: ['study', 'learn', 'course', 'class', 'homework', 'exam', 'test'], icon: GraduationCap, priority: 10 },
+  
+  // Priority 9
+  { keywords: ['shopping', 'buy', 'purchase', 'order', 'deliver', 'grocery', 'store', 'cart'], icon: ShoppingCart, priority: 9 },
+  { keywords: ['money', 'budget', 'save', 'investment', 'stock', 'crypto', 'bank', 'finance'], icon: DollarSign, priority: 9 },
+  { keywords: ['gym', 'fitness', 'workout', 'exercise', 'run', 'jog', 'yoga', 'train', 'sport'], icon: Dumbbell, priority: 9 },
+  { keywords: ['security', 'password', 'login', '2fa', 'authentication', 'privacy'], icon: Lock, priority: 9 },
+  { keywords: ['achievement', 'milestone', 'win', 'success', 'goal'], icon: Trophy, priority: 9 },
+  { keywords: ['home', 'house', 'clean', 'laundry', 'repair', 'fix', 'furniture'], icon: Home, priority: 9 },
+  
+  // Priority 8
+  { keywords: ['phone', 'call', 'contact'], icon: Phone, priority: 8 },
+  { keywords: ['email', 'message', 'mail', 'text'], icon: Mail, priority: 8 },
+  { keywords: ['video', 'zoom', 'meet', 'conference call'], icon: Video, priority: 8 },
+  { keywords: ['birthday', 'party', 'celebration', 'event', 'anniversary'], icon: PartyPopper, priority: 8 },
+  { keywords: ['gift', 'present'], icon: Gift, priority: 8 },
+  { keywords: ['target', 'objective', 'resolution'], icon: Target, priority: 8 },
+  { keywords: ['design', 'art', 'draw', 'paint', 'photo', 'create'], icon: Palette, priority: 8 },
   { keywords: ['computer', 'laptop', 'pc', 'device', 'tech'], icon: Laptop, priority: 8 },
   { keywords: ['server', 'hosting', 'domain', 'website', 'web'], icon: Server, priority: 8 },
   { keywords: ['backup', 'cloud', 'data'], icon: Cloud, priority: 8 },
-  { keywords: ['password', 'security', 'login', '2fa', 'authentication'], icon: Lock, priority: 9 },
   
-  // Creative
-  { keywords: ['design', 'art', 'draw', 'paint', 'photo', 'video edit', 'create'], icon: Palette, priority: 8 },
+  // Priority 7
+  { keywords: ['drive', 'car', 'gas', 'fuel', 'maintenance', 'license', 'traffic'], icon: Car, priority: 7 },
+  { keywords: ['bus', 'train', 'transit', 'commute'], icon: Bus, priority: 7 },
+  { keywords: ['friend', 'family', 'date', 'hangout', 'social'], icon: Users, priority: 7 },
+  { keywords: ['book', 'read', 'library', 'article', 'blog'], icon: BookOpen, priority: 7 },
   { keywords: ['write', 'blog', 'post', 'content'], icon: PenTool, priority: 7 },
   { keywords: ['music', 'song', 'practice', 'instrument'], icon: Music, priority: 7 },
-  
-  // Daily Tasks
-  { keywords: ['chore', 'errand', 'laundry', 'groceries'], icon: Check, priority: 6 },
-  { keywords: ['cook', 'dinner', 'lunch', 'breakfast'], icon: Coffee, priority: 7 },
-  
-  // Goals & Motivation
-  { keywords: ['goal', 'target', 'objective', 'resolution'], icon: Target, priority: 8 },
-  { keywords: ['achievement', 'milestone', 'win', 'success'], icon: Trophy, priority: 9 },
-  { keywords: ['habit', 'routine', 'daily'], icon: Flame, priority: 7 },
-  
-  // Urgent/Important
-  { keywords: ['urgent', 'important', 'asap', 'emergency', 'critical'], icon: AlertTriangle, priority: 10 },
-  { keywords: ['reminder', 'note', 'remember'], icon: Bell, priority: 6 },
-  
-  // Outdoor & Nature
+  { keywords: ['habit', 'routine', 'daily', 'consistency'], icon: Flame, priority: 7 },
   { keywords: ['walk', 'hike', 'outdoor', 'nature', 'park'], icon: Footprints, priority: 7 },
   { keywords: ['pet', 'dog', 'cat', 'feed'], icon: Dog, priority: 7 },
+  
+  // Priority 6
+  { keywords: ['food', 'meal', 'recipe', 'cook', 'eating', 'dinner', 'lunch', 'breakfast'], icon: Utensils, priority: 6 },
+  { keywords: ['coffee', 'cafe', 'drink'], icon: Coffee, priority: 6 },
+  { keywords: ['haircut', 'barber', 'salon', 'spa', 'nails'], icon: Scissors, priority: 6 },
+  { keywords: ['sleep', 'rest', 'relax', 'break'], icon: Moon, priority: 6 },
+  { keywords: ['reminder', 'note', 'remember', 'remind'], icon: Bell, priority: 6 },
   { keywords: ['plant', 'garden', 'water plants'], icon: Leaf, priority: 6 },
   
-  // Default
-  { keywords: [], icon: Check, priority: 0 }
+  // Priority 5
+  { keywords: ['chore', 'errand', 'groceries', 'supplies'], icon: Folder, priority: 5 },
+  { keywords: ['game', 'gaming', 'play'], icon: Gamepad2, priority: 5 },
+  { keywords: ['movie', 'film', 'watch', 'show'], icon: Tv, priority: 5 },
+  { keywords: ['photo', 'picture', 'camera'], icon: Camera, priority: 5 },
+  { keywords: ['record', 'podcast', 'mic'], icon: Mic, priority: 5 },
+  { keywords: ['listen', 'audio', 'headphones'], icon: Headphones, priority: 5 },
+  { keywords: ['repair', 'fix', 'tool', 'wrench', 'hammer'], icon: Hammer, priority: 5 },
+  { keywords: ['bike', 'cycling'], icon: Bike, priority: 5 },
+  { keywords: ['train', 'rail'], icon: Train, priority: 5 },
+  { keywords: ['flower', 'floral'], icon: Flower2, priority: 5 },
+  { keywords: ['tree', 'forest'], icon: TreePine, priority: 5 },
+  { keywords: ['mountain', 'climbing'], icon: Mountain, priority: 5 },
+  { keywords: ['weather', 'sunny'], icon: Sun, priority: 5 },
+  { keywords: ['rain', 'rainy'], icon: CloudRain, priority: 5 },
+  { keywords: ['snow', 'winter'], icon: Snowflake, priority: 5 },
+  { keywords: ['water', 'drink'], icon: Droplets, priority: 5 },
+  { keywords: ['weather', 'temperature'], icon: Thermometer, priority: 5 },
+  { keywords: ['wind', 'breezy'], icon: Wind, priority: 5 },
+  
+  // Priority 4
+  { keywords: ['schedule', 'calendar', 'event'], icon: Calendar, priority: 4 },
+  { keywords: ['time', 'clock', 'alarm'], icon: Clock, priority: 4 },
+  { keywords: ['favorite', 'star', 'like'], icon: Star, priority: 4 },
+  { keywords: ['profile', 'account', 'user'], icon: User, priority: 4 },
+  { keywords: ['group', 'team', 'meeting'], icon: MessageSquare, priority: 4 },
+  { keywords: ['file', 'document', 'report'], icon: FileText, priority: 4 },
+  { keywords: ['folder', 'directory'], icon: Folder, priority: 4 },
+  { keywords: ['invest', 'trading', 'market'], icon: TrendingUp, priority: 4 },
+  { keywords: ['save', 'savings', 'piggy'], icon: PiggyBank, priority: 4 },
+  { keywords: ['protect', 'safe', 'shield'], icon: Shield, priority: 4 },
 ];
 
 /**
- * Analyzes todo text and returns the most appropriate icon
- * based on keyword matching
+ * Get the appropriate icon for a todo based on its text content
+ * Uses keyword matching with priority ordering
  */
 export function getSmartIcon(todoText: string): LucideIcon {
+  if (!todoText) return Check;
+  
   const lowerText = todoText.toLowerCase();
   
-  // Sort categories by priority (highest first) and match
-  const sortedCategories = [...keywordCategories].sort((a, b) => (b.priority || 0) - (a.priority || 0));
+  // Sort by priority (highest first) - do this once at startup
+  const sortedIcons = ICON_MAP.sort((a, b) => b.priority - a.priority);
   
-  for (const category of sortedCategories) {
-    for (const keyword of category.keywords) {
+  // Find first matching keyword
+  for (const item of sortedIcons) {
+    for (const keyword of item.keywords) {
       if (lowerText.includes(keyword)) {
-        return category.icon;
+        return item.icon;
       }
     }
   }
   
-  // Default icon based on completed state
+  // Default fallback
   return Check;
 }
 
-// Additional helper for getting icon name (for debugging/display)
+/**
+ * Get color based on todo content/category
+ */
+export function getIconColor(todoText: string, isCompleted: boolean = false): string {
+  if (isCompleted) return '#9ca3af';
+  
+  const lowerText = todoText.toLowerCase();
+  
+  // Work - Indigo
+  if (lowerText.includes('work') || lowerText.includes('meeting') || lowerText.includes('project') || 
+      lowerText.includes('deadline') || lowerText.includes('office')) {
+    return '#6366f1';
+  }
+  // Shopping - Orange
+  if (lowerText.includes('shop') || lowerText.includes('buy') || lowerText.includes('order') || 
+      lowerText.includes('grocery')) {
+    return '#f97316';
+  }
+  // Health - Green
+  if (lowerText.includes('health') || lowerText.includes('doctor') || lowerText.includes('medicine') || 
+      lowerText.includes('fitness') || lowerText.includes('gym') || lowerText.includes('workout')) {
+    return '#22c55e';
+  }
+  // Finance - Emerald
+  if (lowerText.includes('bill') || lowerText.includes('payment') || lowerText.includes('money') || 
+      lowerText.includes('budget') || lowerText.includes('tax') || lowerText.includes('invest')) {
+    return '#10b981';
+  }
+  // Travel - Sky
+  if (lowerText.includes('travel') || lowerText.includes('trip') || lowerText.includes('flight') || 
+      lowerText.includes('vacation')) {
+    return '#0ea5e9';
+  }
+  // Education - Purple
+  if (lowerText.includes('study') || lowerText.includes('learn') || lowerText.includes('course') || 
+      lowerText.includes('homework') || lowerText.includes('exam')) {
+    return '#a855f7';
+  }
+  // Tech - Slate
+  if (lowerText.includes('code') || lowerText.includes('programming') || lowerText.includes('computer') || 
+      lowerText.includes('server') || lowerText.includes('tech')) {
+    return '#64748b';
+  }
+  // Urgent - Amber
+  if (lowerText.includes('urgent') || lowerText.includes('important') || lowerText.includes('asap') || 
+      lowerText.includes('emergency')) {
+    return '#f59e0b';
+  }
+  // Creative - Pink
+  if (lowerText.includes('design') || lowerText.includes('art') || lowerText.includes('music') || 
+      lowerText.includes('photo')) {
+    return '#ec4899';
+  }
+  
+  // Default - Indigo
+  return '#6366f1';
+}
+
+/**
+ * Get icon name for debugging
+ */
 export function getIconName(todoText: string): string {
   const icon = getSmartIcon(todoText);
   return icon.displayName || 'Check';
 }
 
+// Export icons array for external use if needed
+export const AVAILABLE_ICONS = ICON_MAP.map(item => ({
+  icon: item.icon,
+  keywords: item.keywords,
+  priority: item.priority
+}));
