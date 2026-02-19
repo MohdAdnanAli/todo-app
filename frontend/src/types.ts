@@ -34,20 +34,99 @@ export const LED_COLORS: Record<MessageType, { bg: string; glow: string; border:
 // API URL
 export const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
 
+// Category type for todos
+export type TodoCategory = 'work' | 'personal' | 'shopping' | 'health' | 'other';
+
+// Priority type for todos
+export type TodoPriority = 'low' | 'medium' | 'high';
+
 // Todo interface
 export interface Todo {
   _id: string;
   text: string;
   completed: boolean;
   createdAt: string;
-  category?: 'work' | 'personal' | 'shopping' | 'health' | 'other';
-  priority?: 'low' | 'medium' | 'high';
+  updatedAt?: string;
+  category?: TodoCategory;
+  priority?: TodoPriority;
   tags?: string[];
 }
 
 // User interface
 export interface User {
+  id?: string;
   email: string;
   displayName: string;
+  bio?: string;
+  avatar?: string;
+  emailVerified?: boolean;
+  lastLoginAt?: string;
 }
+
+// Profile update data
+export interface ProfileUpdateData {
+  displayName?: string;
+  bio?: string;
+  avatar?: string;
+}
+
+// Password reset request
+export interface PasswordResetRequest {
+  email: string;
+}
+
+// Password reset with token
+export interface PasswordResetConfirm {
+  token: string;
+  password: string;
+}
+
+// Email verification
+export interface EmailVerification {
+  token: string;
+}
+
+// Auth response
+export interface AuthResponse {
+  message: string;
+  user?: User;
+  encryptionSalt?: string;
+}
+
+// API Error response
+export interface ApiError {
+  error: string;
+  message?: string;
+  retryAfter?: number; // For rate limiting
+}
+
+// Filter options for todos
+export interface TodoFilters {
+  category?: TodoCategory | 'all';
+  priority?: TodoPriority | 'all';
+  completed?: boolean | 'all';
+  search?: string;
+}
+
+// Admin stats
+export interface AdminStats {
+  totalUsers: number;
+  totalTodos: number;
+  completedTodos: number;
+  pendingTodos: number;
+}
+
+// Admin profile with todo count
+export interface AdminProfile {
+  id: string;
+  email: string;
+  displayName: string;
+  bio?: string;
+  avatar?: string;
+  todoCount: number;
+  createdAt: string;
+}
+
+// Auth mode for forms
+export type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password';
 

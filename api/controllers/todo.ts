@@ -2,13 +2,22 @@ import type { Request, Response } from 'express';
 import { Todo } from '../models/Todo';
 import { z } from 'zod';
 
+const CATEGORIES = ['work', 'personal', 'shopping', 'health', 'other'] as const;
+const PRIORITIES = ['low', 'medium', 'high'] as const;
+
 const createTodoSchema = z.object({
   text: z.string().min(1, 'Task text is required').max(500),
+  category: z.enum(CATEGORIES).optional().default('other'),
+  priority: z.enum(PRIORITIES).optional().default('medium'),
+  tags: z.array(z.string().max(50)).optional().default([]),
 });
 
 const updateTodoSchema = z.object({
   text: z.string().min(1).max(500).optional(),
   completed: z.boolean().optional(),
+  category: z.enum(CATEGORIES).optional(),
+  priority: z.enum(PRIORITIES).optional(),
+  tags: z.array(z.string().max(50)).optional(),
 });
 
 export const getTodos = async (req: Request & { user?: { id: string } }, res: Response) => {
@@ -41,9 +50,14 @@ export const createTodo = async (req: Request & { user?: { id: string } }, res: 
       return res.status(400).json({ error: result.error.issues[0]?.message || 'Validation error' });
     }
 
+    const { text, category, priority, tags } = result.data;
+
     const todo = await Todo.create({
-      text: result.data.text,
+      text,
       user: userId,
+      category,
+      priority,
+      tags,
     });
 
     return res.status(201).json(todo);
@@ -105,3 +119,4 @@ export const deleteTodo = async (req: Request & { user?: { id: string } }, res: 
     return res.status(500).json({ error: 'Failed to delete todo' });
   }
 };
+

@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useTheme } from './theme';
-import type { Todo, User, MessageType } from './types';
+import type { Todo, User, MessageType, TodoCategory, TodoPriority } from './types';
 import { API_URL } from './types';
 import { encrypt, decrypt } from './utils/crypto';
 import { 
   AuthForm, 
   LEDIndicator, 
   MessageBanner, 
+  ProfileModal,
   ThemeSelector, 
   TodoForm, 
   TodoList 
@@ -20,6 +21,9 @@ function App() {
   const [messageType, setMessageType] = useState<MessageType>('idle');
   const [user, setUser] = useState<User | null>(null);
   const [todos, setTodos] = useState<Todo[]>([]);
+  
+  // Profile modal state
+  const [showProfileModal, setShowProfileModal] = useState(false);
   
   // Encryption state - stored in memory for session
   const [encryptionSalt, setEncryptionSalt] = useState<string>('');
@@ -120,8 +124,16 @@ function App() {
       const decryptedTodos = await decryptAllTodos(todosRes.data);
       setTodos(decryptedTodos);
     } catch (err: any) {
-      setMessage('Error: ' + (err.response?.data?.error || err.message));
-      setMessageType('error');
+      const errorMsg = err.response?.data?.error || err.message;
+      
+      // Check for account lockout
+      if (errorMsg.toLowerCase().includes('locked')) {
+        setMessage('Account temporarily locked. Too many failed attempts. Try again in 15 minutes.');
+        setMessageType('error');
+      } else {
+        setMessage('Error: ' + errorMsg);
+        setMessageType('error');
+      }
     }
   };
 
@@ -141,7 +153,7 @@ function App() {
       setUser(response.data.user);
       setEncryptionSalt(response.data.encryptionSalt || '');
       setUserPassword(regPassword);
-      setMessage('Account created and logged in');
+      setMessage('Account created and logged in! Please check your email to verify your account.');
       setMessageType('success');
       
       const todosRes = await axios.get(`${API_URL}/api/todos`, {
@@ -174,7 +186,22 @@ function App() {
     setUserPassword('');
   };
 
-  const handleAddTodo = async (text: string) => {
+  const handleProfileUpdate = (updatedUser: User) => {
+    setUser(updatedUser);
+  };
+
+  const handleDeleteAccount = () => {
+    // Clear all state and redirect to login
+    setUser(null);
+    setTodos([]);
+    setEncryptionSalt('');
+    setUserPassword('');
+    setShowProfileModal(false);
+    setMessage('');
+    setMessageType('idle');
+  };
+
+  const handleAddTodo = async (text: string, category?: TodoCategory, priority?: TodoPriority, tags?: string[]) => {
     if (!text.trim()) {
       setMessage('Task text is required');
       setMessageType('warning');
@@ -187,9 +214,14 @@ function App() {
       // Encrypt the todo text before sending
       const encryptedText = await encrypt(text, userPassword, encryptionSalt);
       
+      const todoData: Partial<Todo> = { text: encryptedText };
+      if (category) todoData.category = category;
+      if (priority) todoData.priority = priority;
+      if (tags && tags.length > 0) todoData.tags = tags;
+      
       const res = await axios.post(
         `${API_URL}/api/todos`,
-        { text: encryptedText },
+        todoData,
         { withCredentials: true }
       );
       // Decrypt the returned todo and add to list
@@ -266,6 +298,31 @@ function App() {
     boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)',
   };
 
+  const buttonSecondaryStyle: React.CSSProperties = {
+    padding: '0.5rem 1rem',
+    background: 'var(--bg-tertiary)',
+    color: 'var(--text-primary)',
+    border: '1px solid var(--border-secondary)',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontWeight: 500,
+    fontSize: '0.875rem',
+    transition: 'all 0.2s ease',
+  };
+
+  const buttonPrimaryStyle: React.CSSProperties = {
+    padding: '0.5rem 1rem',
+    background: 'var(--accent-gradient)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontWeight: 500,
+    fontSize: '0.875rem',
+    transition: 'all 0.2s ease',
+    boxShadow: 'var(--glow)',
+  };
+
   // Show loading state while checking authentication
   if (isLoading) {
     return (
@@ -325,30 +382,53 @@ function App() {
 
       {user ? (
         <div>
-          <p style={{ 
-            fontWeight: 600, 
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between',
             marginBottom: '1.5rem',
-            color: 'var(--text-primary)',
-            fontSize: '1.1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
           }}>
-            <span style={{ 
-              display: 'inline-flex',
+            <p style={{ 
+              fontWeight: 600, 
+              color: 'var(--text-primary)',
+              fontSize: '1.1rem',
+              display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              background: 'var(--accent-gradient)',
-              color: 'white',
-              fontSize: '0.875rem',
+              gap: '0.5rem',
+              margin: 0,
             }}>
-              {(user.displayName || user.email.split('@')[0]).charAt(0).toUpperCase()}
-            </span>
-            Welcome, {user.displayName || user.email.split('@')[0]}!
-          </p>
+              <span style={{ 
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: 'var(--accent-gradient)',
+                color: 'white',
+                fontSize: '0.875rem',
+              }}>
+                {(user.displayName || user.email.split('@')[0]).charAt(0).toUpperCase()}
+              </span>
+              Welcome, {user.displayName || user.email.split('@')[0]}!
+            </p>
+            
+            {/* Profile Button */}
+            <button
+              onClick={() => setShowProfileModal(true)}
+              style={buttonPrimaryStyle}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 4px 8px var(--glow)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'var(--glow)';
+              }}
+            >
+              ⚙️ Profile
+            </button>
+          </div>
 
           {/* Add Todo Form */}
           <TodoForm onAdd={handleAddTodo} />
@@ -360,30 +440,46 @@ function App() {
             onDelete={handleDelete} 
           />
 
-          <button
-            onClick={handleLogout}
-            style={{
-              ...buttonDangerStyle,
-              marginTop: '2rem',
-              width: '100%',
-              padding: '0.875rem',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.boxShadow = '0 4px 8px rgba(239, 68, 68, 0.3)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 2px 4px rgba(239, 68, 68, 0.2)';
-            }}
-          >
-            Logout
-          </button>
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '2rem' }}>
+            <button
+              onClick={handleLogout}
+              style={{
+                ...buttonDangerStyle,
+                flex: 1,
+                padding: '0.875rem',
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 4px 8px rgba(239, 68, 68, 0.3)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 2px 4px rgba(239, 68, 68, 0.2)';
+              }}
+            >
+              Logout
+            </button>
+          </div>
         </div>
       ) : (
         <AuthForm 
           onLogin={handleLogin} 
           onRegister={handleRegister} 
+        />
+      )}
+      
+      {/* Profile Modal */}
+      {user && (
+        <ProfileModal
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          user={user}
+          onProfileUpdate={handleProfileUpdate}
+          onDeleteAccount={handleDeleteAccount}
+          onMessage={(msg, type) => {
+            setMessage(msg);
+            setMessageType(type);
+          }}
         />
       )}
     </div>

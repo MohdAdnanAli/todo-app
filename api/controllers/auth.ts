@@ -12,6 +12,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'change-this-in-production-very-lon
 const COOKIE_NAME = 'auth_token';
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCK_TIME = 15 * 60 * 1000; // 15 minutes
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // Helper: Check if account is locked
 const isAccountLocked = (user: any): boolean => {
@@ -71,11 +72,13 @@ export const register = async (req: Request, res: Response) => {
       encryptionSalt,
     });
 
-    // Send verification email
-    await sendVerificationEmail(email, verificationToken);
+    // Send verification email (non-blocking, log error but continue)
+    sendVerificationEmail(email, verificationToken).catch(err => {
+      console.log('[Email] Verification email could not be sent (SMTP not configured)');
+    });
 
     return res.status(201).json({
-      message: 'Account created. Please check your email to verify.',
+      message: 'Account created successfully!',
       user: { id: user._id, email: user.email, displayName: user.displayName },
       encryptionSalt: user.encryptionSalt,
     });
@@ -108,7 +111,7 @@ export const verifyEmail = async (req: Request, res: Response) => {
     user.emailVerificationExpires = null;
     await user.save();
 
-    return res.json({ message: 'Email verified successfully' });
+    return res.json({ message: 'Email verified successfully! You can now login.' });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -182,8 +185,8 @@ export const requestPasswordReset = async (req: Request, res: Response) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      // Don't reveal if email exists
-      return res.json({ message: 'If email exists, password reset link has been sent' });
+      // Don't reveal if email exists - return success anyway
+      return res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
     }
 
     const resetToken = generateResetToken();
@@ -191,9 +194,12 @@ export const requestPasswordReset = async (req: Request, res: Response) => {
     user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
     await user.save();
 
-    await sendPasswordResetEmail(email, resetToken);
+    // Send reset email (non-blocking)
+    sendPasswordResetEmail(email, resetToken).catch(err => {
+      console.log('[Email] Password reset email could not be sent (SMTP not configured)');
+    });
 
-    return res.json({ message: 'Password reset link sent to email' });
+    return res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -215,7 +221,7 @@ export const resetPassword = async (req: Request, res: Response) => {
     });
 
     if (!user) {
-      return res.status(400).json({ error: 'Invalid or expired reset token' });
+      return res.status(400).json({ error: 'Invalid or expired reset token. Please request a new password reset.' });
     }
 
     const salt = await bcrypt.genSalt(12);
@@ -228,7 +234,7 @@ export const resetPassword = async (req: Request, res: Response) => {
     user.accountLockedUntil = null;
     await user.save();
 
-    return res.json({ message: 'Password reset successfully' });
+    return res.json({ message: 'Password reset successful! You can now login with your new password.' });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -287,6 +293,40 @@ export const getProfile = async (req: Request & { user?: { id: string } }, res: 
     }
 
     return res.json(user);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const deleteUser = async (req: Request & { user?: { id: string } }, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Import Todo model to delete all user todos
+    const { Todo } = await import('../models/Todo');
+
+    // Delete all todos for this user
+    await Todo.deleteMany({ user: userId });
+
+    // Delete the user account
+    const user = await User.findByIdAndDelete(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Clear the auth cookie
+    res.clearCookie('auth_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+    });
+
+    return res.json({ message: 'Account and all data deleted successfully' });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });

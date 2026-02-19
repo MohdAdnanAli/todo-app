@@ -1,11 +1,13 @@
 import React from 'react';
-import type { Todo } from '../types';
+import type { Todo, TodoCategory, TodoPriority } from '../types';
 import { getSmartIcon } from '../utils/todoIcons';
 import type { LucideIcon } from 'lucide-react';
 import { 
   CheckCircle2, 
   Circle,
-  Trash2
+  Trash2,
+  Tag,
+  AlertCircle
 } from 'lucide-react';
 
 interface TodoItemProps {
@@ -14,11 +16,30 @@ interface TodoItemProps {
   onDelete: (todoId: string) => void;
 }
 
+const CATEGORY_COLORS: Record<TodoCategory, string> = {
+  work: '#6366f1',
+  personal: '#ec4899',
+  shopping: '#f97316',
+  health: '#22c55e',
+  other: '#9ca3af',
+};
+
+const PRIORITY_COLORS: Record<TodoPriority, { bg: string; border: string; label: string }> = {
+  low: { bg: 'rgba(156, 163, 175, 0.15)', border: '#9ca3af', label: 'Low' },
+  medium: { bg: 'rgba(234, 179, 8, 0.15)', border: '#eab308', label: 'Med' },
+  high: { bg: 'rgba(239, 68, 68, 0.15)', border: '#ef4444', label: 'High' },
+};
+
 // Color palette for smart icons based on todo content
-function getIconColor(todoText: string, isCompleted: boolean): string {
+function getIconColor(todoText: string, isCompleted: boolean, category?: TodoCategory): string {
   // Grey out when completed
   if (isCompleted) {
-    return '#9ca3af'; // Muted grey
+    return '#9ca3af';
+  }
+  
+  // Use category color if available
+  if (category && CATEGORY_COLORS[category]) {
+    return CATEGORY_COLORS[category];
   }
   
   const lowerText = todoText.toLowerCase();
@@ -26,50 +47,53 @@ function getIconColor(todoText: string, isCompleted: boolean): string {
   // Work - Blue/Indigo
   if (lowerText.includes('work') || lowerText.includes('meeting') || lowerText.includes('project') || 
       lowerText.includes('deadline') || lowerText.includes('office')) {
-    return '#6366f1'; // Indigo
+    return '#6366f1';
   }
   // Shopping - Orange
   if (lowerText.includes('buy') || lowerText.includes('shopping') || lowerText.includes('order') || 
       lowerText.includes('grocery')) {
-    return '#f97316'; // Orange
+    return '#f97316';
   }
   // Health - Red/Pink
   if (lowerText.includes('health') || lowerText.includes('doctor') || lowerText.includes('medicine') || 
       lowerText.includes('fitness') || lowerText.includes('gym') || lowerText.includes('workout')) {
-    return '#ef4444'; // Red
+    return '#ef4444';
   }
   // Finance - Green
   if (lowerText.includes('bill') || lowerText.includes('payment') || lowerText.includes('money') || 
       lowerText.includes('budget') || lowerText.includes('tax')) {
-    return '#22c55e'; // Green
+    return '#22c55e';
   }
   // Travel - Sky/Cyan
   if (lowerText.includes('travel') || lowerText.includes('trip') || lowerText.includes('flight') || 
       lowerText.includes('vacation')) {
-    return '#0ea5e9'; // Sky
+    return '#0ea5e9';
   }
   // Education - Purple
   if (lowerText.includes('study') || lowerText.includes('learn') || lowerText.includes('course') || 
       lowerText.includes('homework') || lowerText.includes('exam')) {
-    return '#a855f7'; // Purple
+    return '#a855f7';
   }
   // Tech - Slate
   if (lowerText.includes('code') || lowerText.includes('programming') || lowerText.includes('computer') || 
       lowerText.includes('server')) {
-    return '#64748b'; // Slate
+    return '#64748b';
   }
   // Urgent - Amber
   if (lowerText.includes('urgent') || lowerText.includes('important') || lowerText.includes('asap')) {
-    return '#eab308'; // Amber
+    return '#eab308';
   }
   
-  return '#6366f1'; // Default indigo
+  return '#6366f1';
 }
 
 const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) => {
+  const { category = 'other', priority = 'medium', tags = [] } = todo;
+  
   // Get smart icon based on todo text content
   const SmartIcon: LucideIcon = getSmartIcon(todo.text);
-  const iconColor = getIconColor(todo.text, todo.completed);
+  const iconColor = getIconColor(todo.text, todo.completed, category);
+  const priorityStyle = PRIORITY_COLORS[priority];
 
   const buttonDangerStyle: React.CSSProperties = {
     padding: '0.5rem 1rem',
@@ -112,7 +136,7 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) => {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', flex: 1, gap: '0.875rem' }}>
-        {/* Smart Icon - acts as the checkbox (only element) */}
+        {/* Smart Icon - acts as the checkbox */}
         <button
           onClick={() => onToggle(todo)}
           style={{
@@ -175,18 +199,88 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) => {
           )}
         </button>
 
-        <span
-          style={{
-            flex: 1,
-            textDecoration: todo.completed ? 'line-through' : 'none',
-            color: todo.completed ? 'var(--text-muted)' : 'var(--text-primary)',
-            fontSize: '0.95rem',
-            transition: 'all 0.2s ease',
-            lineHeight: 1.4,
-          }}
-        >
-          {todo.text}
-        </span>
+        {/* Todo text and metadata */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+            <span
+              style={{
+                flex: 1,
+                textDecoration: todo.completed ? 'line-through' : 'none',
+                color: todo.completed ? 'var(--text-muted)' : 'var(--text-primary)',
+                fontSize: '0.95rem',
+                transition: 'all 0.2s ease',
+                lineHeight: 1.4,
+              }}
+            >
+              {todo.text}
+            </span>
+          </div>
+          
+          {/* Badges row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {/* Priority badge */}
+            {priority !== 'medium' && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  padding: '0.15rem 0.4rem',
+                  background: priorityStyle.bg,
+                  border: `1px solid ${priorityStyle.border}`,
+                  borderRadius: '4px',
+                  fontSize: '0.65rem',
+                  fontWeight: 600,
+                  color: priorityStyle.border,
+                  textTransform: 'uppercase',
+                }}
+              >
+                <AlertCircle size={10} />
+                {priorityStyle.label}
+              </span>
+            )}
+            
+            {/* Category badge */}
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '0.15rem 0.4rem',
+                background: `${CATEGORY_COLORS[category]}15`,
+                border: `1px solid ${CATEGORY_COLORS[category]}40`,
+                borderRadius: '4px',
+                fontSize: '0.65rem',
+                fontWeight: 500,
+                color: CATEGORY_COLORS[category],
+                textTransform: 'capitalize',
+              }}
+            >
+              {category}
+            </span>
+            
+            {/* Tags */}
+            {tags.map(tag => (
+              <span
+                key={tag}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.2rem',
+                  padding: '0.15rem 0.4rem',
+                  background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-secondary)',
+                  borderRadius: '4px',
+                  fontSize: '0.65rem',
+                  fontWeight: 500,
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                <Tag size={10} />
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
 
       <button

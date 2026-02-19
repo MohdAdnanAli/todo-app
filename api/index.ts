@@ -3,8 +3,9 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import path from 'path';
 
-import { register, login, verifyEmail, requestPasswordReset, resetPassword, updateProfile, getProfile } from './controllers/auth';
+import { register, login, verifyEmail, requestPasswordReset, resetPassword, updateProfile, getProfile, deleteUser } from './controllers/auth';
 import { protect } from './middleware/auth';
 import { getTodos, createTodo, updateTodo, deleteTodo } from './controllers/todo';
 import { apiLimiter, loginLimiter, registerLimiter, passwordResetLimiter } from './middleware/rateLimiter';
@@ -84,6 +85,15 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected' });
 });
 
+// Serve frontend for email auth routes
+app.get('/verify-email', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+});
+
+app.get('/reset-password', (req, res) => {
+  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+});
+
 // Auth routes with rate limiting
 app.post('/api/auth/register', registerLimiter, register);
 app.post('/api/auth/login', loginLimiter, login);
@@ -121,6 +131,7 @@ app.get('/api/me', protect, async (req: any, res) => {
 
 app.get('/api/profile', protect, getProfile);
 app.put('/api/profile', protect, updateProfile);
+app.delete('/api/profile', protect, deleteUser);
 
 app.post('/api/auth/logout', (req, res) => {
   res.clearCookie('auth_token', {
@@ -130,6 +141,62 @@ app.post('/api/auth/logout', (req, res) => {
   });
 
   res.status(200).json({ message: 'Logged out successfully' });
+});
+
+// Admin routes - get all profiles with todo counts
+app.get('/api/admin/profiles', protect, async (req: any, res) => {
+  try {
+    // Get all users with their profile info (excluding sensitive data)
+    const users = await User.find({}).select('-password -emailVerificationToken -passwordResetToken -encryptionSalt');
+    
+    // Get todo counts for each user
+    const { Todo } = await import('./models/Todo');
+    
+    const profilesWithCounts = await Promise.all(
+      users.map(async (user) => {
+        const todoCount = await Todo.countDocuments({ user: user._id });
+        return {
+          id: user._id,
+          email: user.email,
+          displayName: user.displayName,
+          bio: user.bio,
+          avatar: user.avatar,
+          todoCount,
+          createdAt: user.createdAt,
+        };
+      })
+    );
+    
+    res.json({
+      totalUsers: profilesWithCounts.length,
+      profiles: profilesWithCounts,
+    });
+  } catch (err) {
+    console.error('/api/admin/profiles error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin route - get simple todo count summary
+app.get('/api/admin/stats', protect, async (req: any, res) => {
+  try {
+    const { Todo } = await import('./models/Todo');
+    
+    const totalUsers = await User.countDocuments({});
+    const totalTodos = await Todo.countDocuments({});
+    const completedTodos = await Todo.countDocuments({ completed: true });
+    const pendingTodos = totalTodos - completedTodos;
+    
+    res.json({
+      totalUsers,
+      totalTodos,
+      completedTodos,
+      pendingTodos,
+    });
+  } catch (err) {
+    console.error('/api/admin/stats error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Error handler

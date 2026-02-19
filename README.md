@@ -43,3 +43,6 @@ Overtime / underrun alerts — warns when task runs long/short
 Daily energy / focus prediction — suggests task order by energy level
 Habit streaks + time consistency — tracks daily same-time execution
 Finish time estimator — shows when your whole day ends
+
+
+please do not merge plan and all. to brief join my notion.
