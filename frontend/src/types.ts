@@ -15,20 +15,20 @@ export type MessageType =
   | 'personal'
   | 'pending';
 
-// LED color configuration
+// LED color configuration - VIBRANT COLORS
 export const LED_COLORS: Record<MessageType, { bg: string; glow: string; border: string }> = {
-  error:     { bg: '#ef4444', glow: 'rgba(239, 68, 68, 0.5)', border: '#fca5a5' },
-  success:   { bg: '#22c55e', glow: 'rgba(34, 197, 94, 0.5)', border: '#86efac' },
-  warning:   { bg: '#eab308', glow: 'rgba(234, 179, 8, 0.5)', border: '#fde047' },
-  info:      { bg: '#3b82f6', glow: 'rgba(59, 130, 246, 0.5)', border: '#93c5fd' },
-  loading:   { bg: '#8b5cf6', glow: 'rgba(139, 92, 246, 0.5)', border: '#c4b5fd' },
+  error:     { bg: '#f43f5e', glow: 'rgba(244, 63, 94, 0.5)', border: '#fda4af' },
+  success:   { bg: '#34d399', glow: 'rgba(52, 211, 153, 0.5)', border: '#6ee7b7' },
+  warning:   { bg: '#fbbf24', glow: 'rgba(251, 191, 36, 0.5)', border: '#fde68a' },
+  info:      { bg: '#60a5fa', glow: 'rgba(96, 165, 250, 0.5)', border: '#bfdbfe' },
+  loading:   { bg: '#a78bfa', glow: 'rgba(167, 139, 250, 0.5)', border: '#c4b5fd' },
   idle:      { bg: '#9ca3af', glow: 'rgba(156, 163, 175, 0.3)', border: '#d1d5db' },
-  attention: { bg: '#f97316', glow: 'rgba(249, 115, 22, 0.5)', border: '#fdba74' },
-  primary:   { bg: '#6366f1', glow: 'rgba(99, 102, 241, 0.5)', border: '#a5b4fc' },
-  accent:    { bg: '#a855f7', glow: 'rgba(168, 85, 247, 0.5)', border: '#d8b4fe' },
-  system:    { bg: '#06b6d4', glow: 'rgba(6, 182, 212, 0.5)', border: '#67e8f9' },
-  personal:  { bg: '#ec4899', glow: 'rgba(236, 72, 153, 0.5)', border: '#f9a8d4' },
-  pending:   { bg: '#f59e0b', glow: 'rgba(245, 158, 11, 0.5)', border: '#fcd34d' },
+  attention: { bg: '#fb923c', glow: 'rgba(251, 146, 60, 0.5)', border: '#fdba74' },
+  primary:   { bg: '#818cf8', glow: 'rgba(129, 140, 248, 0.5)', border: '#c7d2fe' },
+  accent:    { bg: '#c084fc', glow: 'rgba(192, 132, 252, 0.5)', border: '#ddd6fe' },
+  system:    { bg: '#22d3ee', glow: 'rgba(34, 211, 238, 0.5)', border: '#a5f3fc' },
+  personal:  { bg: '#f43f5e', glow: 'rgba(244, 63, 94, 0.5)', border: '#fda4af' },
+  pending:   { bg: '#fbbf24', glow: 'rgba(251, 191, 36, 0.5)', border: '#fde68a' },
 };
 
 // API URL

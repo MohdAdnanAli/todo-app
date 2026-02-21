@@ -42,7 +42,6 @@ import {
   Shield,
   TrendingUp,
   PiggyBank,
-  File,
   Folder,
   Clock,
   Calendar,
@@ -57,12 +56,9 @@ import {
   Camera,
   Mic,
   Headphones,
-  Radio,
   Hammer,
-  Wrench,
   Bike,
   Train,
-  Ship,
   Flower2,
   TreePine,
   Mountain,
@@ -184,61 +180,61 @@ export function getSmartIcon(todoText: string): LucideIcon {
 }
 
 /**
- * Get color based on todo content/category
+ * Get color based on todo content/category - VIBRANT COLORS
  */
 export function getIconColor(todoText: string, isCompleted: boolean = false): string {
   if (isCompleted) return '#9ca3af';
   
   const lowerText = todoText.toLowerCase();
   
-  // Work - Indigo
+  // Work - Electric Indigo
   if (lowerText.includes('work') || lowerText.includes('meeting') || lowerText.includes('project') || 
       lowerText.includes('deadline') || lowerText.includes('office')) {
-    return '#6366f1';
+    return '#818cf8';
   }
-  // Shopping - Orange
+  // Shopping - Bright Orange
   if (lowerText.includes('shop') || lowerText.includes('buy') || lowerText.includes('order') || 
       lowerText.includes('grocery')) {
-    return '#f97316';
+    return '#fb923c';
   }
-  // Health - Green
+  // Health - Bright Green
   if (lowerText.includes('health') || lowerText.includes('doctor') || lowerText.includes('medicine') || 
       lowerText.includes('fitness') || lowerText.includes('gym') || lowerText.includes('workout')) {
-    return '#22c55e';
+    return '#34d399';
   }
-  // Finance - Emerald
+  // Finance - Bright Emerald
   if (lowerText.includes('bill') || lowerText.includes('payment') || lowerText.includes('money') || 
       lowerText.includes('budget') || lowerText.includes('tax') || lowerText.includes('invest')) {
-    return '#10b981';
+    return '#34d399';
   }
-  // Travel - Sky
+  // Travel - Bright Cyan
   if (lowerText.includes('travel') || lowerText.includes('trip') || lowerText.includes('flight') || 
       lowerText.includes('vacation')) {
-    return '#0ea5e9';
+    return '#22d3ee';
   }
-  // Education - Purple
+  // Education - Bright Purple
   if (lowerText.includes('study') || lowerText.includes('learn') || lowerText.includes('course') || 
       lowerText.includes('homework') || lowerText.includes('exam')) {
-    return '#a855f7';
+    return '#c084fc';
   }
-  // Tech - Slate
+  // Tech - Bright Slate
   if (lowerText.includes('code') || lowerText.includes('programming') || lowerText.includes('computer') || 
       lowerText.includes('server') || lowerText.includes('tech')) {
-    return '#64748b';
+    return '#94a3b8';
   }
-  // Urgent - Amber
+  // Urgent - Bright Amber
   if (lowerText.includes('urgent') || lowerText.includes('important') || lowerText.includes('asap') || 
       lowerText.includes('emergency')) {
-    return '#f59e0b';
+    return '#fbbf24';
   }
-  // Creative - Pink
+  // Creative - Hot Pink
   if (lowerText.includes('design') || lowerText.includes('art') || lowerText.includes('music') || 
       lowerText.includes('photo')) {
-    return '#ec4899';
+    return '#f43f5e';
   }
   
-  // Default - Indigo
-  return '#6366f1';
+  // Default - Electric Indigo
+  return '#818cf8';
 }
 
 /**

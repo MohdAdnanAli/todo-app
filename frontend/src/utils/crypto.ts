@@ -21,13 +21,6 @@ function base64ToUint8Array(base64: string): Uint8Array {
 }
 
 /**
- * Convert Uint8Array to ArrayBuffer for Web Crypto API
- */
-function uint8ArrayToBufferSource(arr: Uint8Array): ArrayBuffer {
-  return arr.buffer.slice(arr.byteOffset, arr.byteOffset + arr.byteLength);
-}
-
-/**
  * Derive an AES-GCM key from password and salt using PBKDF2
  */
 async function deriveKey(password: string, salt: string): Promise<CryptoKey> {

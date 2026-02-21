@@ -7,12 +7,102 @@ import { encrypt, decrypt } from './utils/crypto';
 import { 
   AuthForm, 
   LEDIndicator, 
-  MessageBanner, 
   ProfileModal,
   ThemeSelector, 
   TodoForm, 
   TodoList 
 } from './components';
+
+// Cool geometry loading animation component
+const GeometryLoader: React.FC = () => {
+  return (
+    <div style={{
+      position: 'relative',
+      width: '120px',
+      height: '120px',
+      margin: '0 auto 2rem',
+    }}>
+      {/* Rotating outer ring */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        border: '3px solid transparent',
+        borderTopColor: '#818cf8',
+        borderRadius: '50%',
+        animation: 'spin 1.5s linear infinite',
+      }} />
+      
+      {/* Counter-rotating middle ring */}
+      <div style={{
+        position: 'absolute',
+        inset: '12px',
+        border: '3px solid transparent',
+        borderBottomColor: '#f43f5e',
+        borderRadius: '50%',
+        animation: 'spin 1s linear infinite reverse',
+      }} />
+      
+      {/* Inner pulsing circle */}
+      <div style={{
+        position: 'absolute',
+        inset: '28px',
+        background: 'linear-gradient(135deg, #818cf8 0%, #f43f5e 100%)',
+        borderRadius: '50%',
+        animation: 'pulse 1.2s ease-in-out infinite',
+      }} />
+      
+      {/* Floating geometric shapes */}
+      <div style={{
+        position: 'absolute',
+        top: '0',
+        left: '50%',
+        width: '8px',
+        height: '8px',
+        background: '#fb923c',
+        borderRadius: '2px',
+        transform: 'translateX(-50%)',
+        animation: 'float 2s ease-in-out infinite',
+      }} />
+      <div style={{
+        position: 'absolute',
+        bottom: '10px',
+        right: '10px',
+        width: '0',
+        height: '0',
+        borderLeft: '6px solid transparent',
+        borderRight: '6px solid transparent',
+        borderBottom: '10px solid #34d399',
+        animation: 'float 2.5s ease-in-out infinite 0.5s',
+      }} />
+      <div style={{
+        position: 'absolute',
+        bottom: '15px',
+        left: '10px',
+        width: '10px',
+        height: '10px',
+        background: 'transparent',
+        border: '2px solid #c084fc',
+        borderRadius: '50%',
+        animation: 'float 1.8s ease-in-out infinite 1s',
+      }} />
+      
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(0.85); opacity: 0.7; }
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          50% { transform: translateY(-8px) rotate(180deg); }
+        }
+      `}</style>
+    </div>
+  );
+};
 
 function App() {
   useTheme(); // Initialize theme context
@@ -56,7 +146,7 @@ function App() {
             withCredentials: true,
           });
           
-          // If we get here, user is authenticated
+          // If we get here, user is authenticated with valid session cookie
           setUser(res.data.user || null);
           
           // Store encryption salt for session restoration
@@ -64,14 +154,28 @@ function App() {
             setEncryptionSalt(res.data.encryptionSalt);
           }
 
-          const todosRes = await axios.get(`${API_URL}/api/todos`, {
-            withCredentials: true,
-          });
+          // Check if user has password in memory (logged in with credentials)
+          // If no password, user needs to login to decrypt - show encrypted todos
+          if (!userPassword) {
+            // Fetch todos but DON'T decrypt - show encrypted with message
+            const todosRes = await axios.get(`${API_URL}/api/todos`, {
+              withCredentials: true,
+            });
+            setTodos(todosRes.data); // These are encrypted
+            setMessage('Session active - please login to decrypt todos');
+            setMessageType('attention');
+          } else {
+            // User has password in memory (page refresh during active session)
+            // Decrypt the todos
+            const todosRes = await axios.get(`${API_URL}/api/todos`, {
+              withCredentials: true,
+            });
+            const decryptedTodos = await decryptAllTodos(todosRes.data);
+            setTodos(decryptedTodos);
+            setMessage('Welcome back!');
+            setMessageType('success');
+          }
           
-          // Without password, we can't decrypt - show encrypted todos with message
-          setTodos(todosRes.data);
-          setMessage('Session active - please login to decrypt todos');
-          setMessageType('attention');
           setIsLoading(false);
           return;
         } catch (err: any) {
@@ -80,7 +184,7 @@ function App() {
           // 401 means user is not authenticated - show login page immediately
           if (status === 401) {
             setUser(null);
-            setTodos([]);
+            setTodos([]); // Clear all todos - they are encrypted server-side
             setEncryptionSalt('');
             setUserPassword('');
             setMessage('');
@@ -102,7 +206,7 @@ function App() {
       }
     };
     checkAuthAndFetch();
-  }, []);
+  }, [userPassword, decryptAllTodos]);
 
   const handleLogin = async (loginEmail: string, loginPassword: string) => {
     try {
@@ -298,18 +402,6 @@ function App() {
     boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)',
   };
 
-  const buttonSecondaryStyle: React.CSSProperties = {
-    padding: '0.5rem 1rem',
-    background: 'var(--bg-tertiary)',
-    color: 'var(--text-primary)',
-    border: '1px solid var(--border-secondary)',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontWeight: 500,
-    fontSize: '0.875rem',
-    transition: 'all 0.2s ease',
-  };
-
   const buttonPrimaryStyle: React.CSSProperties = {
     padding: '0.5rem 1rem',
     background: 'var(--accent-gradient)',
@@ -336,11 +428,12 @@ function App() {
         margin: 'auto',
         textAlign: 'center',
       }}>
-        <div style={{
-          fontSize: '2rem',
-          marginBottom: '1rem',
-        }}>⏳</div>
-        <p style={{ color: 'var(--text-secondary)' }}>Loading...</p>
+        <GeometryLoader />
+        <p style={{ 
+          color: 'var(--text-secondary)',
+          fontSize: '0.95rem',
+          marginTop: '1rem'
+        }}>Preparing your workspace...</p>
       </div>
     );
   }
@@ -366,19 +459,9 @@ function App() {
           margin: 0,
         }}>Todo App</h1>
         
-        {/* LED Status Indicator */}
+        {/* LED Status Indicator - shows messages for 2.5s then returns to idle tooltip */}
         <LEDIndicator message={message} messageType={messageType} />
       </div>
-
-      {/* Message Banner - displays messages prominently */}
-      <MessageBanner 
-        message={message} 
-        messageType={messageType} 
-        onClose={() => {
-          setMessage('');
-          setMessageType('idle');
-        }}
-      />
 
       {user ? (
         <div>

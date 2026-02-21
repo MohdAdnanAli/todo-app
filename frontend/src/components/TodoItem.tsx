@@ -3,8 +3,6 @@ import type { Todo, TodoCategory, TodoPriority } from '../types';
 import { getSmartIcon } from '../utils/todoIcons';
 import type { LucideIcon } from 'lucide-react';
 import { 
-  CheckCircle2, 
-  Circle,
   Trash2,
   Tag,
   AlertCircle
@@ -17,11 +15,11 @@ interface TodoItemProps {
 }
 
 const CATEGORY_COLORS: Record<TodoCategory, string> = {
-  work: '#6366f1',
-  personal: '#ec4899',
-  shopping: '#f97316',
-  health: '#22c55e',
-  other: '#9ca3af',
+  work: '#818cf8',
+  personal: '#f43f5e',
+  shopping: '#fb923c',
+  health: '#34d399',
+  other: '#94a3b8',
 };
 
 const PRIORITY_COLORS: Record<TodoPriority, { bg: string; border: string; label: string }> = {
@@ -30,7 +28,7 @@ const PRIORITY_COLORS: Record<TodoPriority, { bg: string; border: string; label:
   high: { bg: 'rgba(239, 68, 68, 0.15)', border: '#ef4444', label: 'High' },
 };
 
-// Color palette for smart icons based on todo content
+// Color palette for smart icons based on todo content - VIBRANT COLORS
 function getIconColor(todoText: string, isCompleted: boolean, category?: TodoCategory): string {
   // Grey out when completed
   if (isCompleted) {
@@ -44,47 +42,48 @@ function getIconColor(todoText: string, isCompleted: boolean, category?: TodoCat
   
   const lowerText = todoText.toLowerCase();
   
-  // Work - Blue/Indigo
+  // Work - Electric Indigo (vibrant)
   if (lowerText.includes('work') || lowerText.includes('meeting') || lowerText.includes('project') || 
       lowerText.includes('deadline') || lowerText.includes('office')) {
-    return '#6366f1';
+    return '#818cf8';
   }
-  // Shopping - Orange
+  // Shopping - Bright Orange
   if (lowerText.includes('buy') || lowerText.includes('shopping') || lowerText.includes('order') || 
       lowerText.includes('grocery')) {
-    return '#f97316';
+    return '#fb923c';
   }
-  // Health - Red/Pink
+  // Health - Hot Pink/Vibrant Red
   if (lowerText.includes('health') || lowerText.includes('doctor') || lowerText.includes('medicine') || 
       lowerText.includes('fitness') || lowerText.includes('gym') || lowerText.includes('workout')) {
-    return '#ef4444';
+    return '#f43f5e';
   }
-  // Finance - Green
+  // Finance - Bright Green
   if (lowerText.includes('bill') || lowerText.includes('payment') || lowerText.includes('money') || 
       lowerText.includes('budget') || lowerText.includes('tax')) {
-    return '#22c55e';
+    return '#34d399';
   }
-  // Travel - Sky/Cyan
+  // Travel - Bright Cyan/Sky
   if (lowerText.includes('travel') || lowerText.includes('trip') || lowerText.includes('flight') || 
       lowerText.includes('vacation')) {
-    return '#0ea5e9';
+    return '#22d3ee';
   }
-  // Education - Purple
+  // Education - Bright Purple
   if (lowerText.includes('study') || lowerText.includes('learn') || lowerText.includes('course') || 
       lowerText.includes('homework') || lowerText.includes('exam')) {
-    return '#a855f7';
+    return '#c084fc';
   }
-  // Tech - Slate
+  // Tech - Bright Slate/Blue-Grey
   if (lowerText.includes('code') || lowerText.includes('programming') || lowerText.includes('computer') || 
       lowerText.includes('server')) {
-    return '#64748b';
+    return '#94a3b8';
   }
-  // Urgent - Amber
+  // Urgent - Bright Amber/Yellow
   if (lowerText.includes('urgent') || lowerText.includes('important') || lowerText.includes('asap')) {
-    return '#eab308';
+    return '#fbbf24';
   }
   
-  return '#6366f1';
+  // Default - Electric Indigo
+  return '#818cf8';
 }
 
 const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) => {
@@ -136,7 +135,7 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) => {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', flex: 1, gap: '0.875rem' }}>
-        {/* Smart Icon - acts as the checkbox */}
+        {/* Smart Icon - always shows the category icon */}
         <button
           onClick={() => onToggle(todo)}
           style={{
@@ -150,6 +149,7 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) => {
             borderRadius: '8px',
             transition: 'all 0.2s ease',
             flexShrink: 0,
+            position: 'relative',
           }}
           onMouseOver={(e) => {
             if (!todo.completed) {
@@ -161,42 +161,22 @@ const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) => {
           }}
           aria-label={todo.completed ? 'Mark as incomplete' : 'Mark as complete'}
         >
-          {todo.completed ? (
-            <div 
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                backgroundColor: `${iconColor}20`,
-                border: `2px solid ${iconColor}50`,
-              }}
-            >
-              <CheckCircle2 
-                size={22} 
-                color={iconColor} 
-                strokeWidth={2.5}
-              />
-            </div>
-          ) : (
-            <div 
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                backgroundColor: `${iconColor}15`,
-                border: `1.5px solid ${iconColor}40`,
-                transition: 'all 0.2s ease',
-              }}
-            >
-              <SmartIcon size={18} color={iconColor} strokeWidth={2.5} />
-            </div>
-          )}
+          {/* Always show SmartIcon - category-based icon */}
+          <div 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              backgroundColor: `${iconColor}15`,
+              border: todo.completed ? `2px solid ${iconColor}50` : `1.5px solid ${iconColor}40`,
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <SmartIcon size={18} color={iconColor} strokeWidth={2.5} />
+          </div>
         </button>
 
         {/* Todo text and metadata */}

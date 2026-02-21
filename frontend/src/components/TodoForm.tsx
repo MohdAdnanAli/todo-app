@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { X, Plus, Tag } from 'lucide-react';
-import type { TodoCategory, TodoPriority, MessageType } from '../types';
+import type { TodoCategory, TodoPriority } from '../types';
 
 interface TodoFormProps {
   onAdd: (text: string, category?: TodoCategory, priority?: TodoPriority, tags?: string[]) => void;
 }
 
 const CATEGORIES: { value: TodoCategory; label: string; color: string }[] = [
-  { value: 'work', label: 'Work', color: '#6366f1' },
-  { value: 'personal', label: 'Personal', color: '#ec4899' },
-  { value: 'shopping', label: 'Shopping', color: '#f97316' },
-  { value: 'health', label: 'Health', color: '#22c55e' },
-  { value: 'other', label: 'Other', color: '#9ca3af' },
+  { value: 'work', label: 'Work', color: '#818cf8' },
+  { value: 'personal', label: 'Personal', color: '#f43f5e' },
+  { value: 'shopping', label: 'Shopping', color: '#fb923c' },
+  { value: 'health', label: 'Health', color: '#34d399' },
+  { value: 'other', label: 'Other', color: '#94a3b8' },
 ];
 
 const PRIORITIES: { value: TodoPriority; label: string; color: string }[] = [

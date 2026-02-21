@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { authApi, getApiErrorMessage, isRateLimitError, isAccountLockedError } from '../services/api';
-import type { AuthMode, MessageType } from '../types';
+import type { AuthMode } from '../types';
 
 interface AuthFormProps {
   onLogin: (email: string, password: string) => void;
