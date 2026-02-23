@@ -1,10 +1,11 @@
 import xss from 'xss';
+import crypto from 'crypto';
 
 // Sanitize user input to prevent XSS
 export const sanitizeInput = (input: string): string => {
   return xss(input, {
     whiteList: {},
-    stripIgnoredTag: true,
+    stripIgnoreTag: true,
   });
 };
 
@@ -24,12 +25,24 @@ export const validatePasswordStrength = (password: string): { valid: boolean; er
   };
 };
 
-// Generate email verification token
+// Generate email verification token - secure random token
 export const generateVerificationToken = (): string => {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  try {
+    return crypto.randomBytes(32).toString('hex');
+  } catch (error) {
+    // Fallback to Math.random if crypto fails (should never happen in Node.js)
+    console.error('[Security] Crypto random failed, using fallback');
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  }
 };
 
-// Generate password reset token
+// Generate password reset token - secure random token
 export const generateResetToken = (): string => {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  try {
+    return crypto.randomBytes(32).toString('hex');
+  } catch (error) {
+    // Fallback to Math.random if crypto fails (should never happen in Node.js)
+    console.error('[Security] Crypto random failed, using fallback');
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  }
 };

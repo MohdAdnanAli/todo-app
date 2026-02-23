@@ -6,7 +6,7 @@ import { API_URL } from './types';
 import { encrypt, decrypt } from './utils/crypto';
 import { 
   AuthForm, 
-  Footer,
+  // Footer,
   LEDIndicator, 
   ProfileModal,
   ThemeSelector, 

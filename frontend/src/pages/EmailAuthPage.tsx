@@ -2,6 +2,15 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_URL } from '../types';
 
+// Password requirements for validation
+const PASSWORD_REQUIREMENTS = [
+  { label: 'At least 8 characters', test: (p: string) => p.length >= 8 },
+  { label: 'One uppercase letter', test: (p: string) => /[A-Z]/.test(p) },
+  { label: 'One lowercase letter', test: (p: string) => /[a-z]/.test(p) },
+  { label: 'One number', test: (p: string) => /[0-9]/.test(p) },
+  { label: 'One special character (!@#$%^&*)', test: (p: string) => /[!@#$%^&*]/.test(p) },
+];
+
 // Parse URL params manually (no react-router-dom needed)
 const getUrlParams = () => {
   const params = new URLSearchParams(window.location.search);
@@ -129,6 +138,17 @@ const PasswordResetForm: React.FC<{ token: string }> = ({ token }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
+
+  // Real-time password validation
+  useEffect(() => {
+    if (password) {
+      const errors = PASSWORD_REQUIREMENTS.filter(req => !req.test(password)).map(req => req.label);
+      setPasswordErrors(errors);
+    } else {
+      setPasswordErrors([]);
+    }
+  }, [password]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,8 +159,9 @@ const PasswordResetForm: React.FC<{ token: string }> = ({ token }) => {
       return;
     }
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+    // Validate password requirements
+    if (passwordErrors.length > 0) {
+      setError('Password does not meet requirements');
       return;
     }
 
@@ -154,7 +175,7 @@ const PasswordResetForm: React.FC<{ token: string }> = ({ token }) => {
       );
       setSuccess(true);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to reset password');
+      setError(err.response?.data?.error || 'Failed to reset password. The token may be expired.');
     } finally {
       setIsLoading(false);
     }
@@ -168,7 +189,7 @@ const PasswordResetForm: React.FC<{ token: string }> = ({ token }) => {
     borderRadius: '8px',
     backgroundColor: 'var(--input-bg)',
     color: 'var(--text-primary)',
-    marginBottom: '1rem',
+    marginBottom: '0.5rem',
     boxSizing: 'border-box',
   };
 
@@ -268,7 +289,7 @@ const PasswordResetForm: React.FC<{ token: string }> = ({ token }) => {
           />
         </div>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', color: 'var(--text-secondary)', fontSize: '0.875rem', cursor: 'pointer', justifyContent: 'center' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--text-secondary)', fontSize: '0.875rem', cursor: 'pointer', justifyContent: 'center' }}>
           <input
             type="checkbox"
             checked={showPassword}
@@ -277,16 +298,47 @@ const PasswordResetForm: React.FC<{ token: string }> = ({ token }) => {
           Show password
         </label>
 
+        {/* Password Requirements Display */}
+        {password && (
+          <div style={{ 
+            textAlign: 'left', 
+            marginBottom: '1.5rem', 
+            padding: '0.75rem', 
+            background: 'var(--bg-tertiary)', 
+            borderRadius: '8px',
+            fontSize: '0.75rem',
+          }}>
+            <div style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 500 }}>
+              Password Requirements:
+            </div>
+            {PASSWORD_REQUIREMENTS.map((req, i) => (
+              <div 
+                key={i}
+                style={{ 
+                  color: req.test(password) ? '#22c55e' : 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  marginBottom: '0.25rem',
+                }}
+              >
+                <span>{req.test(password) ? '✓' : '○'}</span>
+                <span>{req.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         <button
           type="submit"
-          disabled={isLoading}
+          disabled={isLoading || passwordErrors.length > 0}
           style={{
             padding: '0.875rem 1.5rem',
             background: 'var(--accent-gradient)',
             color: 'white',
             border: 'none',
             borderRadius: '8px',
-            cursor: isLoading ? 'not-allowed' : 'pointer',
+            cursor: isLoading || passwordErrors.length > 0 ? 'not-allowed' : 'pointer',
             fontWeight: 500,
             fontSize: '1rem',
             width: '100%',

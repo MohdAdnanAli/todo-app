@@ -215,6 +215,12 @@ export const resetPassword = async (req: Request, res: Response) => {
 
     const { token, password } = result.data;
 
+    // Validate password strength before proceeding
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ error: passwordValidation.errors[0] || 'Password does not meet requirements' });
+    }
+
     const user = await User.findOne({
       passwordResetToken: token,
       passwordResetExpires: { $gt: new Date() },

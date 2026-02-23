@@ -15,27 +15,78 @@ const PASSWORD_REQUIREMENTS = [
   { label: 'One special character (!@#$%^&*)', test: (p: string) => /[!@#$%^&*]/.test(p) },
 ];
 
+// Calculate password strength score (0-100)
+const calculatePasswordStrength = (password: string): number => {
+  if (!password) return 0;
+  let score = 0;
+  
+  // Length checks
+  if (password.length >= 8) score += 20;
+  if (password.length >= 12) score += 10;
+  if (password.length >= 16) score += 10;
+  
+  // Character type checks
+  if (/[a-z]/.test(password)) score += 15;
+  if (/[A-Z]/.test(password)) score += 15;
+  if (/[0-9]/.test(password)) score += 15;
+  if (/[!@#$%^&*]/.test(password)) score += 15;
+  
+  return Math.min(100, score);
+};
+
+// Get strength color and label
+const getStrengthInfo = (score: number): { color: string; label: string; bgColor: string } => {
+  if (score < 40) return { color: '#ef4444', label: 'Weak', bgColor: 'rgba(239, 68, 68, 0.3)' };
+  if (score < 60) return { color: '#f59e0b', label: 'Fair', bgColor: 'rgba(245, 158, 11, 0.3)' };
+  if (score < 80) return { color: '#22c55e', label: 'Good', bgColor: 'rgba(34, 197, 94, 0.3)' };
+  return { color: '#10b981', label: 'Strong', bgColor: 'rgba(16, 185, 129, 0.3)' };
+};
+
+// Helper function to get token from URL
+const getTokenFromUrl = (): string | null => {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('token');
+};
+
 const AuthForm: React.FC<AuthFormProps> = memo(({ onLogin, onRegister }) => {
-  const [mode, setMode] = useState<AuthMode>('login');
+  // Check URL for reset token on initial load
+  const urlToken = typeof window !== 'undefined' ? getTokenFromUrl() : null;
+  const initialMode: AuthMode = urlToken ? 'reset-password' : 'login';
+  
+  const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [displayName, setDisplayName] = useState('');
-  const [resetToken, setResetToken] = useState('');
+  const [resetToken, setResetToken] = useState(urlToken || '');
   
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
   const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
+  const [passwordStrength, setPasswordStrength] = useState(0);
+
+  // Check URL for token when mode changes to reset-password
+  useEffect(() => {
+    if (mode === 'reset-password' && !resetToken) {
+      const token = getTokenFromUrl();
+      if (token) {
+        setResetToken(token);
+      }
+    }
+  }, [mode, resetToken]);
 
   useEffect(() => {
-    if (mode === 'register' && password) {
+    // Validate password for both register and reset-password modes
+    if ((mode === 'register' || mode === 'reset-password') && password) {
       const errors = PASSWORD_REQUIREMENTS.filter(req => !req.test(password)).map(req => req.label);
       setPasswordErrors(errors);
+      setPasswordStrength(calculatePasswordStrength(password));
     } else {
       setPasswordErrors([]);
+      setPasswordStrength(0);
     }
   }, [password, mode]);
 
@@ -252,6 +303,26 @@ const AuthForm: React.FC<AuthFormProps> = memo(({ onLogin, onRegister }) => {
                   {showPassword ? '👁️' : '👁️‍🗨️'}
                 </button>
               </div>
+              {/* Password Strength Meter - Show for register and reset-password */}
+              {(mode === 'register' || mode === 'reset-password') && password && (
+                <div className="mt-2">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs text-[var(--text-muted)]">Password Strength</span>
+                    <span className="text-xs font-medium" style={{ color: getStrengthInfo(passwordStrength).color }}>
+                      {getStrengthInfo(passwordStrength).label}
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full bg-[var(--bg-tertiary)] overflow-hidden">
+                    <div 
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{ 
+                        width: `${passwordStrength}%`,
+                        backgroundColor: getStrengthInfo(passwordStrength).color
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -274,10 +345,12 @@ const AuthForm: React.FC<AuthFormProps> = memo(({ onLogin, onRegister }) => {
             </div>
           )}
 
-          {/* Password Requirements */}
-          {mode === 'register' && password && (
+          {/* Password Requirements - Show for both register and reset-password */}
+          {(mode === 'register' || mode === 'reset-password') && password && (
             <div className="mb-6 p-3 rounded-lg bg-[var(--bg-tertiary)]">
-              <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">Password Requirements:</div>
+              <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">
+                {mode === 'reset-password' ? 'New Password Requirements:' : 'Password Requirements:'}
+              </div>
               {PASSWORD_REQUIREMENTS.map((req, i) => (
                 <div 
                   key={i} 
