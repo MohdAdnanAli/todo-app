@@ -71,7 +71,6 @@ import {
 } from 'lucide-react';
 
 // Keyword to icon mapping with priority
-// Higher priority = checked first
 const ICON_MAP: Array<{ keywords: string[]; icon: LucideIcon; priority: number }> = [
   // Priority 10 - High importance
   { keywords: ['work', 'job', 'office', 'meeting', 'project', 'deadline', 'client', 'boss', 'colleague', 'conference', 'presentation'], icon: Briefcase, priority: 10 },
@@ -154,6 +153,12 @@ const ICON_MAP: Array<{ keywords: string[]; icon: LucideIcon; priority: number }
   { keywords: ['protect', 'safe', 'shield'], icon: Shield, priority: 4 },
 ];
 
+// Pre-sorted icons at module load time for performance
+const SORTED_ICONS = [...ICON_MAP].sort((a, b) => b.priority - a.priority);
+
+// Memoized color cache
+const colorCache = new Map<string, string>();
+
 /**
  * Get the appropriate icon for a todo based on its text content
  * Uses keyword matching with priority ordering
@@ -163,11 +168,8 @@ export function getSmartIcon(todoText: string): LucideIcon {
   
   const lowerText = todoText.toLowerCase();
   
-  // Sort by priority (highest first) - do this once at startup
-  const sortedIcons = ICON_MAP.sort((a, b) => b.priority - a.priority);
-  
-  // Find first matching keyword
-  for (const item of sortedIcons) {
+  // Use pre-sorted icons (no runtime sorting)
+  for (const item of SORTED_ICONS) {
     for (const keyword of item.keywords) {
       if (lowerText.includes(keyword)) {
         return item.icon;
@@ -185,56 +187,67 @@ export function getSmartIcon(todoText: string): LucideIcon {
 export function getIconColor(todoText: string, isCompleted: boolean = false): string {
   if (isCompleted) return '#9ca3af';
   
+  // Check cache first
+  const cacheKey = `${todoText}-${isCompleted}`;
+  const cached = colorCache.get(cacheKey);
+  if (cached) return cached;
+  
   const lowerText = todoText.toLowerCase();
+  let color = '#818cf8'; // Default
   
   // Work - Electric Indigo
   if (lowerText.includes('work') || lowerText.includes('meeting') || lowerText.includes('project') || 
       lowerText.includes('deadline') || lowerText.includes('office')) {
-    return '#818cf8';
+    color = '#818cf8';
   }
   // Shopping - Bright Orange
-  if (lowerText.includes('shop') || lowerText.includes('buy') || lowerText.includes('order') || 
+  else if (lowerText.includes('shop') || lowerText.includes('buy') || lowerText.includes('order') || 
       lowerText.includes('grocery')) {
-    return '#fb923c';
+    color = '#fb923c';
   }
   // Health - Bright Green
-  if (lowerText.includes('health') || lowerText.includes('doctor') || lowerText.includes('medicine') || 
+  else if (lowerText.includes('health') || lowerText.includes('doctor') || lowerText.includes('medicine') || 
       lowerText.includes('fitness') || lowerText.includes('gym') || lowerText.includes('workout')) {
-    return '#34d399';
+    color = '#34d399';
   }
   // Finance - Bright Emerald
-  if (lowerText.includes('bill') || lowerText.includes('payment') || lowerText.includes('money') || 
+  else if (lowerText.includes('bill') || lowerText.includes('payment') || lowerText.includes('money') || 
       lowerText.includes('budget') || lowerText.includes('tax') || lowerText.includes('invest')) {
-    return '#34d399';
+    color = '#34d399';
   }
   // Travel - Bright Cyan
-  if (lowerText.includes('travel') || lowerText.includes('trip') || lowerText.includes('flight') || 
+  else if (lowerText.includes('travel') || lowerText.includes('trip') || lowerText.includes('flight') || 
       lowerText.includes('vacation')) {
-    return '#22d3ee';
+    color = '#22d3ee';
   }
   // Education - Bright Purple
-  if (lowerText.includes('study') || lowerText.includes('learn') || lowerText.includes('course') || 
+  else if (lowerText.includes('study') || lowerText.includes('learn') || lowerText.includes('course') || 
       lowerText.includes('homework') || lowerText.includes('exam')) {
-    return '#c084fc';
+    color = '#c084fc';
   }
   // Tech - Bright Slate
-  if (lowerText.includes('code') || lowerText.includes('programming') || lowerText.includes('computer') || 
+  else if (lowerText.includes('code') || lowerText.includes('programming') || lowerText.includes('computer') || 
       lowerText.includes('server') || lowerText.includes('tech')) {
-    return '#94a3b8';
+    color = '#94a3b8';
   }
   // Urgent - Bright Amber
-  if (lowerText.includes('urgent') || lowerText.includes('important') || lowerText.includes('asap') || 
+  else if (lowerText.includes('urgent') || lowerText.includes('important') || lowerText.includes('asap') || 
       lowerText.includes('emergency')) {
-    return '#fbbf24';
+    color = '#fbbf24';
   }
   // Creative - Hot Pink
-  if (lowerText.includes('design') || lowerText.includes('art') || lowerText.includes('music') || 
+  else if (lowerText.includes('design') || lowerText.includes('art') || lowerText.includes('music') || 
       lowerText.includes('photo')) {
-    return '#f43f5e';
+    color = '#f43f5e';
   }
   
-  // Default - Electric Indigo
-  return '#818cf8';
+  // Cache the result (limit cache size to prevent memory issues)
+  if (colorCache.size > 100) {
+    colorCache.clear();
+  }
+  colorCache.set(cacheKey, color);
+  
+  return color;
 }
 
 /**
@@ -246,8 +259,9 @@ export function getIconName(todoText: string): string {
 }
 
 // Export icons array for external use if needed
-export const AVAILABLE_ICONS = ICON_MAP.map(item => ({
+export const AVAILABLE_ICONS = SORTED_ICONS.map(item => ({
   icon: item.icon,
   keywords: item.keywords,
   priority: item.priority
 }));
+

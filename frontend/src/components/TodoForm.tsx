@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { X, Plus, Tag } from 'lucide-react';
 import type { TodoCategory, TodoPriority } from '../types';
 
@@ -20,7 +20,7 @@ const PRIORITIES: { value: TodoPriority; label: string; color: string }[] = [
   { value: 'high', label: 'High', color: '#ef4444' },
 ];
 
-const TodoForm: React.FC<TodoFormProps> = ({ onAdd }) => {
+const TodoForm: React.FC<TodoFormProps> = memo(({ onAdd }) => {
   const [text, setText] = useState('');
   const [category, setCategory] = useState<TodoCategory>('personal');
   const [priority, setPriority] = useState<TodoPriority>('medium');
@@ -55,112 +55,38 @@ const TodoForm: React.FC<TodoFormProps> = ({ onAdd }) => {
     setTags(tags.filter(t => t !== tagToRemove));
   };
 
-  const inputStyle: React.CSSProperties = {
-    flex: 1,
-    padding: '0.75rem 1rem',
-    fontSize: '1rem',
-    border: '1px solid var(--border-primary)',
-    borderRadius: '8px',
-    backgroundColor: 'var(--input-bg)',
-    color: 'var(--text-primary)',
-    transition: 'all 0.2s ease',
-  };
-
-  const buttonStyle: React.CSSProperties = {
-    padding: '0.75rem 1.5rem',
-    background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontWeight: 500,
-    fontSize: '0.95rem',
-    transition: 'all 0.2s ease',
-    boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-  };
-
-  const optionButtonStyle = (isActive: boolean, color: string): React.CSSProperties => ({
-    padding: '0.4rem 0.75rem',
-    fontSize: '0.75rem',
-    border: `1.5px solid ${isActive ? color : 'var(--border-secondary)'}`,
-    background: isActive ? `${color}20` : 'transparent',
-    color: isActive ? color : 'var(--text-secondary)',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: 500,
-    transition: 'all 0.2s ease',
-  });
-
-  const toggleStyle: React.CSSProperties = {
-    padding: '0.5rem',
-    background: 'var(--bg-tertiary)',
-    border: '1px solid var(--border-secondary)',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    color: 'var(--text-secondary)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'all 0.2s ease',
-  };
-
-  const tagStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '0.25rem',
-    padding: '0.2rem 0.5rem',
-    background: 'var(--accent-gradient)',
-    color: 'white',
-    borderRadius: '4px',
-    fontSize: '0.7rem',
-    fontWeight: 500,
-  };
-
   return (
     <form 
       onSubmit={handleSubmit}
-      style={{ 
-        marginBottom: '2rem', 
-        display: 'flex', 
-        flexDirection: 'column',
-        gap: '0.75rem',
-        padding: '1.25rem',
-        background: 'var(--bg-secondary)',
-        borderRadius: '12px',
-        border: '1px solid var(--border-secondary)',
-      }}
+      className="mb-8 flex flex-col gap-3 p-5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-secondary)]"
     >
       {/* Main input row */}
-      <div style={{ display: 'flex', gap: '0.75rem' }}>
+      <div className="flex gap-3">
         <input
           type="text"
           placeholder="Add a new task..."
           value={text}
           onChange={(e) => setText(e.target.value)}
-          style={inputStyle}
+          className="flex-1 px-4 py-3 text-base rounded-lg border border-[var(--border-primary)] 
+            bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-200
+            focus:outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--glow)]"
         />
         <button
           type="button"
           onClick={() => setShowOptions(!showOptions)}
-          style={toggleStyle}
+          className="p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] 
+            cursor-pointer text-[var(--text-secondary)] flex items-center justify-center 
+            hover:bg-[var(--hover-bg)] transition-all duration-200"
           title="Task options"
         >
           ⚙️
         </button>
         <button
           type="submit"
-          style={buttonStyle}
-          onMouseOver={(e) => {
-            e.currentTarget.style.transform = 'translateY(-1px)';
-            e.currentTarget.style.boxShadow = '0 4px 8px rgba(16, 185, 129, 0.3)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.2)';
-          }}
+          className="px-6 py-3 rounded-lg font-medium text-base flex items-center gap-2
+            bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md
+            hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+          style={{ boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)' }}
         >
           <Plus size={18} />
           Add
@@ -169,26 +95,26 @@ const TodoForm: React.FC<TodoFormProps> = ({ onAdd }) => {
 
       {/* Options panel */}
       {showOptions && (
-        <div style={{ 
-          padding: '1rem', 
-          background: 'var(--bg-tertiary)', 
-          borderRadius: '8px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1rem',
-        }}>
+        <div className="p-4 bg-[var(--bg-tertiary)] rounded-lg flex flex-col gap-4 animate-fade-in">
           {/* Category selection */}
           <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 500 }}>
-              Category
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">Category</div>
+            <div className="flex flex-wrap gap-2">
               {CATEGORIES.map(cat => (
                 <button
                   key={cat.value}
                   type="button"
                   onClick={() => setCategory(cat.value)}
-                  style={optionButtonStyle(category === cat.value, cat.color)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 border
+                    ${category === cat.value
+                      ? 'border-2'
+                      : 'border border-[var(--border-secondary)]'
+                    }`}
+                  style={{
+                    background: category === cat.value ? `${cat.color}20` : 'transparent',
+                    borderColor: category === cat.value ? cat.color : undefined,
+                    color: category === cat.color ? cat.color : 'var(--text-secondary)',
+                  }}
                 >
                   {cat.label}
                 </button>
@@ -198,16 +124,23 @@ const TodoForm: React.FC<TodoFormProps> = ({ onAdd }) => {
 
           {/* Priority selection */}
           <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 500 }}>
-              Priority
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">Priority</div>
+            <div className="flex flex-wrap gap-2">
               {PRIORITIES.map(pri => (
                 <button
                   key={pri.value}
                   type="button"
                   onClick={() => setPriority(pri.value)}
-                  style={optionButtonStyle(priority === pri.value, pri.color)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 border
+                    ${priority === pri.value
+                      ? 'border-2'
+                      : 'border border-[var(--border-secondary)]'
+                    }`}
+                  style={{
+                    background: priority === pri.value ? `${pri.color}20` : 'transparent',
+                    borderColor: priority === pri.value ? pri.color : undefined,
+                    color: priority === pri.value ? pri.color : 'var(--text-secondary)',
+                  }}
                 >
                   {pri.label}
                 </button>
@@ -217,26 +150,22 @@ const TodoForm: React.FC<TodoFormProps> = ({ onAdd }) => {
 
           {/* Tags input */}
           <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 500 }}>
+            <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">
               Tags (press Enter to add, max 5)
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+            <div className="flex flex-wrap gap-2 items-center">
               {tags.map(tag => (
-                <span key={tag} style={tagStyle}>
+                <span 
+                  key={tag} 
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-white"
+                  style={{ background: 'var(--accent-gradient)' }}
+                >
                   <Tag size={10} />
                   {tag}
                   <button
                     type="button"
                     onClick={() => removeTag(tag)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'white',
-                      cursor: 'pointer',
-                      padding: 0,
-                      display: 'flex',
-                      marginLeft: '0.25rem',
-                    }}
+                    className="bg-transparent border-none text-white cursor-pointer p-0 ml-0.5 flex"
                   >
                     <X size={12} />
                   </button>
@@ -249,12 +178,9 @@ const TodoForm: React.FC<TodoFormProps> = ({ onAdd }) => {
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
                   onKeyDown={handleAddTag}
-                  style={{
-                    ...inputStyle,
-                    flex: '0 0 100px',
-                    padding: '0.4rem 0.5rem',
-                    fontSize: '0.8rem',
-                  }}
+                  className="flex-shrink-0 w-24 px-2 py-1.5 text-xs rounded-md border border-[var(--border-primary)] 
+                    bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-200
+                    focus:outline-none focus:border-[var(--accent-primary)]"
                 />
               )}
             </div>
@@ -263,7 +189,8 @@ const TodoForm: React.FC<TodoFormProps> = ({ onAdd }) => {
       )}
     </form>
   );
-};
+});
+
+TodoForm.displayName = 'TodoForm';
 
 export default TodoForm;
-

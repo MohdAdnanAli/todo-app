@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, memo } from 'react';
 import type { Todo, TodoCategory, TodoPriority } from '../types';
 import TodoItem from './TodoItem';
 import { SlidersHorizontal, ChevronDown, ChevronUp, Search, FilterX } from 'lucide-react';
@@ -25,94 +25,38 @@ const PRIORITIES: { value: TodoPriority | 'all'; label: string }[] = [
   { value: 'low', label: 'Low' },
 ];
 
-const TodoList: React.FC<TodoListProps> = ({ todos, onToggle, onDelete }) => {
+const TodoList: React.FC<TodoListProps> = memo(({ todos, onToggle, onDelete }) => {
   const [categoryFilter, setCategoryFilter] = useState<TodoCategory | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<TodoPriority | 'all'>('all');
   const [showCompleted, setShowCompleted] = useState<boolean | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
-  // Check if any filters are active
   const hasActiveFilters = categoryFilter !== 'all' || priorityFilter !== 'all' || showCompleted !== 'all' || searchQuery !== '';
 
-  // Filter todos based on current filters
   const filteredTodos = useMemo(() => {
     return todos.filter(todo => {
-      // Category filter
-      if (categoryFilter !== 'all' && todo.category !== categoryFilter) {
-        return false;
-      }
+      if (categoryFilter !== 'all' && todo.category !== categoryFilter) return false;
+      if (priorityFilter !== 'all' && todo.priority !== priorityFilter) return false;
+      if (showCompleted !== 'all' && todo.completed !== showCompleted) return false;
       
-      // Priority filter
-      if (priorityFilter !== 'all' && todo.priority !== priorityFilter) {
-        return false;
-      }
-      
-      // Completed filter
-      if (showCompleted !== 'all' && todo.completed !== showCompleted) {
-        return false;
-      }
-      
-      // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const matchesText = todo.text.toLowerCase().includes(query);
         const matchesTags = todo.tags?.some(tag => tag.toLowerCase().includes(query));
-        if (!matchesText && !matchesTags) {
-          return false;
-        }
+        if (!matchesText && !matchesTags) return false;
       }
       
       return true;
     });
   }, [todos, categoryFilter, priorityFilter, showCompleted, searchQuery]);
 
-  // Count stats
   const stats = useMemo(() => ({
     total: todos.length,
     completed: todos.filter(t => t.completed).length,
     pending: todos.filter(t => !t.completed).length,
     filtered: filteredTodos.length,
   }), [todos, filteredTodos]);
-
-  const filterButtonStyle = (isActive: boolean): React.CSSProperties => ({
-    padding: '0.35rem 0.65rem',
-    fontSize: '0.7rem',
-    border: `1.5px solid ${isActive ? 'var(--accent-primary)' : 'var(--border-secondary)'}`,
-    background: isActive ? 'var(--accent-gradient)' : 'transparent',
-    color: isActive ? 'white' : 'var(--text-secondary)',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: 500,
-    transition: 'all 0.2s ease',
-  });
-
-  const searchInputStyle: React.CSSProperties = {
-    padding: '0.5rem 0.75rem',
-    paddingLeft: '2rem',
-    fontSize: '0.85rem',
-    border: '1px solid var(--border-secondary)',
-    borderRadius: '6px',
-    backgroundColor: 'var(--input-bg)',
-    color: 'var(--text-primary)',
-    width: '100%',
-  };
-
-  const toggleButtonStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    padding: '0.65rem 0.85rem',
-    fontSize: '0.8rem',
-    border: '1px solid var(--border-secondary)',
-    borderRadius: '8px',
-    backgroundColor: hasActiveFilters ? 'var(--accent-gradient)' : 'var(--bg-secondary)',
-    color: hasActiveFilters ? 'white' : 'var(--text-primary)',
-    cursor: 'pointer',
-    fontWeight: 500,
-    transition: 'all 0.2s ease',
-  };
 
   const clearFilters = () => {
     setCategoryFilter('all');
@@ -121,17 +65,9 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onToggle, onDelete }) => {
     setSearchQuery('');
   };
 
-  // Empty states
   if (todos.length === 0) {
     return (
-      <p style={{ 
-        color: 'var(--text-muted)', 
-        textAlign: 'center',
-        padding: '2rem',
-        background: 'var(--bg-secondary)',
-        borderRadius: '12px',
-        border: '2px dashed var(--border-primary)',
-      }}>
+      <p className="text-center p-8 rounded-xl border-2 border-dashed border-[var(--border-primary)] text-[var(--text-muted)] bg-[var(--bg-secondary)]">
         No tasks yet. Add one above! ✨
       </p>
     );
@@ -142,9 +78,13 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onToggle, onDelete }) => {
       {/* Collapsible Filter Toggle */}
       <button
         onClick={() => setShowFilters(!showFilters)}
-        style={toggleButtonStyle}
+        className={`flex items-center justify-between w-full px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200
+          ${hasActiveFilters 
+            ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white' 
+            : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-secondary)]'
+          }`}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div className="flex items-center gap-2">
           <SlidersHorizontal size={14} />
           <span>
             {hasActiveFilters 
@@ -152,14 +92,7 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onToggle, onDelete }) => {
               : 'Filter & Search'}
           </span>
           {hasActiveFilters && (
-            <span style={{ 
-              background: 'rgba(255,255,255,0.2)', 
-              padding: '0.1rem 0.4rem', 
-              borderRadius: '4px',
-              fontSize: '0.7rem',
-            }}>
-              Active
-            </span>
+            <span className="bg-white/20 px-1.5 py-0.5 rounded text-xs">Active</span>
           )}
         </div>
         {showFilters ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -167,47 +100,37 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onToggle, onDelete }) => {
 
       {/* Expandable Filter Panel */}
       {showFilters && (
-        <div style={{ 
-          padding: '1rem', 
-          background: 'var(--bg-secondary)', 
-          borderRadius: '0 0 12px 12px',
-          border: '1px solid var(--border-secondary)',
-          borderTop: 'none',
-          marginBottom: '1rem',
-          animation: 'slideDown 0.2s ease',
-        }}>
+        <div className="p-4 bg-[var(--bg-secondary)] rounded-b-xl border border-[var(--border-secondary)] border-t-none mb-4 animate-fade-in">
           {/* Search */}
-          <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
+          <div className="relative mb-3">
             <Search 
               size={14} 
-              style={{ 
-                position: 'absolute', 
-                left: '0.6rem', 
-                top: '50%', 
-                transform: 'translateY(-50%)',
-                color: 'var(--text-muted)',
-              }} 
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" 
             />
             <input
               type="text"
               placeholder="Search tasks..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={searchInputStyle}
+              className="w-full pl-9 pr-3 py-2 text-sm rounded-md border border-[var(--border-secondary)] 
+                bg-[var(--input-bg)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)] 
+                focus:ring-2 focus:ring-[var(--glow)] transition-all duration-200"
             />
           </div>
           
           {/* Category filters */}
-          <div style={{ marginBottom: '0.6rem' }}>
-            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '0.3rem', fontWeight: 500, textTransform: 'uppercase' }}>
-              Category
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+          <div className="mb-2.5">
+            <div className="text-xs font-medium text-[var(--text-muted)] uppercase mb-1.5 tracking-wide">Category</div>
+            <div className="flex flex-wrap gap-1.5">
               {CATEGORIES.map(cat => (
                 <button
                   key={cat.value}
                   onClick={() => setCategoryFilter(cat.value)}
-                  style={filterButtonStyle(categoryFilter === cat.value)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 border
+                    ${categoryFilter === cat.value
+                      ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-transparent'
+                      : 'border-[var(--border-secondary)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
+                    }`}
                 >
                   {cat.label}
                 </button>
@@ -216,16 +139,18 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onToggle, onDelete }) => {
           </div>
           
           {/* Priority filters */}
-          <div style={{ marginBottom: '0.6rem' }}>
-            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '0.3rem', fontWeight: 500, textTransform: 'uppercase' }}>
-              Priority
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+          <div className="mb-2.5">
+            <div className="text-xs font-medium text-[var(--text-muted)] uppercase mb-1.5 tracking-wide">Priority</div>
+            <div className="flex flex-wrap gap-1.5">
               {PRIORITIES.map(pri => (
                 <button
                   key={pri.value}
                   onClick={() => setPriorityFilter(pri.value)}
-                  style={filterButtonStyle(priorityFilter === pri.value)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 border
+                    ${priorityFilter === pri.value
+                      ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-transparent'
+                      : 'border-[var(--border-secondary)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
+                    }`}
                 >
                   {pri.label}
                 </button>
@@ -234,26 +159,36 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onToggle, onDelete }) => {
           </div>
           
           {/* Show completed toggle */}
-          <div style={{ marginBottom: '0.5rem' }}>
-            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginBottom: '0.3rem', fontWeight: 500, textTransform: 'uppercase' }}>
-              Show
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+          <div className="mb-2">
+            <div className="text-xs font-medium text-[var(--text-muted)] uppercase mb-1.5 tracking-wide">Show</div>
+            <div className="flex flex-wrap gap-1.5">
               <button
                 onClick={() => setShowCompleted('all')}
-                style={filterButtonStyle(showCompleted === 'all')}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 border
+                  ${showCompleted === 'all'
+                    ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-transparent'
+                    : 'border-[var(--border-secondary)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
+                  }`}
               >
                 All
               </button>
               <button
                 onClick={() => setShowCompleted(false)}
-                style={filterButtonStyle(showCompleted === false)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 border
+                  ${showCompleted === false
+                    ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-transparent'
+                    : 'border-[var(--border-secondary)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
+                  }`}
               >
                 Pending ({stats.pending})
               </button>
               <button
                 onClick={() => setShowCompleted(true)}
-                style={filterButtonStyle(showCompleted === true)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 border
+                  ${showCompleted === true
+                    ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-transparent'
+                    : 'border-[var(--border-secondary)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
+                  }`}
               >
                 Done ({stats.completed})
               </button>
@@ -264,19 +199,8 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onToggle, onDelete }) => {
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-                padding: '0.4rem 0.75rem',
-                fontSize: '0.75rem',
-                background: 'transparent',
-                border: '1px solid var(--border-secondary)',
-                borderRadius: '6px',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-                marginTop: '0.5rem',
-              }}
+              className="flex items-center gap-1 px-3 py-2 text-xs rounded-md border border-[var(--border-secondary)] 
+                text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] transition-all duration-200 mt-2"
             >
               <FilterX size={12} />
               Clear All Filters
@@ -284,15 +208,7 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onToggle, onDelete }) => {
           )}
           
           {/* Results count */}
-          <div style={{ 
-            marginTop: '0.6rem', 
-            paddingTop: '0.6rem', 
-            borderTop: '1px solid var(--border-secondary)',
-            fontSize: '0.75rem',
-            color: 'var(--text-muted)',
-            display: 'flex',
-            justifyContent: 'space-between',
-          }}>
+          <div className="mt-3 pt-3 border-t border-[var(--border-secondary)] text-xs text-[var(--text-muted)] flex justify-between">
             <span>Showing {stats.filtered} of {stats.total} tasks</span>
             {stats.completed > 0 && (
               <span>✓ {Math.round((stats.completed / stats.total) * 100)}% complete</span>
@@ -303,21 +219,14 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onToggle, onDelete }) => {
 
       {/* No results message */}
       {filteredTodos.length === 0 && hasActiveFilters && (
-        <p style={{ 
-          color: 'var(--text-muted)', 
-          textAlign: 'center',
-          padding: '2rem',
-          background: 'var(--bg-secondary)',
-          borderRadius: '12px',
-          border: '2px dashed var(--border-primary)',
-        }}>
+        <p className="text-center p-8 rounded-xl border-2 border-dashed border-[var(--border-primary)] text-[var(--text-muted)] bg-[var(--bg-secondary)]">
           No tasks match your filters. Try adjusting them! 🔍
         </p>
       )}
 
       {/* Todo list */}
       {filteredTodos.length > 0 && (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+        <ul className="list-none p-0 m-0">
           {filteredTodos.map((todo) => (
             <TodoItem
               key={todo._id}
@@ -330,7 +239,8 @@ const TodoList: React.FC<TodoListProps> = ({ todos, onToggle, onDelete }) => {
       )}
     </div>
   );
-};
+});
+
+TodoList.displayName = 'TodoList';
 
 export default TodoList;
-

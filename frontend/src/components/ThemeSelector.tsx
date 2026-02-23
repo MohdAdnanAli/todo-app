@@ -39,32 +39,14 @@ const ThemeSelector: React.FC = () => {
   return (
     <div className="theme-selector" ref={dropdownRef}>
       <button
+        className="theme-toggle-button"
         onClick={() => setIsOpen(!isOpen)}
-        style={{
-          position: 'absolute',
-          top: '0.75rem',
-          right: '0.75rem',
-          padding: '0.5rem 0.75rem',
-          background: 'var(--bg-secondary)',
-          border: '1px solid var(--border-primary)',
-          borderRadius: '8px',
-          cursor: 'pointer',
-          fontSize: '1rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          color: 'var(--text-primary)',
-          transition: 'all 0.2s ease',
-        }}
-        onMouseOver={(e) => {
-          e.currentTarget.style.background = 'var(--hover-bg)';
-        }}
-        onMouseOut={(e) => {
-          e.currentTarget.style.background = 'var(--bg-secondary)';
-        }}
+        title="Toggle theme selector"
+        aria-label="Theme selector"
+        aria-expanded={isOpen}
       >
         <span>{currentTheme.icon}</span>
-        <span style={{ fontSize: '0.75rem' }}>▼</span>
+        <span className="theme-toggle-arrow">▼</span>
       </button>
 
       {isOpen && (
@@ -73,6 +55,7 @@ const ThemeSelector: React.FC = () => {
           <button
             className={`theme-option ${themeId === 'system' ? 'active' : ''}`}
             onClick={() => handleThemeSelect('system')}
+            aria-pressed={themeId === 'system'}
           >
             <span className="theme-option-icon">⚙️</span>
             <span>System</span>
@@ -86,6 +69,7 @@ const ThemeSelector: React.FC = () => {
               key={theme.id}
               className={`theme-option ${themeId === theme.id ? 'active' : ''}`}
               onClick={() => handleThemeSelect(theme.id)}
+              aria-pressed={themeId === theme.id}
             >
               <span className="theme-option-icon">{theme.icon}</span>
               <span>{theme.name}</span>
@@ -101,6 +85,7 @@ const ThemeSelector: React.FC = () => {
               setIsCustomizing(true);
               setThemeId('custom');
             }}
+            aria-pressed={themeId === 'custom' || isCustomizing}
           >
             <span className="theme-option-icon">🎨</span>
             <span>Custom Theme</span>
@@ -111,32 +96,36 @@ const ThemeSelector: React.FC = () => {
               <h4>Customize Colors</h4>
               <div className="color-picker-row">
                 <div className="color-picker-group">
-                  <label>Background</label>
+                  <label htmlFor="bg-primary-input">Background</label>
                   <input
+                    id="bg-primary-input"
                     type="color"
                     value={customColors.bgPrimary}
                     onChange={(e) => handleCustomColorChange('bgPrimary', e.target.value)}
                   />
                 </div>
                 <div className="color-picker-group">
-                  <label>Surface</label>
+                  <label htmlFor="bg-secondary-input">Surface</label>
                   <input
+                    id="bg-secondary-input"
                     type="color"
                     value={customColors.bgSecondary}
                     onChange={(e) => handleCustomColorChange('bgSecondary', e.target.value)}
                   />
                 </div>
                 <div className="color-picker-group">
-                  <label>Primary</label>
+                  <label htmlFor="accent-primary-input">Primary</label>
                   <input
+                    id="accent-primary-input"
                     type="color"
                     value={customColors.accentPrimary}
                     onChange={(e) => handleCustomColorChange('accentPrimary', e.target.value)}
                   />
                 </div>
                 <div className="color-picker-group">
-                  <label>Secondary</label>
+                  <label htmlFor="accent-secondary-input">Secondary</label>
                   <input
+                    id="accent-secondary-input"
                     type="color"
                     value={customColors.accentSecondary}
                     onChange={(e) => handleCustomColorChange('accentSecondary', e.target.value)}
@@ -145,16 +134,18 @@ const ThemeSelector: React.FC = () => {
               </div>
               <div className="color-picker-row">
                 <div className="color-picker-group">
-                  <label>Text</label>
+                  <label htmlFor="text-primary-input">Text</label>
                   <input
+                    id="text-primary-input"
                     type="color"
                     value={customColors.textPrimary}
                     onChange={(e) => handleCustomColorChange('textPrimary', e.target.value)}
                   />
                 </div>
                 <div className="color-picker-group">
-                  <label>Muted</label>
+                  <label htmlFor="text-secondary-input">Muted</label>
                   <input
+                    id="text-secondary-input"
                     type="color"
                     value={customColors.textSecondary}
                     onChange={(e) => handleCustomColorChange('textSecondary', e.target.value)}
@@ -164,28 +155,13 @@ const ThemeSelector: React.FC = () => {
               <div className="custom-theme-buttons">
                 <button
                   onClick={saveCustomTheme}
-                  style={{
-                    background: 'var(--accent-gradient)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    padding: '0.5rem',
-                    cursor: 'pointer',
-                    fontWeight: 500,
-                  }}
+                  className="theme-apply-button"
                 >
                   Apply
                 </button>
                 <button
                   onClick={() => setIsCustomizing(false)}
-                  style={{
-                    background: 'var(--bg-tertiary)',
-                    color: 'var(--text-secondary)',
-                    border: '1px solid var(--border-primary)',
-                    borderRadius: '6px',
-                    padding: '0.5rem',
-                    cursor: 'pointer',
-                  }}
+                  className="theme-cancel-button"
                 >
                   Cancel
                 </button>

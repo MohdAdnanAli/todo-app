@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { authApi, getApiErrorMessage, isRateLimitError, isAccountLockedError } from '../services/api';
 import type { AuthMode } from '../types';
 
@@ -15,7 +15,7 @@ const PASSWORD_REQUIREMENTS = [
   { label: 'One special character (!@#$%^&*)', test: (p: string) => /[!@#$%^&*]/.test(p) },
 ];
 
-const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
+const AuthForm: React.FC<AuthFormProps> = memo(({ onLogin, onRegister }) => {
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,18 +24,12 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
   const [displayName, setDisplayName] = useState('');
   const [resetToken, setResetToken] = useState('');
   
-  // Error and loading states
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  
-  // Password validation for registration
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
-  
-  // Rate limiting
   const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
 
-  // Validate password on change
   useEffect(() => {
     if (mode === 'register' && password) {
       const errors = PASSWORD_REQUIREMENTS.filter(req => !req.test(password)).map(req => req.label);
@@ -45,7 +39,6 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
     }
   }, [password, mode]);
 
-  // Countdown for rate limiting
   useEffect(() => {
     if (rateLimitSeconds <= 0) return;
     const timer = setTimeout(() => setRateLimitSeconds(s => s - 1), 1000);
@@ -98,14 +91,12 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
     } catch (err: unknown) {
       const message = getApiErrorMessage(err);
       
-      // Handle rate limiting
       if (isRateLimitError(err)) {
         setRateLimitSeconds(err.retryAfter || 60);
         setError(`Too many attempts. Please wait ${err.retryAfter || 60} seconds.`);
         return;
       }
       
-      // Handle account lockout
       if (isAccountLockedError(err)) {
         setError('Account temporarily locked due to too many failed attempts. Try again in 15 minutes.');
         return;
@@ -117,168 +108,31 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
     }
   };
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '0.75rem 1rem',
-    fontSize: '1rem',
-    border: '1px solid var(--border-primary)',
-    borderRadius: '8px',
-    backgroundColor: 'var(--input-bg)',
-    color: 'var(--text-primary)',
-    transition: 'all 0.2s ease',
-  };
-
-  const passwordInputContainerStyle: React.CSSProperties = {
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-  };
-
-  const passwordToggleStyle: React.CSSProperties = {
-    position: 'absolute',
-    right: '0.75rem',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: 'var(--text-muted)',
-    fontSize: '0.875rem',
-    padding: '0.25rem',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  };
-
-  const buttonPrimaryStyle: React.CSSProperties = {
-    padding: '0.75rem 1.5rem',
-    background: 'var(--accent-gradient)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: isLoading ? 'not-allowed' : 'pointer',
-    fontWeight: 500,
-    fontSize: '0.95rem',
-    transition: 'all 0.2s ease',
-    boxShadow: 'var(--glow)',
-    opacity: isLoading ? 0.7 : 1,
-  };
-
-  const buttonSecondaryStyle: React.CSSProperties = {
-    padding: '0.75rem 1.5rem',
-    background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: isLoading ? 'not-allowed' : 'pointer',
-    fontWeight: 500,
-    fontSize: '0.95rem',
-    transition: 'all 0.2s ease',
-    boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)',
-    opacity: isLoading ? 0.7 : 1,
-  };
-
-  const toggleActiveStyle: React.CSSProperties = {
-    padding: '0.6rem 1.2rem',
-    marginRight: '0.5rem',
-    background: 'var(--accent-gradient)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px 8px 0 0',
-    cursor: 'pointer',
-    fontWeight: 500,
-    transition: 'all 0.2s ease',
-  };
-
-  const toggleInactiveStyle: React.CSSProperties = {
-    padding: '0.6rem 1.2rem',
-    marginRight: '0.5rem',
-    background: 'var(--bg-tertiary)',
-    color: 'var(--text-secondary)',
-    border: 'none',
-    borderRadius: '8px 8px 0 0',
-    cursor: 'pointer',
-    fontWeight: 500,
-    transition: 'all 0.2s ease',
-  };
-
-  const errorStyle: React.CSSProperties = {
-    padding: '0.75rem',
-    background: 'rgba(239, 68, 68, 0.1)',
-    border: '1px solid rgba(239, 68, 68, 0.3)',
-    borderRadius: '8px',
-    color: '#ef4444',
-    fontSize: '0.875rem',
-    marginBottom: '1rem',
-  };
-
-  const successStyle: React.CSSProperties = {
-    padding: '0.75rem',
-    background: 'rgba(34, 197, 94, 0.1)',
-    border: '1px solid rgba(34, 197, 94, 0.3)',
-    borderRadius: '8px',
-    color: '#22c55e',
-    fontSize: '0.875rem',
-    marginBottom: '1rem',
-  };
-
-  const linkStyle: React.CSSProperties = {
-    color: 'var(--accent-primary)',
-    cursor: 'pointer',
-    textDecoration: 'underline',
-    fontSize: '0.875rem',
-  };
-
-  const passwordReqStyle = (met: boolean): React.CSSProperties => ({
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    fontSize: '0.75rem',
-    color: met ? '#22c55e' : 'var(--text-muted)',
-    marginBottom: '0.25rem',
-  });
-
-  // Show tabs only for login/register modes
   const showTabs = mode === 'login' || mode === 'register';
 
   return (
-    <div style={{ padding: '0.5rem' }}>
+    <div className="p-2">
       {showTabs && (
-        <div style={{ 
-          marginBottom: '1.5rem', 
-          display: 'flex', 
-          gap: '0',
-          borderBottom: '2px solid var(--border-secondary)',
-        }}>
+        <div className="flex mb-6 border-b-2 border-[var(--border-secondary)]">
           <button
             type="button"
             onClick={() => { setMode('login'); setError(''); setSuccessMessage(''); }}
-            style={mode === 'login' ? toggleActiveStyle : toggleInactiveStyle}
-            onMouseOver={(e) => {
-              if (mode !== 'login') {
-                e.currentTarget.style.background = 'var(--hover-bg)';
-              }
-            }}
-            onMouseOut={(e) => {
-              if (mode !== 'login') {
-                e.currentTarget.style.background = 'var(--bg-tertiary)';
-              }
-            }}
+            className={`px-5 py-2.5 mx-1 font-medium transition-all duration-200 rounded-tl-lg
+              ${mode === 'login' 
+                ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white' 
+                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
+              }`}
           >
             Login
           </button>
           <button
             type="button"
             onClick={() => { setMode('register'); setError(''); setSuccessMessage(''); }}
-            style={mode === 'register' ? toggleActiveStyle : toggleInactiveStyle}
-            onMouseOver={(e) => {
-              if (mode !== 'register') {
-                e.currentTarget.style.background = 'var(--hover-bg)';
-              }
-            }}
-            onMouseOut={(e) => {
-              if (mode !== 'register') {
-                e.currentTarget.style.background = 'var(--bg-tertiary)';
-              }
-            }}
+            className={`px-5 py-2.5 mx-1 font-medium transition-all duration-200 rounded-tr-lg
+              ${mode === 'register' 
+                ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white' 
+                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
+              }`}
           >
             Register
           </button>
@@ -286,15 +140,16 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
       )}
 
       <form onSubmit={handleSubmit}>
-        <div style={{ 
-          padding: '1.5rem', 
-          background: 'var(--bg-secondary)', 
-          borderRadius: '12px',
-          border: '1px solid var(--border-secondary)',
-        }}>
+        <div className="p-6 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-secondary)]">
           {/* Error Message */}
           {error && (
-            <div style={errorStyle}>
+            <div className="p-3 mb-4 rounded-lg text-sm"
+              style={{ 
+                background: 'rgba(239, 68, 68, 0.1)', 
+                border: '1px solid rgba(239, 68, 68, 0.3)', 
+                color: '#ef4444' 
+              }}
+            >
               {rateLimitSeconds > 0 && `⏳ ${rateLimitSeconds}s — `}
               {error}
             </div>
@@ -302,15 +157,21 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
 
           {/* Success Message */}
           {successMessage && (
-            <div style={successStyle}>
+            <div className="p-3 mb-4 rounded-lg text-sm"
+              style={{ 
+                background: 'rgba(34, 197, 94, 0.1)', 
+                border: '1px solid rgba(34, 197, 94, 0.3)', 
+                color: '#22c55e' 
+              }}
+            >
               ✓ {successMessage}
             </div>
           )}
 
           {/* Display Name - Register only */}
           {mode === 'register' && (
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+            <div className="mb-4">
+              <label className="block mb-2 text-sm font-medium text-[var(--text-primary)]">
                 Display Name *
               </label>
               <input
@@ -319,15 +180,17 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 required
-                style={inputStyle}
+                className="w-full px-4 py-3 text-base rounded-lg border border-[var(--border-primary)] 
+                  bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-200
+                  focus:outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--glow)]"
               />
             </div>
           )}
 
-          {/* Email - Register and Forgot Password */}
+          {/* Email */}
           {(mode === 'register' || mode === 'forgot-password' || mode === 'login') && (
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+            <div className="mb-4">
+              <label className="block mb-2 text-sm font-medium text-[var(--text-primary)]">
                 Email
               </label>
               <input
@@ -336,15 +199,17 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                style={inputStyle}
+                className="w-full px-4 py-3 text-base rounded-lg border border-[var(--border-primary)] 
+                  bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-200
+                  focus:outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--glow)]"
               />
             </div>
           )}
 
-          {/* Reset Token - Reset Password mode */}
+          {/* Reset Token */}
           {mode === 'reset-password' && (
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+            <div className="mb-4">
+              <label className="block mb-2 text-sm font-medium text-[var(--text-primary)]">
                 Reset Token *
               </label>
               <input
@@ -353,30 +218,36 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
                 value={resetToken}
                 onChange={(e) => setResetToken(e.target.value)}
                 required
-                style={inputStyle}
+                className="w-full px-4 py-3 text-base rounded-lg border border-[var(--border-primary)] 
+                  bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-200
+                  focus:outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--glow)]"
               />
             </div>
           )}
 
-          {/* Password - Login, Register, Reset Password */}
+          {/* Password */}
           {(mode === 'login' || mode === 'register' || mode === 'reset-password') && (
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+            <div className="mb-4">
+              <label className="block mb-2 text-sm font-medium text-[var(--text-primary)]">
                 Password {mode === 'register' && '*'}
               </label>
-              <div style={passwordInputContainerStyle}>
+              <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   placeholder={mode === 'login' ? 'Enter your password' : 'Create a password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  style={{ ...inputStyle, paddingRight: '2.5rem' }}
+                  className="w-full px-4 py-3 text-base rounded-lg border border-[var(--border-primary)] 
+                    bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-200
+                    focus:outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--glow)]"
+                  style={{ paddingRight: '3rem' }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  style={passwordToggleStyle}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none 
+                    cursor-pointer text-[var(--text-muted)] text-sm p-1"
                 >
                   {showPassword ? '👁️' : '👁️‍🗨️'}
                 </button>
@@ -384,10 +255,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
             </div>
           )}
 
-          {/* Confirm Password - Register and Reset Password */}
+          {/* Confirm Password */}
           {(mode === 'register' || mode === 'reset-password') && (
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-primary)', fontWeight: 500, fontSize: '0.875rem' }}>
+            <div className="mb-4">
+              <label className="block mb-2 text-sm font-medium text-[var(--text-primary)]">
                 Confirm Password *
               </label>
               <input
@@ -396,19 +267,23 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                style={inputStyle}
+                className="w-full px-4 py-3 text-base rounded-lg border border-[var(--border-primary)] 
+                  bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-200
+                  focus:outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--glow)]"
               />
             </div>
           )}
 
-          {/* Password Requirements - Register only */}
+          {/* Password Requirements */}
           {mode === 'register' && password && (
-            <div style={{ marginBottom: '1.5rem', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '8px' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 500 }}>
-                Password Requirements:
-              </div>
+            <div className="mb-6 p-3 rounded-lg bg-[var(--bg-tertiary)]">
+              <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">Password Requirements:</div>
               {PASSWORD_REQUIREMENTS.map((req, i) => (
-                <div key={i} style={passwordReqStyle(req.test(password))}>
+                <div 
+                  key={i} 
+                  className="flex items-center gap-2 text-xs mb-1"
+                  style={{ color: req.test(password) ? '#22c55e' : 'var(--text-muted)' }}
+                >
                   <span>{req.test(password) ? '✓' : '○'}</span>
                   <span>{req.label}</span>
                 </div>
@@ -420,27 +295,13 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
           <button
             type="submit"
             disabled={isLoading || rateLimitSeconds > 0}
-            style={mode === 'login' || mode === 'reset-password' ? 
-              { ...buttonPrimaryStyle, width: '100%' } : 
-              { ...buttonSecondaryStyle, width: '100%' }}
-            onMouseOver={(e) => {
-              if (!isLoading && rateLimitSeconds === 0) {
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                if (mode === 'login' || mode === 'reset-password') {
-                  e.currentTarget.style.boxShadow = '0 4px 8px var(--glow)';
-                } else {
-                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(16, 185, 129, 0.3)';
-                }
+            className={`w-full py-3 rounded-lg font-medium text-base transition-all duration-200
+              ${(mode === 'login' || mode === 'reset-password')
+                ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5'
+                : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md hover:shadow-lg hover:-translate-y-0.5'
               }
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              if (mode === 'login' || mode === 'reset-password') {
-                e.currentTarget.style.boxShadow = 'var(--glow)';
-              } else {
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.2)';
-              }
-            }}
+              disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none`}
+            style={{ boxShadow: 'var(--glow)' }}
           >
             {isLoading ? 'Please wait...' : 
              rateLimitSeconds > 0 ? `Wait ${rateLimitSeconds}s...` :
@@ -450,11 +311,11 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
              'Reset Password'}
           </button>
 
-          {/* Forgot Password Link - Login only */}
+          {/* Forgot Password Link */}
           {mode === 'login' && (
-            <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+            <div className="mt-4 text-center">
               <span 
-                style={linkStyle}
+                className="text-sm cursor-pointer underline text-[var(--accent-primary)] hover:text-[var(--accent-secondary)]"
                 onClick={() => { setMode('forgot-password'); setError(''); setSuccessMessage(''); }}
               >
                 Forgot Password?
@@ -462,11 +323,11 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
             </div>
           )}
 
-          {/* Back to Login - Forgot/Reset Password modes */}
+          {/* Back to Login */}
           {(mode === 'forgot-password' || mode === 'reset-password') && (
-            <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+            <div className="mt-4 text-center">
               <span 
-                style={linkStyle}
+                className="text-sm cursor-pointer underline text-[var(--accent-primary)] hover:text-[var(--accent-secondary)]"
                 onClick={() => { setMode('login'); setError(''); setSuccessMessage(''); }}
               >
                 Back to Login
@@ -477,7 +338,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ onLogin, onRegister }) => {
       </form>
     </div>
   );
-};
+});
+
+AuthForm.displayName = 'AuthForm';
 
 export default AuthForm;
-
