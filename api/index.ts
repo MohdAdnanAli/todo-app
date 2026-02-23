@@ -23,7 +23,9 @@ app.use(cors({
   origin: [
     'http://localhost:5173',
     'https://metb-todo.vercel.app',
-    'https://*.vercel.app'
+    'https://*.vercel.app',
+    'https://todo-app-srbx.onrender.com',
+    /\.onrender\.com$/
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -138,7 +140,7 @@ app.post('/api/auth/logout', (req, res) => {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
 
-    sameSite: 'lax',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   });
 
 

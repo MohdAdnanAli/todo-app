@@ -159,7 +159,7 @@ export const login = async (req: Request, res: Response) => {
     res.cookie(COOKIE_NAME, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', // Use 'lax' for both dev and prod to ensure cookie persists on page reload
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -329,7 +329,7 @@ export const deleteUser = async (req: Request & { user?: { id: string } }, res: 
     res.clearCookie('auth_token', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     });
 
     return res.json({ message: 'Account and all data deleted successfully' });
