@@ -28,18 +28,20 @@ function App() {
   const [userPassword, setUserPassword] = useState<string>('');
 
   const decryptTodo = useCallback(async (todo: Todo): Promise<Todo> => {
+    // Skip decryption if password or salt not available
     if (!userPassword || !encryptionSalt) return todo;
     try {
       const decryptedText = await decrypt(todo.text, userPassword, encryptionSalt);
       return { ...todo, text: decryptedText };
     } catch (err) {
-      console.error('Failed to decrypt todo:', err);
+      // Silently return original todo on decryption failure (e.g., already decrypted or invalid format)
       return todo;
     }
   }, [userPassword, encryptionSalt]);
 
   const decryptAllTodos = useCallback(async (todosToDecrypt: Todo[]): Promise<Todo[]> => {
-    if (!userPassword || !encryptionSalt) return todosToDecrypt;
+    // Only decrypt if user has provided their password
+    if (!userPassword || !encryptionSalt || todosToDecrypt.length === 0) return todosToDecrypt;
     return Promise.all(todosToDecrypt.map(decryptTodo));
   }, [userPassword, encryptionSalt]);
 
@@ -61,6 +63,7 @@ function App() {
             const todosRes = await axios.get(`${API_URL}/api/todos`, {
               withCredentials: true,
             });
+            // Don't try to decrypt - just store encrypted todos
             setTodos(todosRes.data);
             setMessage('Session active - please login to decrypt todos');
             setMessageType('attention');

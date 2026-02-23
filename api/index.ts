@@ -43,7 +43,10 @@ dns.setServers(['8.8.8.8', '8.8.4.4']);
 // Database
 // ────────────────────────────────────────────────
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://admin:secret@localhost:27017/todo-app?authSource=admin';
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  throw new Error('MONGODB_URI environment variable is required');
+}
 
 const connectWithRetry = async (retries = 5, delay = 5000) => {
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -136,11 +139,11 @@ app.put('/api/profile', protect, updateProfile);
 app.delete('/api/profile', protect, deleteUser);
 
 app.post('/api/auth/logout', (req, res) => {
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
   res.clearCookie('auth_token', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
   });
 
 

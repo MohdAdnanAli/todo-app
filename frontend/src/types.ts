@@ -31,8 +31,8 @@ export const LED_COLORS: Record<MessageType, { bg: string; glow: string; border:
   pending:   { bg: '#fbbf24', glow: 'rgba(251, 191, 36, 0.5)', border: '#fde68a' },
 };
 
-// API URL
-export const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
+// API URL - use empty string in development to use Vite proxy (same origin)
+export const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : '');
 
 // Category type for todos
 export type TodoCategory = 'work' | 'personal' | 'shopping' | 'health' | 'other';

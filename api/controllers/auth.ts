@@ -8,7 +8,11 @@ import { registerSchema, loginSchema, passwordResetSchema, resetPasswordSchema, 
 import { sanitizeInput, generateVerificationToken, generateResetToken, validatePasswordStrength } from '../utils/security';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/email';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'change-this-in-production-very-long-random-string';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
+
 const COOKIE_NAME = 'auth_token';
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCK_TIME = 15 * 60 * 1000; // 15 minutes
@@ -154,12 +158,15 @@ export const login = async (req: Request, res: Response) => {
     
     await user.save();
 
+    // Determine if we're in production (including Vercel deployment)
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+    
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '7d' });
 
     res.cookie(COOKIE_NAME, token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      secure: isProduction, // Only require HTTPS in production
+      sameSite: isProduction ? 'none' : 'lax', // 'none' for cross-site in production, 'lax' otherwise
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -325,11 +332,12 @@ export const deleteUser = async (req: Request & { user?: { id: string } }, res: 
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Clear the auth cookie
+    // Clear the auth cookie - match the settings used in login
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
     res.clearCookie('auth_token', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
     });
 
     return res.json({ message: 'Account and all data deleted successfully' });
