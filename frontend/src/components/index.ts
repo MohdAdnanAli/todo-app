@@ -1,4 +1,5 @@
 export { default as AuthForm } from './AuthForm';
+export { default as Footer } from './Footer';
 export { default as GeometryLoader } from './GeometryLoader';
 export { default as LEDIndicator } from './LEDIndicator';
 export { default as MessageBanner } from './MessageBanner';

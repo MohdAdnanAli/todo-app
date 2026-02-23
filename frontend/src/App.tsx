@@ -6,6 +6,7 @@ import { API_URL } from './types';
 import { encrypt, decrypt } from './utils/crypto';
 import { 
   AuthForm, 
+  Footer,
   LEDIndicator, 
   ProfileModal,
   ThemeSelector, 
@@ -363,6 +364,8 @@ function App() {
           }}
         />
       )}
+      
+      {/* <Footer developerLink="https://t.me/jerrymanager_bot" /> */}
     </div>
   );
 }
