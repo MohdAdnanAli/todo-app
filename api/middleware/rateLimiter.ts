@@ -7,6 +7,7 @@ export const apiLimiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
 });
 
 // Login attempt limiter - strict
@@ -17,6 +18,7 @@ export const loginLimiter = rateLimit({
   skipSuccessfulRequests: true, // don't count successful logins
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
 });
 
 // Registration limiter
@@ -26,6 +28,7 @@ export const registerLimiter = rateLimit({
   message: 'Too many registration attempts, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
 });
 
 // Password reset limiter
@@ -35,4 +38,5 @@ export const passwordResetLimiter = rateLimit({
   message: 'Too many password reset attempts, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
 });
