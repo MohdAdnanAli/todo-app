@@ -6,7 +6,9 @@ import dotenv from 'dotenv';
 import path from 'path';
 
 import { register, login, verifyEmail, requestPasswordReset, resetPassword, updateProfile, getProfile, deleteUser } from './controllers/auth';
+import { getDashboardStats, getAllUsers, getUserDetails, updateUser, deleteUser as adminDeleteUser, getAllTodos, deleteTodo as adminDeleteTodo, deleteMultipleTodos, getSystemHealth } from './controllers/admin';
 import { protect } from './middleware/auth';
+import { adminProtect } from './middleware/admin';
 import { getTodos, createTodo, updateTodo, deleteTodo } from './controllers/todo';
 import { apiLimiter, loginLimiter, registerLimiter, passwordResetLimiter } from './middleware/rateLimiter';
 import { User } from './models/User';
@@ -14,6 +16,8 @@ import { User } from './models/User';
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1); // Required for rate limiter on Render/VPS
+
 
 // ────────────────────────────────────────────────
 // Middleware – ORDER IS CRITICAL
@@ -118,14 +122,21 @@ app.get('/api/me', protect, async (req: any, res) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+    
+    // Check if user is admin (by comparing with ADMIN_EMAIL from .env)
+    const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+    const isAdmin = ADMIN_EMAIL ? user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() : false;
+    
     res.json({ 
       user: { 
         id: user._id, 
         email: user.email, 
         displayName: user.displayName,
         bio: user.bio,
-        avatar: user.avatar 
+        avatar: user.avatar,
+        role: user.role,
       },
+      isAdmin,
       encryptionSalt: user.encryptionSalt 
     });
   } catch (err) {
@@ -150,61 +161,27 @@ app.post('/api/auth/logout', (req, res) => {
   res.status(200).json({ message: 'Logged out successfully' });
 });
 
-// Admin routes - get all profiles with todo counts
-app.get('/api/admin/profiles', protect, async (req: any, res) => {
-  try {
-    // Get all users with their profile info (excluding sensitive data)
-    const users = await User.find({}).select('-password -emailVerificationToken -passwordResetToken -encryptionSalt');
-    
-    // Get todo counts for each user
-    const { Todo } = await import('./models/Todo');
-    
-    const profilesWithCounts = await Promise.all(
-      users.map(async (user) => {
-        const todoCount = await Todo.countDocuments({ user: user._id });
-        return {
-          id: user._id,
-          email: user.email,
-          displayName: user.displayName,
-          bio: user.bio,
-          avatar: user.avatar,
-          todoCount,
-          createdAt: user.createdAt,
-        };
-      })
-    );
-    
-    res.json({
-      totalUsers: profilesWithCounts.length,
-      profiles: profilesWithCounts,
-    });
-  } catch (err) {
-    console.error('/api/admin/profiles error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+// Admin routes - Full admin dashboard with adminProtect middleware
+// ───────────────────────────────────────────────
 
-// Admin route - get simple todo count summary
-app.get('/api/admin/stats', protect, async (req: any, res) => {
-  try {
-    const { Todo } = await import('./models/Todo');
-    
-    const totalUsers = await User.countDocuments({});
-    const totalTodos = await Todo.countDocuments({});
-    const completedTodos = await Todo.countDocuments({ completed: true });
-    const pendingTodos = totalTodos - completedTodos;
-    
-    res.json({
-      totalUsers,
-      totalTodos,
-      completedTodos,
-      pendingTodos,
-    });
-  } catch (err) {
-    console.error('/api/admin/stats error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+// Dashboard stats
+app.get('/api/admin/dashboard', adminProtect, getDashboardStats);
+
+// User management
+app.get('/api/admin/users', adminProtect, getAllUsers);
+app.get('/api/admin/users/:userId', adminProtect, getUserDetails);
+app.put('/api/admin/users/:userId', adminProtect, updateUser);
+app.delete('/api/admin/users/:userId', adminProtect, adminDeleteUser);
+
+// Todo management
+app.get('/api/admin/todos', adminProtect, getAllTodos);
+app.delete('/api/admin/todos/:todoId', adminProtect, adminDeleteTodo);
+app.post('/api/admin/todos/delete-many', adminProtect, deleteMultipleTodos);
+
+// System health
+app.get('/api/admin/health', adminProtect, getSystemHealth);
+
+// Legacy admin routes (deprecated - use new adminProtect routes above)
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

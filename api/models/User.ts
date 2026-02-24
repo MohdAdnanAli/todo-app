@@ -5,6 +5,9 @@ const userSchema = new Schema({
   password: { type: String, required: true },
   displayName: { type: String, trim: true, default: null },
   
+  // User role - 'user' or 'admin'
+  role: { type: String, enum: ['user', 'admin'], default: 'user' },
+  
   // Email verification
   emailVerified: { type: Boolean, default: false },
   emailVerificationToken: { type: String, default: null },

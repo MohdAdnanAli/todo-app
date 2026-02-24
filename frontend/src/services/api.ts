@@ -7,6 +7,11 @@ import type {
   ApiError,
   AdminStats,
   AdminProfile,
+  AdminDashboardData,
+  AdminUsersResponse,
+  AdminTodosResponse,
+  SystemHealth,
+  AdminUser,
 } from '../types';
 import { API_URL } from '../types';
 
@@ -67,8 +72,8 @@ export const authApi = {
     return res.data;
   },
 
-  getMe: async (): Promise<{ user: User; encryptionSalt: string }> => {
-    const res = await api.get<{ user: User; encryptionSalt: string }>('/api/me');
+  getMe: async (): Promise<{ user: User; encryptionSalt: string; isAdmin?: boolean }> => {
+    const res = await api.get<{ user: User; encryptionSalt: string; isAdmin?: boolean }>('/api/me');
     return res.data;
   },
 };
@@ -119,14 +124,87 @@ export const todoApi = {
 // ==================== ADMIN ====================
 
 export const adminApi = {
-  getStats: async (): Promise<AdminStats> => {
-    const res = await api.get<AdminStats>('/api/admin/stats');
+  // Dashboard
+  getDashboard: async (): Promise<AdminDashboardData> => {
+    const res = await api.get<AdminDashboardData>('/api/admin/dashboard');
     return res.data;
   },
 
-  getProfiles: async (): Promise<{ totalUsers: number; profiles: AdminProfile[] }> => {
-    const res = await api.get<{ totalUsers: number; profiles: AdminProfile[] }>('/api/admin/profiles');
+  // User Management
+  getUsers: async (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }): Promise<AdminUsersResponse> => {
+    const res = await api.get<AdminUsersResponse>('/api/admin/users', { params });
     return res.data;
+  },
+
+  getUser: async (userId: string): Promise<{ user: AdminUser; todos: { total: number; completed: number; pending: number; items: Todo[] } }> => {
+    const res = await api.get<{ user: AdminUser; todos: { total: number; completed: number; pending: number; items: Todo[] } }>(`/api/admin/users/${userId}`);
+    return res.data;
+  },
+
+  updateUser: async (userId: string, data: Partial<AdminUser>): Promise<{ message: string; user: AdminUser }> => {
+    const res = await api.put<{ message: string; user: AdminUser }>(`/api/admin/users/${userId}`, data);
+    return res.data;
+  },
+
+  deleteUser: async (userId: string): Promise<{ message: string }> => {
+    const res = await api.delete<{ message: string }>(`/api/admin/users/${userId}`);
+    return res.data;
+  },
+
+  // Todo Management
+  getTodos: async (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    completed?: 'true' | 'false' | 'all';
+  }): Promise<AdminTodosResponse> => {
+    const res = await api.get<AdminTodosResponse>('/api/admin/todos', { params });
+    return res.data;
+  },
+
+  deleteTodo: async (todoId: string): Promise<{ message: string }> => {
+    const res = await api.delete<{ message: string }>(`/api/admin/todos/${todoId}`);
+    return res.data;
+  },
+
+  deleteMultipleTodos: async (todoIds: string[]): Promise<{ message: string; deletedCount: number }> => {
+    const res = await api.post<{ message: string; deletedCount: number }>('/api/admin/todos/delete-many', { todoIds });
+    return res.data;
+  },
+
+  // System Health
+  getSystemHealth: async (): Promise<SystemHealth> => {
+    const res = await api.get<SystemHealth>('/api/admin/health');
+    return res.data;
+  },
+
+  // Legacy/Deprecated - use new endpoints above
+  getStats: async (): Promise<AdminStats> => {
+    const data = await api.get<AdminDashboardData>('/api/admin/dashboard');
+    return data.data.stats;
+  },
+
+  getProfiles: async (): Promise<{ totalUsers: number; profiles: AdminProfile[] }> => {
+    const data = await api.get<AdminUsersResponse>('/api/admin/users');
+    const users = data.data;
+    return {
+      totalUsers: users.pagination.total,
+      profiles: users.users.map((u) => ({
+        id: u.id,
+        email: u.email,
+        displayName: u.displayName,
+        bio: u.bio,
+        avatar: u.avatar,
+        todoCount: u.todoCount,
+        createdAt: u.createdAt,
+      })),
+    };
   },
 };
 

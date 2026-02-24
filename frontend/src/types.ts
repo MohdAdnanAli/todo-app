@@ -61,6 +61,8 @@ export interface User {
   avatar?: string;
   emailVerified?: boolean;
   lastLoginAt?: string;
+  role?: 'user' | 'admin';
+  isAdmin?: boolean;
 }
 
 // Profile update data
@@ -120,11 +122,110 @@ export interface AdminStats {
 export interface AdminProfile {
   id: string;
   email: string;
-  displayName: string;
+  displayName?: string;
   bio?: string;
   avatar?: string;
   todoCount: number;
   createdAt: string;
+}
+
+// Admin User (for API responses)
+export interface AdminUser {
+  id: string;
+  email: string;
+  displayName?: string;
+  bio?: string;
+  avatar?: string;
+  emailVerified?: boolean;
+  todoCount: number;
+  completedTodos?: number;
+  completionRate?: number;
+  lastLoginAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// Admin Dashboard Stats
+export interface AdminDashboardStats {
+  totalUsers: number;
+  totalTodos: number;
+  completedTodos: number;
+  pendingTodos: number;
+  activeUsers: number;
+  completionRate: number;
+}
+
+// Admin User Info
+export interface AdminUserInfo {
+  id: string;
+  email: string;
+  displayName?: string;
+  bio?: string;
+  avatar?: string;
+  emailVerified: boolean;
+  todoCount: number;
+  completedTodos: number;
+  completionRate: number;
+  createdAt: string;
+  lastLoginAt?: string;
+}
+
+// Admin Dashboard Data
+export interface AdminDashboardData {
+  stats: AdminDashboardStats;
+  recentUsers: AdminUserInfo[];
+}
+
+// Admin Users Response
+export interface AdminUsersResponse {
+  users: AdminUserInfo[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+// Admin Todo User
+export interface AdminTodoUser {
+  id: string;
+  email: string;
+  displayName?: string;
+}
+
+// Admin Todo
+export interface AdminTodo {
+  _id: string;
+  text: string;
+  completed: boolean;
+  category?: string;
+  priority?: string;
+  createdAt: string;
+  user?: AdminTodoUser;
+}
+
+// Admin Todos Response
+export interface AdminTodosResponse {
+  todos: AdminTodo[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+// System Health
+export interface SystemHealth {
+  status: string;
+  timestamp: string;
+  database: {
+    state: string;
+    error?: string;
+  };
+  uptime: string;
+  environment: string;
 }
 
 // Auth mode for forms

@@ -4,6 +4,7 @@ import { useTheme } from './theme';
 import type { Todo, User, MessageType, TodoCategory, TodoPriority } from './types';
 import { API_URL } from './types';
 import { encrypt, decrypt } from './utils/crypto';
+import { AdminDashboard } from './pages/AdminDashboard';
 import { 
   AuthForm, 
   // Footer,
@@ -19,9 +20,11 @@ function App() {
   useTheme();
   
   const [isLoading, setIsLoading] = useState(true);
+  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<MessageType>('idle');
   const [user, setUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [encryptionSalt, setEncryptionSalt] = useState<string>('');
@@ -54,6 +57,7 @@ function App() {
           });
           
           setUser(res.data.user || null);
+          setIsAdmin(res.data.isAdmin || false);
           
           if (res.data.encryptionSalt) {
             setEncryptionSalt(res.data.encryptionSalt);
@@ -182,6 +186,8 @@ function App() {
     }
   
     setUser(null);
+    setIsAdmin(false);
+    setShowAdminDashboard(false);
     setTodos([]);
     setEncryptionSalt('');
     setUserPassword('');
@@ -288,11 +294,11 @@ function App() {
   }
 
   return (
-    <div 
-      className="rounded-2xl sm:p-[2.5rem] p-4 max-w-[560px] w-full mx-auto relative"
-      style={{ 
-        background: 'var(--bg-primary)', 
-        boxShadow: 'var(--shadow)' 
+    <div
+      className={`rounded-2xl sm:p-[2.5rem] p-4 w-full mx-auto relative ${showAdminDashboard ? 'max-w-[90vw]' : 'max-w-[560px]'}`}
+      style={{
+        background: 'var(--bg-primary)',
+        boxShadow: 'var(--shadow)'
       }}
     >
       <ThemeSelector />
@@ -307,8 +313,11 @@ function App() {
 
       {user ? (
         <div>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-[1.5rem]">
-            <p className="font-semibold text-lg text-[var(--text-primary)] flex items-center gap-2 m-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-end mb-[1.5rem]">
+            <p
+              onClick={() => setShowProfileModal(true)}
+              className="font-semibold text-lg text-[var(--text-primary)] flex items-center gap-2 m-0 mr-auto cursor-pointer hover:opacity-80 transition-opacity"
+            >
               <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm">
                 {(user.displayName || user.email.split('@')[0]).charAt(0).toUpperCase()}
               </span>
@@ -316,17 +325,32 @@ function App() {
                 Welcome, {user.displayName || user.email.split('@')[0]}!
               </span>
             </p>
-            
+
             <button
-              onClick={() => setShowProfileModal(true)}
-              className="px-4 py-2 rounded-lg font-medium text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white 
+              onClick={() => setShowProfileModal(false)}
+              title="this feature is in beta"
+              className="px-4 py-2 rounded-lg font-medium text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white
                 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
               style={{ boxShadow: 'var(--glow)' }}
             >
-              ⚙️ Profile
+              ⏰
             </button>
+            {isAdmin && (
+              <button
+                onClick={() => setShowAdminDashboard(true)}
+                className="px-4 py-2 rounded-lg font-medium text-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white
+                  shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
+                style={{ boxShadow: 'var(--glow)' }}
+              >
+                ⚙️ Admin
+              </button>
+            )}
           </div>
 
+          {showAdminDashboard ? (
+            <AdminDashboard onClose={() => setShowAdminDashboard(false)} />
+          ) : (
+            <>
           <TodoForm onAdd={handleAddTodo} />
 
           <TodoList 
@@ -346,6 +370,8 @@ function App() {
               Logout
             </button>
           </div>
+            </>
+          )}
         </div>
       ) : (
         <AuthForm 
