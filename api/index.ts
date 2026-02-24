@@ -15,8 +15,9 @@ import { User } from './models/User';
 
 dotenv.config();
 
+// Set trust proxy BEFORE creating express app
 const app = express();
-app.set('trust proxy', 1); // Required for rate limiter on Render/VPS
+app.enable('trust proxy'); // Enable trust proxy at app level
 
 
 // ────────────────────────────────────────────────
