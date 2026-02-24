@@ -1,5 +1,10 @@
 import rateLimit from 'express-rate-limit';
 
+// Global configuration for express-rate-limit
+const globalRateLimitConfig = {
+  validate: { xForwardedForHeader: false },
+};
+
 // General API rate limiter
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -7,7 +12,7 @@ export const apiLimiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false },
+  ...globalRateLimitConfig,
 });
 
 // Login attempt limiter - strict
@@ -18,7 +23,7 @@ export const loginLimiter = rateLimit({
   skipSuccessfulRequests: true, // don't count successful logins
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false },
+  ...globalRateLimitConfig,
 });
 
 // Registration limiter
@@ -28,7 +33,7 @@ export const registerLimiter = rateLimit({
   message: 'Too many registration attempts, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false },
+  ...globalRateLimitConfig,
 });
 
 // Password reset limiter
@@ -38,5 +43,5 @@ export const passwordResetLimiter = rateLimit({
   message: 'Too many password reset attempts, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { xForwardedForHeader: false },
+  ...globalRateLimitConfig,
 });
