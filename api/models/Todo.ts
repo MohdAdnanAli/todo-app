@@ -32,8 +32,20 @@ const todoSchema = new Schema({
     enum: ['low', 'medium', 'high'],
     default: 'medium',
   },
+  dueDate: {
+    type: Date,
+    default: null,
+  },
+  order: {
+    type: Number,
+    default: 0,
+    index: true,
+  },
 }, {
   timestamps: true,
 });
+
+// Compound index for efficient querying by user and order
+todoSchema.index({ user: 1, order: 1 });
 
 export const Todo = model('Todo', todoSchema);

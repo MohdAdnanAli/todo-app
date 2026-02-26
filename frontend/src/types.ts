@@ -50,6 +50,8 @@ export interface Todo {
   category?: TodoCategory;
   priority?: TodoPriority;
   tags?: string[];
+  dueDate?: string | null;
+  order?: number;
 }
 
 // User interface

@@ -1,4 +1,3 @@
-
 import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -7,6 +6,7 @@ import { User } from '../models/User';
 import { registerSchema, loginSchema, passwordResetSchema, resetPasswordSchema, updateProfileSchema, verifyEmailSchema } from '../schemas/auth';
 import { sanitizeInput, generateVerificationToken, generateResetToken, validatePasswordStrength } from '../utils/security';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/email';
+import { emailDripService } from '../services/emailDrip';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -71,10 +71,58 @@ export const register = async (req: Request, res: Response) => {
       email,
       password: hashed,
       displayName: sanitizeInput(displayName || email.split('@')[0] || 'User'),
+      authProvider: 'local',
       emailVerificationToken: verificationToken,
       emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
       encryptionSalt,
     });
+
+    // Schedule email drip sequence (non-blocking)
+    emailDripService.scheduleEmailDrip(user._id.toString(), email, user.displayName).catch(err => {
+      console.log('[Email Drip] Could not schedule email drip (SMTP not configured)');
+    });
+
+    // Create example todos for the user (non-blocking)
+    try {
+      const { Todo } = await import('../models/Todo');
+      const exampleTodos = [
+        {
+          text: '📧 Check welcome email for tips',
+          completed: false,
+          category: 'personal',
+          priority: 'high',
+          tags: ['getting-started'],
+          dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          order: 0,
+          user: user._id,
+        },
+        {
+          text: '🚀 Set up your first project',
+          completed: false,
+          category: 'work',
+          priority: 'high',
+          tags: ['getting-started'],
+          dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+          order: 1,
+          user: user._id,
+        },
+        {
+          text: '🎯 Review your goals for this week',
+          completed: false,
+          category: 'personal',
+          priority: 'medium',
+          tags: ['getting-started', 'planning'],
+          dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+          order: 2,
+          user: user._id,
+        },
+      ];
+      
+      await Todo.insertMany(exampleTodos);
+      console.log(`[Onboarding] Created ${exampleTodos.length} example todos for user ${user._id}`);
+    } catch (err) {
+      console.log('[Onboarding] Could not create example todos');
+    }
 
     // Send verification email (non-blocking, log error but continue)
     sendVerificationEmail(email, verificationToken).catch(err => {
@@ -136,9 +184,19 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Check if this is a Google-only user trying to login with password
+    if (user.isGoogleUser && !user.password) {
+      return res.status(401).json({ error: 'This account uses Google Sign-In. Please login with Google.' });
+    }
+
     // Check if account is locked
     if (isAccountLocked(user)) {
       return res.status(429).json({ error: 'Account temporarily locked due to too many failed attempts. Try again later.' });
+    }
+
+    // Check if user has a password (required for email/password login)
+    if (!user.password) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const match = await bcrypt.compare(password, user.password);
@@ -346,4 +404,3 @@ export const deleteUser = async (req: Request & { user?: { id: string } }, res: 
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
-

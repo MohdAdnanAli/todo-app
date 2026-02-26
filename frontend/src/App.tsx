@@ -7,14 +7,20 @@ import { encrypt, decrypt } from './utils/crypto';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { 
   AuthForm, 
-  // Footer,
   LEDIndicator, 
   ProfileModal,
+  WelcomeBackModal,
   ThemeSelector, 
   TodoForm, 
-  TodoList,
-  GeometryLoader
+  GeometryLoader,
+  WelcomeTour,
+  QuickStartChecklist,
+  PWAInstallPrompt,
+  ConfirmDialog,
 } from './components';
+import SortableTodoList from './components/SortableTodoList';
+import { onboardingService } from './services/onboarding';
+import { offlineStorage } from './services/offlineStorage';
 
 function App() {
   useTheme();
@@ -29,25 +35,80 @@ function App() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [encryptionSalt, setEncryptionSalt] = useState<string>('');
   const [userPassword, setUserPassword] = useState<string>('');
+  const [showWelcomeTour, setShowWelcomeTour] = useState(false);
+  const [showQuickStart, setShowQuickStart] = useState(false);
+  const [quickStartChecked, setQuickStartChecked] = useState(false);
+  const [showWelcomeBackModal, setShowWelcomeBackModal] = useState(false);
+  const [isLoadingTodos, setIsLoadingTodos] = useState(false);
+  
+  // Delete confirmation dialog state
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    todoId: string | null;
+    isDeleting: boolean;
+  }>({ isOpen: false, todoId: null, isDeleting: false });
 
   const decryptTodo = useCallback(async (todo: Todo): Promise<Todo> => {
-    // Skip decryption if password or salt not available
     if (!userPassword || !encryptionSalt) return todo;
     try {
       const decryptedText = await decrypt(todo.text, userPassword, encryptionSalt);
       return { ...todo, text: decryptedText };
     } catch (err) {
-      // Silently return original todo on decryption failure (e.g., already decrypted or invalid format)
       return todo;
     }
   }, [userPassword, encryptionSalt]);
 
   const decryptAllTodos = useCallback(async (todosToDecrypt: Todo[]): Promise<Todo[]> => {
-    // Only decrypt if user has provided their password
     if (!userPassword || !encryptionSalt || todosToDecrypt.length === 0) return todosToDecrypt;
     return Promise.all(todosToDecrypt.map(decryptTodo));
-  }, [userPassword, encryptionSalt]);
+  }, [userPassword, encryptionSalt, decryptTodo]);
 
+  const handleGetIn = async () => {
+    setIsLoadingTodos(true);
+    try {
+      const todosRes = await axios.get(`${API_URL}/api/todos`, {
+        withCredentials: true,
+      });
+      // If no password is set, just load the todos as-is (encrypted)
+      if (!userPassword) {
+        setTodos(todosRes.data);
+      } else {
+        const decryptedTodos = await decryptAllTodos(todosRes.data);
+        setTodos(decryptedTodos);
+      }
+      await offlineStorage.saveTodos(todosRes.data);
+      setShowWelcomeBackModal(false);
+      setMessage('Ready to go!');
+      setMessageType('success');
+    } catch (err: any) {
+      setMessage('Error loading your tasks');
+      setMessageType('error');
+    } finally {
+      setIsLoadingTodos(false);
+    }
+  };
+
+  // Load todos from offline storage and password on mount
+  useEffect(() => {
+    const loadOfflineTodos = async () => {
+      try {
+        const offlineTodos = await offlineStorage.getAllTodos();
+        if (offlineTodos.length > 0) {
+          setTodos(offlineTodos);
+        }
+        // Try to restore password from storage
+        const storedPassword = await offlineStorage.getPassword();
+        if (storedPassword) {
+          setUserPassword(storedPassword);
+        }
+      } catch (error) {
+        console.error('Error loading offline todos:', error);
+      }
+    };
+    loadOfflineTodos();
+  }, []);
+
+  // Separate effect to handle auth check - runs AFTER userPassword is restored
   useEffect(() => {
     const checkAuthAndFetch = async (retries = 3) => {
       for (let attempt = 1; attempt <= retries; attempt++) {
@@ -63,22 +124,34 @@ function App() {
             setEncryptionSalt(res.data.encryptionSalt);
           }
 
-          if (!userPassword) {
-            const todosRes = await axios.get(`${API_URL}/api/todos`, {
-              withCredentials: true,
-            });
-            // Don't try to decrypt - just store encrypted todos
-            setTodos(todosRes.data);
-            setMessage('Session active - please login to decrypt todos');
-            setMessageType('attention');
-          } else {
-            const todosRes = await axios.get(`${API_URL}/api/todos`, {
-              withCredentials: true,
-            });
+          // Fetch todos from server
+          const todosRes = await axios.get(`${API_URL}/api/todos`, {
+            withCredentials: true,
+          });
+          
+          // Use the current userPassword value (which may have been restored from storage)
+          if (userPassword) {
             const decryptedTodos = await decryptAllTodos(todosRes.data);
             setTodos(decryptedTodos);
-            setMessage('Welcome back!');
-            setMessageType('success');
+            await offlineStorage.saveTodos(decryptedTodos);
+          } else {
+            setTodos(todosRes.data);
+            await offlineStorage.saveTodos(todosRes.data);
+          }
+          
+          // Only show welcome modal on first visit (no todos in offline storage AND no userPassword)
+          const offlineTodos = await offlineStorage.getAllTodos();
+          if (offlineTodos.length === 0 && !userPassword) {
+            setShowWelcomeBackModal(true);
+            setMessage('');
+            setMessageType('idle');
+          } else {
+            // User already has todos or password, show them normally
+            setShowWelcomeBackModal(false);
+            if (userPassword) {
+              setMessage('Welcome back!');
+              setMessageType('success');
+            }
           }
           
           setIsLoading(false);
@@ -111,6 +184,29 @@ function App() {
     checkAuthAndFetch();
   }, [userPassword, decryptAllTodos]);
 
+  // Handle Google OAuth callback params on initial load
+  useEffect(() => {
+    const handleGoogleOAuthParams = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const googleAuth = urlParams.get('google_auth');
+      const googleId = urlParams.get('googleId');
+      const salt = urlParams.get('encryptionSalt');
+
+      if (googleAuth === 'success' && googleId && salt) {
+        // Set encryption params for Google OAuth
+        setUserPassword(googleId);
+        setEncryptionSalt(salt);
+        
+        // Save password for future reloads
+        await offlineStorage.savePassword(googleId);
+        
+        // Clear URL params
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    };
+    handleGoogleOAuthParams();
+  }, []);
+
   const handleLogin = async (loginEmail: string, loginPassword: string) => {
     try {
       const response = await axios.post(
@@ -124,11 +220,15 @@ function App() {
       setMessage('Login successful');
       setMessageType('success');
 
+      // Save password for future reloads
+      await offlineStorage.savePassword(loginPassword);
+
       const todosRes = await axios.get(`${API_URL}/api/todos`, {
         withCredentials: true,
       });
       const decryptedTodos = await decryptAllTodos(todosRes.data);
       setTodos(decryptedTodos);
+      await offlineStorage.saveTodos(decryptedTodos);
     } catch (err: any) {
       const errorMsg = err.response?.data?.error || err.message;
       
@@ -160,12 +260,16 @@ function App() {
       setUserPassword(regPassword);
       setMessage('Account created and logged in! Please check your email to verify your account.');
       setMessageType('success');
+
+      // Save password for future reloads
+      await offlineStorage.savePassword(regPassword);
       
       const todosRes = await axios.get(`${API_URL}/api/todos`, {
         withCredentials: true,
       });
       const decryptedTodos = await decryptAllTodos(todosRes.data);
       setTodos(decryptedTodos);
+      await offlineStorage.saveTodos(decryptedTodos);
     } catch (err: any) {
       setMessage('Error: ' + (err.response?.data?.error || err.message));
       setMessageType('error');
@@ -177,12 +281,8 @@ function App() {
       await axios.post(`${API_URL}/api/auth/logout`, {}, {
         withCredentials: true,
       });
-      setMessage('Logged out successfully');
-      setMessageType('info');
     } catch (err: any) {
       console.error('Logout failed:', err);
-      setMessage('Logout failed, but session cleared locally');
-      setMessageType('warning');
     }
   
     setUser(null);
@@ -191,6 +291,13 @@ function App() {
     setTodos([]);
     setEncryptionSalt('');
     setUserPassword('');
+    setShowWelcomeBackModal(false);
+    
+    // Clear stored password on logout
+    await offlineStorage.clearPassword();
+    
+    // Redirect directly to login page (home)
+    window.location.href = '/';
   };
 
   const handleProfileUpdate = (updatedUser: User) => {
@@ -205,24 +312,36 @@ function App() {
     setShowProfileModal(false);
     setMessage('');
     setMessageType('idle');
+    
+    // Clear stored password on account deletion
+    offlineStorage.clearPassword().catch(err => console.error('Error clearing password:', err));
   };
 
-  const handleAddTodo = async (text: string, category?: TodoCategory, priority?: TodoPriority, tags?: string[]) => {
+  const handleAddTodo = async (text: string, category?: TodoCategory, priority?: TodoPriority, tags?: string[], dueDate?: string) => {
     if (!text.trim()) {
       setMessage('Task text is required');
       setMessageType('warning');
       return;
     }
   
+    // Track if this is the first task being added
+    const isFirstTask = todos.length === 0;
+    const hasCategory = !!category;
+    const hasPriority = !!priority;
+  
     setMessage('Adding...');
     setMessageType('loading');
     try {
       const encryptedText = await encrypt(text, userPassword, encryptionSalt);
       
-      const todoData: Partial<Todo> = { text: encryptedText };
+      const todoData: Partial<Todo> = { 
+        text: encryptedText,
+        order: todos.length,
+      };
       if (category) todoData.category = category;
       if (priority) todoData.priority = priority;
       if (tags && tags.length > 0) todoData.tags = tags;
+      if (dueDate) todoData.dueDate = dueDate;
       
       const res = await axios.post(
         `${API_URL}/api/todos`,
@@ -230,7 +349,21 @@ function App() {
         { withCredentials: true }
       );
       const decryptedTodo = await decryptTodo(res.data);
-      setTodos([decryptedTodo, ...todos]);
+      const updatedTodos = [decryptedTodo, ...todos];
+      setTodos(updatedTodos);
+      await offlineStorage.saveTodos(updatedTodos);
+      
+      // Auto-complete quick-start tasks
+      if (isFirstTask) {
+        await checkAndAutoCompleteTask('first-task');
+      }
+      if (hasCategory) {
+        await checkAndAutoCompleteTask('categorize');
+      }
+      if (hasPriority) {
+        await checkAndAutoCompleteTask('set-priority');
+      }
+      
       setMessage('Todo added');
       setMessageType('primary');
     } catch (err: any) {
@@ -248,9 +381,11 @@ function App() {
       );
 
       const decryptedTodo = await decryptTodo(res.data);
-      setTodos(todos.map(t =>
+      const updatedTodos = todos.map(t =>
         t._id === todo._id ? decryptedTodo : t
-      ));
+      );
+      setTodos(updatedTodos);
+      await offlineStorage.saveTodos(updatedTodos);
       setMessage(todo.completed ? 'Task marked as pending' : 'Task completed');
       setMessageType(todo.completed ? 'pending' : 'success');
     } catch (err: any) {
@@ -259,20 +394,96 @@ function App() {
     }
   };
 
-  const handleDelete = async (todoId: string) => {
-    if (!window.confirm('Delete this task?')) return;
+  const handleDeleteClick = (todoId: string) => {
+    setDeleteConfirm({ isOpen: true, todoId, isDeleting: false });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm.todoId) return;
+    
+    setDeleteConfirm(prev => ({ ...prev, isDeleting: true }));
 
     try {
-      await axios.delete(`${API_URL}/api/todos/${todoId}`, {
+      await axios.delete(`${API_URL}/api/todos/${deleteConfirm.todoId}`, {
         withCredentials: true,
       });
 
-      setTodos(todos.filter(t => t._id !== todoId));
+      const updatedTodos = todos.filter(t => t._id !== deleteConfirm.todoId);
+      setTodos(updatedTodos);
+      await offlineStorage.saveTodos(updatedTodos);
       setMessage('Todo deleted');
       setMessageType('accent');
     } catch (err: any) {
       setMessage('Error deleting todo: ' + (err.response?.data?.error || err.message));
       setMessageType('error');
+    } finally {
+      setDeleteConfirm({ isOpen: false, todoId: null, isDeleting: false });
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirm({ isOpen: false, todoId: null, isDeleting: false });
+  };
+
+  const handleReorder = async (reorderedTodos: Todo[]) => {
+    setTodos(reorderedTodos);
+    await offlineStorage.saveTodos(reorderedTodos);
+    
+    // Update orders on server (non-blocking)
+    try {
+      for (const todo of reorderedTodos) {
+        await axios.put(
+          `${API_URL}/api/todos/${todo._id}`,
+          { order: todo.order },
+          { withCredentials: true }
+        );
+      }
+    } catch (err) {
+      console.error('Error saving order:', err);
+    }
+  };
+
+  const handleTourComplete = async () => {
+    setShowWelcomeTour(false);
+    await onboardingService.markOnboardingAsCompleted();
+  };
+
+  const handleQuickStartComplete = async () => {
+    setShowQuickStart(false);
+  };
+
+  // Check quick-start progress and show checklist for new users
+  useEffect(() => {
+    const checkQuickStartStatus = async () => {
+      if (!user || quickStartChecked) return;
+      
+      try {
+        const isComplete = await onboardingService.isQuickStartComplete();
+        
+        // Show checklist if user hasn't completed all tasks yet
+        if (!isComplete) {
+          setShowQuickStart(true);
+        }
+        setQuickStartChecked(true);
+      } catch (error) {
+        console.error('Error checking quick-start status:', error);
+        setQuickStartChecked(true);
+      }
+    };
+    
+    checkQuickStartStatus();
+  }, [user, quickStartChecked]);
+
+  // Auto-complete quick-start tasks when user performs actions
+  const checkAndAutoCompleteTask = async (taskId: string) => {
+    try {
+      const progress = await onboardingService.getQuickStartProgress();
+      const task = progress.find(t => t.id === taskId);
+      if (task && !task.completed) {
+        await onboardingService.updateQuickStartTask(taskId, true);
+      }
+    } catch (error) {
+      console.error('Error auto-completing task:', error);
     }
   };
 
@@ -303,7 +514,6 @@ function App() {
     >
       <ThemeSelector />
       
-      {/* Header with LED Status Indicator */}
       <div className="flex items-center justify-center mb-[2rem] relative">
         <h1 className="text-center bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent text-[2rem] font-semibold m-0">
           Todo App
@@ -313,63 +523,83 @@ function App() {
 
       {user ? (
         <div>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-end mb-[1.5rem]">
-            <p
-              onClick={() => setShowProfileModal(true)}
-              className="font-semibold text-lg text-[var(--text-primary)] flex items-center gap-2 m-0 mr-auto cursor-pointer hover:opacity-80 transition-opacity"
-            >
-              <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm">
-                {(user.displayName || user.email.split('@')[0]).charAt(0).toUpperCase()}
-              </span>
-              <span className="whitespace-nowrap">
-                Welcome, {user.displayName || user.email.split('@')[0]}!
-              </span>
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-[1.5rem] gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p
+                onClick={() => setShowProfileModal(true)}
+                className="font-semibold text-lg text-[var(--text-primary)] flex items-center gap-2 m-0 cursor-pointer hover:opacity-80 transition-opacity"
+              >
+                {user.avatar ? (
+                  <img 
+                    src={user.avatar} 
+                    alt={user.displayName || user.email}
+                    className="w-8 h-8 rounded-full object-cover"
+                  />
+                ) : (
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm flex-shrink-0">
+                    {(user.displayName || user.email.split('@')[0]).charAt(0).toUpperCase()}
+                  </span>
+                )}
+                <span className="whitespace-nowrap">
+                  Welcome, {user.displayName || user.email.split('@')[0]}!
+                </span>
+              </p>
+              {user.bio && (
+                <span className="text-xs text-[var(--text-muted)]">
+                  ({user.bio.length > 20 ? user.bio.substring(0, 20) + '...' : user.bio})
+                </span>
+              )}
+            </div>
 
-            <button
-              onClick={() => setShowProfileModal(false)}
-              title="this feature is in beta"
-              className="px-4 py-2 rounded-lg font-medium text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white
-                shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
-              style={{ boxShadow: 'var(--glow)' }}
-            >
-              ⏰
-            </button>
-            {isAdmin && (
+            <div className="flex items-center gap-2 ml-auto sm:ml-0">
               <button
-                onClick={() => setShowAdminDashboard(true)}
-                className="px-4 py-2 rounded-lg font-medium text-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white
+                
+                title="Premium Feature is in Beta"
+                className="px-4 py-2 rounded-lg font-medium text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white
                   shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
                 style={{ boxShadow: 'var(--glow)' }}
               >
-                ⚙️ Admin
+                ⏰
               </button>
-            )}
+              {isAdmin && (
+                <button
+                  onClick={() => setShowAdminDashboard(true)}
+                  className="px-3 py-2 rounded-lg font-medium text-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white
+                    shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
+                  style={{ boxShadow: 'var(--glow)' }}
+                >
+                  ⚙️ Admin
+                </button>
+              )}
+            </div>
           </div>
 
           {showAdminDashboard ? (
             <AdminDashboard onClose={() => setShowAdminDashboard(false)} />
           ) : (
             <>
-          <TodoForm onAdd={handleAddTodo} />
+              {showQuickStart && <QuickStartChecklist onComplete={handleQuickStartComplete} />}
+              
+              <TodoForm onAdd={handleAddTodo} />
 
-          <TodoList 
-            todos={todos} 
-            onToggle={handleToggle} 
-            onDelete={handleDelete} 
-          />
+              <SortableTodoList 
+                todos={todos} 
+                onToggle={handleToggle} 
+                onDelete={handleDeleteClick}
+                onReorder={handleReorder}
+              />
 
-          <div className="flex gap-3 mt-[2rem]">
-            <button
-              onClick={handleLogout}
-              className="flex-1 py-3.5 rounded-lg font-medium text-sm
-                bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md
-                hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
-              style={{ boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)' }}
-            >
-              Logout
-            </button>
-          </div>
+              <div className="flex gap-3 mt-[2rem]">
+                <button
+                  onClick={handleLogout}
+                  className="flex-1 py-3.5 rounded-lg font-medium text-sm
+                    bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md
+                    hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+                  style={{ boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)' }}
+                >
+                  Logout
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -393,10 +623,39 @@ function App() {
           }}
         />
       )}
-      
-      {/* <Footer developerLink="https://t.me/jerrymanager_bot" /> */}
+
+      {showWelcomeBackModal && user && (
+        <WelcomeBackModal
+          isOpen={showWelcomeBackModal}
+          userName={user.displayName || user.email.split('@')[0]}
+          onGetIn={handleGetIn}
+          isLoading={isLoadingTodos}
+        />
+      )}
+
+      <WelcomeTour 
+        isOpen={showWelcomeTour}
+        onClose={() => setShowWelcomeTour(false)}
+        onComplete={handleTourComplete}
+      />
+
+      <PWAInstallPrompt />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        title="Delete Task"
+        message="Are you sure you want to delete this task? This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+        isLoading={deleteConfirm.isDeleting}
+      />
     </div>
   );
 }
 
 export default App;
+

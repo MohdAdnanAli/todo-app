@@ -7,6 +7,8 @@ import path from 'path';
 
 import { register, login, verifyEmail, requestPasswordReset, resetPassword, updateProfile, getProfile, deleteUser } from './controllers/auth';
 import { getDashboardStats, getAllUsers, getUserDetails, updateUser, deleteUser as adminDeleteUser, getAllTodos, deleteTodo as adminDeleteTodo, deleteMultipleTodos, getSystemHealth } from './controllers/admin';
+import { getSupabaseGoogleAuthUrl, handleSupabaseCallback, getSupabaseAuthStatus, signOutSupabase, checkEmailAvailability } from './controllers/supabaseAuth';
+import { getGoogleAuthUrlHandler, googleCallback, googleError, linkGoogleAccount, unlinkGoogleAccount, getGoogleAuthStatus } from './controllers/googleAuth';
 import { protect } from './middleware/auth';
 import { adminProtect } from './middleware/admin';
 import { getTodos, createTodo, updateTodo, deleteTodo } from './controllers/todo';
@@ -111,6 +113,41 @@ app.post('/api/auth/verify-email', verifyEmail);
 app.post('/api/auth/request-password-reset', passwordResetLimiter, requestPasswordReset);
 app.post('/api/auth/reset-password', resetPassword);
 
+// Supabase Google OAuth (PARALLEL system)
+app.get('/api/auth/supabase/google/url', getSupabaseGoogleAuthUrl);
+app.get('/auth/callback', handleSupabaseCallback);
+app.get('/api/auth/supabase/status', protect, getSupabaseAuthStatus);
+app.post('/api/auth/supabase/signout', signOutSupabase);
+app.get('/api/auth/check-email', checkEmailAvailability);
+
+// Google OAuth routes
+app.get('/api/auth/google/url', getGoogleAuthUrlHandler);
+app.get('/api/auth/google/callback', googleCallback);
+app.get('/api/auth/google/error', googleError);
+
+// Protected Google OAuth routes
+app.post('/api/auth/google/link', protect, linkGoogleAccount);
+app.post('/api/auth/google/unlink', protect, unlinkGoogleAccount);
+app.get('/api/auth/google/status', protect, getGoogleAuthStatus);
+
+// Set auth token from URL (for Google OAuth callback with token in URL)
+app.post('/api/auth/set-token', (req, res) => {
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).json({ error: 'Token is required' });
+  }
+  
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+  res.cookie('auth_token', token, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+  
+  res.json({ message: 'Token set successfully' });
+});
+
 // Protected routes
 app.get('/api/todos', protect, getTodos);
 app.post('/api/todos', protect, createTodo);
@@ -136,6 +173,9 @@ app.get('/api/me', protect, async (req: any, res) => {
         bio: user.bio,
         avatar: user.avatar,
         role: user.role,
+        authProvider: user.authProvider,
+        isGoogleUser: user.isGoogleUser,
+        googleProfile: user.googleProfile,
       },
       isAdmin,
       encryptionSalt: user.encryptionSalt 

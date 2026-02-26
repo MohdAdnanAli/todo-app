@@ -39,3 +39,21 @@ export const updateProfileSchema = z.object({
 export const verifyEmailSchema = z.object({
   token: z.string().min(1, 'Verification token is required'),
 });
+
+// Google OAuth schemas
+export const googleAuthUrlSchema = z.object({
+  redirectUri: z.string().url().optional(),
+});
+
+export const googleCallbackSchema = z.object({
+  code: z.string().min(1, 'Authorization code is required'),
+  state: z.string().optional(),
+});
+
+export const googleLinkSchema = z.object({
+  googleToken: z.string().min(1, 'Google token is required'),
+});
+
+export const googleUnlinkSchema = z.object({
+  password: z.string().min(1, 'Password is required to unlink Google account'),
+});

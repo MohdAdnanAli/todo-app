@@ -76,6 +76,44 @@ export const authApi = {
     const res = await api.get<{ user: User; encryptionSalt: string; isAdmin?: boolean }>('/api/me');
     return res.data;
   },
+
+  setToken: async (token: string): Promise<{ message: string }> => {
+    const res = await api.post<{ message: string }>('/api/auth/set-token', { token });
+    return res.data;
+  },
+
+};
+
+// ==================== GOOGLE OAUTH ====================
+
+export const googleApi = {
+  // Get Google OAuth URL - pass frontend URL so backend knows where to redirect after OAuth
+  getAuthUrl: async (): Promise<{ authUrl: string; state: string }> => {
+    // Pass the current frontend origin so backend can redirect back to the correct URL
+    const frontendUrl = typeof window !== 'undefined' ? window.location.origin : undefined;
+    const res = await api.get<{ authUrl: string; state: string }>('/api/auth/google/url', {
+      params: frontendUrl ? { frontendUrl } : {}
+    });
+    return res.data;
+  },
+
+  // Link Google account to existing user
+  linkAccount: async (googleToken: string): Promise<{ message: string; user: { id: string; email: string; displayName: string; isGoogleUser: boolean } }> => {
+    const res = await api.post<{ message: string; user: { id: string; email: string; displayName: string; isGoogleUser: boolean } }>('/api/auth/google/link', { googleToken });
+    return res.data;
+  },
+
+  // Unlink Google account from user
+  unlinkAccount: async (password: string): Promise<{ message: string }> => {
+    const res = await api.post<{ message: string }>('/api/auth/google/unlink', { password });
+    return res.data;
+  },
+
+  // Get Google auth status
+  getStatus: async (): Promise<{ isGoogleUser: boolean; hasGoogleLinked: boolean; authProvider: string }> => {
+    const res = await api.get<{ isGoogleUser: boolean; hasGoogleLinked: boolean; authProvider: string }>('/api/auth/google/status');
+    return res.data;
+  },
 };
 
 // ==================== PROFILE ====================
@@ -240,4 +278,3 @@ export const isAccountLockedError = (error: unknown): boolean => {
   const message = getApiErrorMessage(error).toLowerCase();
   return message.includes('locked') || message.includes('too many failed attempts');
 };
-

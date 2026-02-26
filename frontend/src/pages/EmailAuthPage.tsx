@@ -289,14 +289,25 @@ const PasswordResetForm: React.FC<{ token: string }> = ({ token }) => {
           />
         </div>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--text-secondary)', fontSize: '0.875rem', cursor: 'pointer', justifyContent: 'center' }}>
-          <input
-            type="checkbox"
-            checked={showPassword}
-            onChange={(e) => setShowPassword(e.target.checked)}
-          />
-          Show password
-        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', justifyContent: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '1.25rem',
+              padding: '0.25rem',
+            }}
+            title={showPassword ? 'Hide password' : 'Show password'}
+          >
+            {showPassword ? '👁️' : '👁️‍🗨️'}
+          </button>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+            {showPassword ? 'Hide password' : 'Show password'}
+          </span>
+        </div>
 
         {/* Password Requirements Display */}
         {password && (
@@ -353,4 +364,3 @@ const PasswordResetForm: React.FC<{ token: string }> = ({ token }) => {
 };
 
 export default EmailAuthPage;
-

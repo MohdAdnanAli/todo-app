@@ -3,7 +3,7 @@ import { X, Plus, Tag } from 'lucide-react';
 import type { TodoCategory, TodoPriority } from '../types';
 
 interface TodoFormProps {
-  onAdd: (text: string, category?: TodoCategory, priority?: TodoPriority, tags?: string[]) => void;
+  onAdd: (text: string, category?: TodoCategory, priority?: TodoPriority, tags?: string[], dueDate?: string) => void;
 }
 
 const CATEGORIES: { value: TodoCategory; label: string; color: string }[] = [
@@ -26,16 +26,18 @@ const TodoForm: React.FC<TodoFormProps> = memo(({ onAdd }) => {
   const [priority, setPriority] = useState<TodoPriority>('medium');
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
+  const [dueDate, setDueDate] = useState('');
   const [showOptions, setShowOptions] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (text.trim()) {
-      onAdd(text.trim(), category, priority, tags);
+      onAdd(text.trim(), category, priority, tags, dueDate || undefined);
       setText('');
       setCategory('personal');
       setPriority('medium');
       setTags([]);
+      setDueDate('');
       setShowOptions(false);
     }
   };
@@ -55,26 +57,31 @@ const TodoForm: React.FC<TodoFormProps> = memo(({ onAdd }) => {
     setTags(tags.filter(t => t !== tagToRemove));
   };
 
+  const getTodayDate = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
   return (
     <form 
       onSubmit={handleSubmit}
       className="mb-8 flex flex-col gap-3 p-5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-secondary)]"
     >
-      {/* Main input row */}
-      <div className="flex gap-3">
+      {/* Main input row - wraps on small screens */}
+      <div className="flex flex-wrap sm:flex-nowrap gap-2 sm:gap-3">
         <input
           type="text"
           placeholder="Add a new task..."
           value={text}
           onChange={(e) => setText(e.target.value)}
-          className="flex-1 px-4 py-3 text-base rounded-lg border border-[var(--border-primary)] 
+          className="flex-1 min-w-full sm:min-w-0 px-4 py-3 text-base rounded-lg border border-[var(--border-primary)] 
             bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-200
             focus:outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--glow)]"
         />
         <button
           type="button"
           onClick={() => setShowOptions(!showOptions)}
-          className="p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] 
+          className="flex-1 sm:flex-initial p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] 
             cursor-pointer text-[var(--text-secondary)] flex items-center justify-center 
             hover:bg-[var(--hover-bg)] transition-all duration-200"
           title="Task options"
@@ -83,13 +90,13 @@ const TodoForm: React.FC<TodoFormProps> = memo(({ onAdd }) => {
         </button>
         <button
           type="submit"
-          className="px-6 py-3 rounded-lg font-medium text-base flex items-center gap-2
+          className="flex-1 sm:flex-initial px-6 py-3 rounded-lg font-medium text-base flex items-center justify-center gap-2
             bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md
             hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
           style={{ boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)' }}
         >
           <Plus size={18} />
-          Add
+          <span className="sm:hidden">Add</span>
         </button>
       </div>
 
@@ -145,6 +152,32 @@ const TodoForm: React.FC<TodoFormProps> = memo(({ onAdd }) => {
                   {pri.label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Due Date */}
+          <div>
+            <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">Due Date (Optional)</div>
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                min={getTodayDate()}
+                className="flex-1 px-3 py-2 text-xs rounded-md border border-[var(--border-primary)] 
+                  bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-200
+                  focus:outline-none focus:border-[var(--accent-primary)]"
+              />
+              {dueDate && (
+                <button
+                  type="button"
+                  onClick={() => setDueDate('')}
+                  className="px-2 py-1 text-xs rounded-md bg-[var(--hover-bg)] border border-[var(--border-secondary)] 
+                    text-[var(--text-secondary)] hover:bg-red-500/20 transition-all"
+                >
+                  Clear
+                </button>
+              )}
             </div>
           </div>
 

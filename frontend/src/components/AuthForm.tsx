@@ -1,5 +1,6 @@
-import React, { useState, useEffect, memo } from 'react';
-import { authApi, getApiErrorMessage, isRateLimitError, isAccountLockedError } from '../services/api';
+import React, { useState, useEffect, useCallback } from 'react';
+import type { JSX } from 'react';
+import { authApi, googleApi, getApiErrorMessage, isRateLimitError, isAccountLockedError } from '../services/api';
 import type { AuthMode } from '../types';
 
 interface AuthFormProps {
@@ -48,10 +49,26 @@ const getTokenFromUrl = (): string | null => {
   return params.get('token');
 };
 
-const AuthForm: React.FC<AuthFormProps> = memo(({ onLogin, onRegister }) => {
+// Google SVG Icon
+const GoogleIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </svg>
+);
+
+const AuthForm = ({ onLogin, onRegister }: AuthFormProps): JSX.Element => {
   // Check URL for reset token on initial load
   const urlToken = typeof window !== 'undefined' ? getTokenFromUrl() : null;
   const initialMode: AuthMode = urlToken ? 'reset-password' : 'login';
+  
+  // Check for Google OAuth callback in URL (backend redirects with google_auth=success or google_error=...)
+  const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const googleAuth = urlParams?.get('google_auth') ?? null;
+  const googleError = urlParams?.get('google_error') ?? null;
+  const googleToken = urlParams?.get('token') ?? null;
   
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState('');
@@ -67,6 +84,70 @@ const AuthForm: React.FC<AuthFormProps> = memo(({ onLogin, onRegister }) => {
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
   const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
   const [passwordStrength, setPasswordStrength] = useState(0);
+
+  // Handle Google OAuth callback
+  useEffect(() => {
+    const handleGoogleCallback = async () => {
+      if (googleAuth === 'success') {
+        setIsLoading(true);
+        try {
+          // If token in URL, set it in cookie via API call
+          if (googleToken) {
+            // Set cookie by calling any authenticated endpoint
+            await fetch('/api/me', {
+              method: 'GET',
+              credentials: 'include',
+            });
+          }
+          
+          // Clear URL params without reload
+          window.history.replaceState({}, document.title, window.location.pathname);
+          
+          // Set success message
+          setSuccessMessage('Google sign-in successful! Redirecting...');
+          
+          // Reload to trigger auth check
+          setTimeout(() => window.location.reload(), 1500);
+        } catch (err: unknown) {
+          const message = getApiErrorMessage(err);
+          setError(message);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    if (googleAuth === 'success') {
+      handleGoogleCallback();
+    }
+  }, [googleAuth, googleToken]);
+
+  // Handle Google OAuth errors
+  useEffect(() => {
+    if (googleError) {
+      setError(decodeURIComponent(googleError));
+      // Clear URL params
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [googleError]);
+
+  // Google Sign-In handler
+  const handleGoogleSignIn = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      
+      // Get Google OAuth URL from backend
+      const { authUrl } = await googleApi.getAuthUrl();
+      
+      // Redirect to Google
+      window.location.href = authUrl;
+    } catch (err: unknown) {
+      getApiErrorMessage(err);
+      setError('Failed to initiate Google sign-in. Please try again.');
+      setIsLoading(false);
+    }
+  }, []);
 
   // Check URL for token when mode changes to reset-password
   useEffect(() => {
@@ -351,9 +432,9 @@ const AuthForm: React.FC<AuthFormProps> = memo(({ onLogin, onRegister }) => {
               <div className="text-xs font-medium text-[var(--text-secondary)] mb-2">
                 {mode === 'reset-password' ? 'New Password Requirements:' : 'Password Requirements:'}
               </div>
-              {PASSWORD_REQUIREMENTS.map((req, i) => (
+              {PASSWORD_REQUIREMENTS.map((req) => (
                 <div 
-                  key={i} 
+                  key={req.label}
                   className="flex items-center gap-2 text-xs mb-1"
                   style={{ color: req.test(password) ? '#22c55e' : 'var(--text-muted)' }}
                 >
@@ -361,6 +442,36 @@ const AuthForm: React.FC<AuthFormProps> = memo(({ onLogin, onRegister }) => {
                   <span>{req.label}</span>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Google Sign-In Button - Show for login and register */}
+          {(mode === 'login' || mode === 'register') && (
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isLoading}
+                className="w-full py-3 px-4 rounded-lg font-medium text-base transition-all duration-200
+                  bg-white text-gray-700 border border-gray-300 hover:bg-gray-50
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  flex items-center justify-center gap-3"
+              >
+                <GoogleIcon />
+                {isLoading ? 'Please wait...' : mode === 'login' ? 'Continue with Google' : 'Sign up with Google'}
+              </button>
+            </div>
+          )}
+
+          {/* Divider */}
+          {(mode === 'login' || mode === 'register') && (
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-[var(--border-secondary)]"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-[var(--bg-secondary)] px-2 text-[var(--text-muted)]">Or</span>
+              </div>
             </div>
           )}
 
@@ -378,8 +489,8 @@ const AuthForm: React.FC<AuthFormProps> = memo(({ onLogin, onRegister }) => {
           >
             {isLoading ? 'Please wait...' : 
              rateLimitSeconds > 0 ? `Wait ${rateLimitSeconds}s...` :
-             mode === 'login' ? 'Login' :
-             mode === 'register' ? 'Create Account' :
+             mode === 'login' ? 'Login with Email' :
+             mode === 'register' ? 'Create Account with Email' :
              mode === 'forgot-password' ? 'Send Reset Link' :
              'Reset Password'}
           </button>
@@ -411,8 +522,7 @@ const AuthForm: React.FC<AuthFormProps> = memo(({ onLogin, onRegister }) => {
       </form>
     </div>
   );
-});
-
-AuthForm.displayName = 'AuthForm';
+};
 
 export default AuthForm;
+
