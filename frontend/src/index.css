@@ -188,22 +188,56 @@ input[type="checkbox"] {
   /* padding: 0.6rem 1rem; */
   background: var(--bg-secondary);
   color: var(--text-primary);
-  border: 1px solid var(--border-primary);
+  border: 2px solid transparent;
   border-radius: 8px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 9999;
+  background-image: linear-gradient(var(--bg-secondary), var(--bg-secondary)),
+    linear-gradient(135deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3, #54a0ff, #5f27cd);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
 }
 
 .theme-toggle-button:hover {
-  background: var(--hover-bg);
-  border-color: var(--border-accent);
+  background-image: linear-gradient(var(--hover-bg), var(--hover-bg)),
+    linear-gradient(135deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3, #54a0ff, #5f27cd);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  animation: gradientCirclePath 1.5s linear infinite;
 }
 
 .theme-toggle-button:active {
   background: var(--active-bg);
+  background-image: linear-gradient(var(--active-bg), var(--active-bg)),
+    linear-gradient(135deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3, #54a0ff, #5f27cd);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+@keyframes gradientCirclePath {
+  0% {
+    background-position: 0% 50%;
+    box-shadow: 0 0 5px rgba(255, 107, 107, 0.5);
+  }
+  25% {
+    background-position: 100% 50%;
+    box-shadow: 0 0 10px rgba(254, 202, 87, 0.5);
+  }
+  50% {
+    background-position: 100% 100%;
+    box-shadow: 0 0 10px rgba(72, 219, 251, 0.5);
+  }
+  75% {
+    background-position: 0% 100%;
+    box-shadow: 0 0 10px rgba(255, 159, 243, 0.5);
+  }
+  100% {
+    background-position: 0% 50%;
+    box-shadow: 0 0 5px rgba(255, 107, 107, 0.5);
+  }
 }
 
 .theme-toggle-arrow {
