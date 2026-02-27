@@ -1,8 +1,8 @@
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 
 // Supabase configuration
-const supabaseUrl = process.env.SUPABASE_URL || 'https://dkeyvjscseuiihiodjqz.supabase.co';
-const supabaseKey = process.env.SUPABASE_KEY || 'sb_publishable_wRNdG0f-j8Oo0eiDhqA9qg_f0Gh1OQE';
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_KEY || '';
 
 // Create Supabase client
 export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey, {
@@ -17,8 +17,8 @@ export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey, {
 
 // Google OAuth configuration
 export const googleOAuthConfig = {
-  clientId: process.env.GOOGLE_CLIENT_ID || '709918879424-4841f75e6vqnotbgcmo5ehnfakv8ep7i.apps.googleusercontent.com',
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET || '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',
+  clientId: process.env.GOOGLE_CLIENT_ID || '',
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
   // Redirect to our backend callback, which will handle the session
   redirectTo: process.env.SUPABASE_REDIRECT_URL || 'http://localhost:5000/auth/callback',
 };
