@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useRef, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Todo, TodoCategory, TodoPriority } from '../types';
@@ -61,6 +61,9 @@ const SortableTodoItem: React.FC<SortableTodoItemProps> = memo(({ todo, onToggle
     isDragging,
   } = useSortable({ id: todo._id, disabled: dragDisabled });
 
+  const [participantImageLoading, setParticipantImageLoading] = useState(true);
+  const imageRef = useRef<HTMLImageElement>(null);
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -76,6 +79,29 @@ const SortableTodoItem: React.FC<SortableTodoItemProps> = memo(({ todo, onToggle
   const formattedDueDate = dueDate
     ? new Date(dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : null;
+
+  // Handle image loading
+  useEffect(() => {
+    const img = imageRef.current;
+    if (!img) return;
+
+    const handleLoad = () => setParticipantImageLoading(false);
+    const handleError = () => setParticipantImageLoading(false);
+
+    if (img.complete) {
+      // Image is already loaded (cached)
+      setParticipantImageLoading(false);
+    } else {
+      // Image is still loading
+      img.addEventListener('load', handleLoad);
+      img.addEventListener('error', handleError);
+    }
+
+    return () => {
+      img.removeEventListener('load', handleLoad);
+      img.removeEventListener('error', handleError);
+    };
+  }, [todo.participants]);
 
   return (
     <li
