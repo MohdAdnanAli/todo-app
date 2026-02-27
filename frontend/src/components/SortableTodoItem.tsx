@@ -196,6 +196,33 @@ const SortableTodoItem: React.FC<SortableTodoItemProps> = memo(({ todo, onToggle
                 {tag}
               </span>
             ))}
+
+            {/* Participants */}
+            {todo.participants && todo.participants.length > 0 && (
+              <div className="flex items-center gap-1">
+                <div className="flex -space-x-2">
+                  {todo.participants.map((participant) => (
+                    <div key={participant.id} className="relative">
+                      {participant.avatar ? (
+                        <img
+                          ref={imageRef}
+                          src={participant.avatar}
+                          alt={participant.name}
+                          className="w-6 h-6 rounded-full border-2 border-[var(--card-bg)]"
+                        />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-[var(--accent-primary)] border-2 border-[var(--card-bg)] flex items-center justify-center text-[10px] font-medium text-white">
+                          {participant.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {participantImageLoading && (
+                  <div className="w-4 h-4 border-2 border-[var(--border-secondary)] border-t-[var(--accent-primary)] rounded-full animate-spin" />
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

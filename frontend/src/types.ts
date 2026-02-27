@@ -40,6 +40,13 @@ export type TodoCategory = 'work' | 'personal' | 'shopping' | 'health' | 'other'
 // Priority type for todos
 export type TodoPriority = 'low' | 'medium' | 'high';
 
+// Participant interface for collaborative todos
+export interface TodoParticipant {
+  id: string;
+  name: string;
+  avatar?: string;
+}
+
 // Todo interface
 export interface Todo {
   _id: string;
@@ -52,6 +59,7 @@ export interface Todo {
   tags?: string[];
   dueDate?: string | null;
   order?: number;
+  participants?: TodoParticipant[];
 }
 
 // User interface

@@ -41,6 +41,11 @@ const todoSchema = new Schema({
     default: 0,
     index: true,
   },
+  participants: [{
+    id: { type: String, required: true },
+    name: { type: String, required: true },
+    avatar: { type: String },
+  }],
 }, {
   timestamps: true,
 });

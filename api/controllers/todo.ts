@@ -10,6 +10,11 @@ const createTodoSchema = z.object({
   category: z.enum(CATEGORIES).optional().default('other'),
   priority: z.enum(PRIORITIES).optional().default('medium'),
   tags: z.array(z.string().max(50)).optional().default([]),
+  participants: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    avatar: z.string().optional(),
+  })).optional().default([]),
 });
 
 const updateTodoSchema = z.object({
@@ -18,6 +23,11 @@ const updateTodoSchema = z.object({
   category: z.enum(CATEGORIES).optional(),
   priority: z.enum(PRIORITIES).optional(),
   tags: z.array(z.string().max(50)).optional(),
+  participants: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    avatar: z.string().optional(),
+  })).optional(),
 });
 
 export const getTodos = async (req: Request & { user?: { id: string } }, res: Response) => {
