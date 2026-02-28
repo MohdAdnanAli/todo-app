@@ -17,17 +17,27 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
 // CRITICAL: The redirect URI must ALWAYS point to the BACKEND callback, not frontend
+// Priority: RENDER_URL > VERCEL_URL > API_URL > localhost
 let GOOGLE_REDIRECT_URI = 'http://localhost:5000/api/auth/google/callback';
 
+// Check for production deployment and set appropriate redirect URI
+const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+
 if (process.env.RENDER_URL) {
-  GOOGLE_REDIRECT_URI = `${process.env.RENDER_URL}/api/auth/google/callback`;
+  // Render deployment - explicit URL set in environment
+  GOOGLE_REDIRECT_URI = `${process.env.RENDER_URL.replace(/\/$/, '')}/api/auth/google/callback`;
+} else if (process.env.VERCEL_URL) {
+  // Vercel deployment - VERCEL_URL is automatically set by Vercel
+  GOOGLE_REDIRECT_URI = `https://${process.env.VERCEL_URL}/api/auth/google/callback`;
 } else if (process.env.API_URL && process.env.API_URL.startsWith('http')) {
+  // Custom API URL specified
   const apiUrl = process.env.API_URL.replace(/\/$/, '');
   GOOGLE_REDIRECT_URI = `${apiUrl}/api/auth/google/callback`;
 }
 
 if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
   console.warn('[Google OAuth] Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET environment variables');
+  console.warn('[Google OAuth] Google login will not be available');
 }
 
 interface GoogleTokenResponse {
@@ -143,10 +153,10 @@ export const getGoogleAuthUrlHandler = async (req: Request, res: Response) => {
     }
     
     console.log('[Google OAuth] Using frontend URL for redirect:', validatedFrontendUrl);
+    console.log('[Google OAuth] Redirect URI:', GOOGLE_REDIRECT_URI);
     
     const state = crypto.randomBytes(32).toString('hex');
     
-    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
     res.cookie('google_oauth_state', state, {
       httpOnly: true,
       secure: isProduction,
@@ -194,7 +204,6 @@ export const googleCallback = async (req: Request, res: Response) => {
       return res.redirect(`${frontendUrl}?google_error=${encodeURIComponent('Invalid state parameter')}`);
     }
 
-    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
     res.clearCookie('google_oauth_state', {
       httpOnly: true,
       secure: isProduction,
@@ -291,7 +300,9 @@ export const googleCallback = async (req: Request, res: Response) => {
     }
 
     // Pass token in URL as fallback for cross-origin cookie issues
-return res.redirect(`${frontendUrl}?google_auth=success&token=${token}&googleId=${encodeURIComponent(user.googleId)}&encryptionSalt=${encodeURIComponent(user.encryptionSalt || '')}`);
+    const googleId = user.googleId || '';
+    const encryptionSalt = user.encryptionSalt || '';
+    return res.redirect(`${frontendUrl}?google_auth=success&token=${token}&googleId=${encodeURIComponent(googleId)}&encryptionSalt=${encodeURIComponent(encryptionSalt)}`);
   } catch (err: unknown) {
     console.error('[Google OAuth] Callback error:', err);
     const frontendUrl = req.cookies?.google_oauth_frontend_url || FRONTEND_URL;
