@@ -49,28 +49,32 @@ function getIconColor(todoText: string, isCompleted: boolean, category?: TodoCat
 }
 
 const TodoItem: React.FC<TodoItemProps> = memo(({ todo, onToggle, onDelete }) => {
-  const { category = 'other', priority = 'medium', tags = [] } = todo;
+  const { category = 'other', priority = 'medium', tags = [], dueDate } = todo;
   
   const SmartIcon: LucideIcon = getSmartIcon(todo.text);
   const iconColor = getIconColor(todo.text, todo.completed, category);
   const priorityStyle = PRIORITY_COLORS[priority];
 
+  const formattedDueDate = dueDate
+    ? new Date(dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : null;
+
   return (
     <li
-      className="p-4 mb-3 rounded-xl flex items-center justify-between transition-all duration-200 border
+      className="p-2 sm:p-3 mb-2 sm:mb-3 rounded-xl flex items-center gap-1 sm:gap-2 transition-all duration-200 border
         hover:bg-[var(--hover-bg)] hover:border-[var(--border-primary)] hover:translate-x-0.5
         bg-[var(--card-bg)] border-[var(--border-secondary)]"
     >
-      <div className="flex items-center flex-1 gap-3.5">
-        {/* Smart Icon Button */}
+      {/* Column 1: Icon with padding */}
+      <div className="flex-shrink-0">
         <button
           onClick={() => onToggle(todo)}
-          className="bg-transparent border-none cursor-pointer rounded-lg transition-all duration-200 flex-shrink-0
+          className="bg-transparent border-none cursor-pointer rounded-lg transition-all duration-200
             hover:scale-110 active:scale-95"
           aria-label={todo.completed ? 'Mark as incomplete' : 'Mark as complete'}
         >
           <div 
-            className="flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200"
+            className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-200"
             style={{
               backgroundColor: `${iconColor}15`,
               border: todo.completed ? `2px solid ${iconColor}50` : `1.5px solid ${iconColor}40`,
@@ -79,71 +83,82 @@ const TodoItem: React.FC<TodoItemProps> = memo(({ todo, onToggle, onDelete }) =>
             <SmartIcon size={18} color={iconColor} strokeWidth={2.5} />
           </div>
         </button>
+      </div>
 
-        {/* Todo text and metadata */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
+      {/* Column 2-3: Text and metadata */}
+      <div className="flex-1 min-w-0 py-1">
+        <div className="flex items-start gap-2">
+          <span
+            className="flex-1 text-sm sm:text-base transition-all duration-200 leading-snug truncate"
+            style={{
+              textDecoration: todo.completed ? 'line-through' : 'none',
+              color: todo.completed ? 'var(--text-muted)' : 'var(--text-primary)',
+            }}
+          >
+            {todo.text}
+          </span>
+        </div>
+        
+        {/* Badges row - hidden on very small screens */}
+        <div className="hidden sm:flex items-center gap-1.5 flex-wrap mt-1">
+          {priority !== 'medium' && (
             <span
-              className="flex-1 text-base transition-all duration-200 leading-snug"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold uppercase"
               style={{
-                textDecoration: todo.completed ? 'line-through' : 'none',
-                color: todo.completed ? 'var(--text-muted)' : 'var(--text-primary)',
+                background: priorityStyle.bg,
+                border: `1px solid ${priorityStyle.border}`,
+                color: priorityStyle.border,
               }}
             >
-              {todo.text}
+              <AlertCircle size={10} />
+              {priorityStyle.label}
             </span>
-          </div>
+          )}
           
-          {/* Badges row */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {priority !== 'medium' && (
-              <span
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold uppercase"
-                style={{
-                  background: priorityStyle.bg,
-                  border: `1px solid ${priorityStyle.border}`,
-                  color: priorityStyle.border,
-                }}
-              >
-                <AlertCircle size={10} />
-                {priorityStyle.label}
-              </span>
-            )}
-            
-            <span
-              className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium capitalize"
-              style={{
-                background: `${CATEGORY_COLORS[category]}15`,
-                border: `1px solid ${CATEGORY_COLORS[category]}40`,
-                color: CATEGORY_COLORS[category],
-              }}
-            >
-              {category}
+          <span
+            className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium capitalize"
+            style={{
+              background: `${CATEGORY_COLORS[category]}15`,
+              border: `1px solid ${CATEGORY_COLORS[category]}40`,
+              color: CATEGORY_COLORS[category],
+            }}
+          >
+            {category}
+          </span>
+
+          {formattedDueDate && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] text-[var(--text-secondary)]">
+              📅 {formattedDueDate}
             </span>
-            
-            {tags.map(tag => (
-              <span
-                key={tag}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium
-                  bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] text-[var(--text-secondary)]"
-              >
-                <Tag size={10} />
-                {tag}
-              </span>
-            ))}
-          </div>
+          )}
+          
+          {tags.slice(0, 2).map(tag => (
+            <span
+              key={tag}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium
+                bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] text-[var(--text-secondary)]"
+            >
+              <Tag size={10} />
+              {tag}
+            </span>
+          ))}
+          {tags.length > 2 && (
+            <span className="text-xs text-[var(--text-muted)]">+{tags.length - 2}</span>
+          )}
         </div>
       </div>
 
+      {/* Column 4: Delete button - icon only on small, text+icon on larger */}
       <button
         onClick={() => onDelete(todo._id)}
-        className="px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-1.5 transition-all duration-200
-          bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md
+        className="p-1.5 sm:px-3 sm:py-1.5 rounded-lg font-medium text-xs sm:text-sm flex items-center justify-center gap-1 transition-all duration-200
+          bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md flex-shrink-0
           hover:shadow-lg hover:scale-[1.02] hover:-translate-y-0.5"
         style={{ boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)' }}
+        aria-label="Delete todo"
       >
         <Trash2 size={16} />
-        Delete
+        <span className="hidden sm:inline">Delete</span>
       </button>
     </li>
   );
@@ -152,3 +167,4 @@ const TodoItem: React.FC<TodoItemProps> = memo(({ todo, onToggle, onDelete }) =>
 TodoItem.displayName = 'TodoItem';
 
 export default TodoItem;
+
