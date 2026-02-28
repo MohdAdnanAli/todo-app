@@ -17,6 +17,7 @@ import {
   QuickStartChecklist,
   PWAInstallPrompt,
   ConfirmDialog,
+  Footer,
 } from './components';
 import SortableTodoList from './components/SortableTodoList';
 import { onboardingService } from './services/onboarding';
@@ -429,15 +430,18 @@ function App() {
     setTodos(reorderedTodos);
     await offlineStorage.saveTodos(reorderedTodos);
     
-    // Update orders on server (non-blocking)
+    // Use batch reorder endpoint for efficiency
     try {
-      for (const todo of reorderedTodos) {
-        await axios.put(
-          `${API_URL}/api/todos/${todo._id}`,
-          { order: todo.order },
-          { withCredentials: true }
-        );
-      }
+      const reorderData = reorderedTodos.map((todo, index) => ({
+        id: todo._id,
+        order: index,
+      }));
+      
+      await axios.post(
+        `${API_URL}/api/todos/reorder`,
+        { todos: reorderData },
+        { withCredentials: true }
+      );
     } catch (err) {
       console.error('Error saving order:', err);
     }
@@ -653,6 +657,8 @@ function App() {
         onCancel={handleDeleteCancel}
         isLoading={deleteConfirm.isDeleting}
       />
+
+      <Footer />
     </div>
   );
 }

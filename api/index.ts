@@ -11,7 +11,7 @@ import { getSupabaseGoogleAuthUrl, handleSupabaseCallback, getSupabaseAuthStatus
 import { getGoogleAuthUrlHandler, googleCallback, googleError, linkGoogleAccount, unlinkGoogleAccount, getGoogleAuthStatus } from './controllers/googleAuth';
 import { protect } from './middleware/auth';
 import { adminProtect } from './middleware/admin';
-import { getTodos, createTodo, updateTodo, deleteTodo } from './controllers/todo';
+import { getTodos, createTodo, updateTodo, deleteTodo, reorderTodos } from './controllers/todo';
 import { apiLimiter, loginLimiter, registerLimiter, passwordResetLimiter } from './middleware/rateLimiter';
 import { User } from './models/User';
 
@@ -21,19 +21,38 @@ dotenv.config();
 const app = express();
 app.enable('trust proxy'); // Enable trust proxy at app level
 
+// Get production URLs from environment
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const RENDER_URL = process.env.RENDER_URL;
+const API_URL = process.env.API_URL;
+
+// Build CORS origins array
+const corsOrigins = [
+  'http://localhost:5173',
+  'https://metb-todo.vercel.app',
+  'https://*.vercel.app',
+  'https://todo-app-srbx.onrender.com',
+  /\.onrender\.com$/,
+];
+
+// Add dynamic production URLs
+if (FRONTEND_URL && FRONTEND_URL.startsWith('http')) {
+  corsOrigins.push(FRONTEND_URL);
+}
+if (RENDER_URL && RENDER_URL.startsWith('http')) {
+  corsOrigins.push(RENDER_URL);
+}
+if (API_URL && API_URL.startsWith('http')) {
+  corsOrigins.push(API_URL);
+}
+
 
 // ────────────────────────────────────────────────
 // Middleware – ORDER IS CRITICAL
 // ────────────────────────────────────────────────
 
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://metb-todo.vercel.app',
-    'https://*.vercel.app',
-    'https://todo-app-srbx.onrender.com',
-    /\.onrender\.com$/
-  ],
+  origin: corsOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -153,6 +172,7 @@ app.get('/api/todos', protect, getTodos);
 app.post('/api/todos', protect, createTodo);
 app.put('/api/todos/:id', protect, updateTodo);
 app.delete('/api/todos/:id', protect, deleteTodo);
+app.post('/api/todos/reorder', protect, reorderTodos);
 
 app.get('/api/me', protect, async (req: any, res) => {
   try {

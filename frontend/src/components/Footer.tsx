@@ -4,7 +4,7 @@ interface FooterProps {
   developerLink?: string;
 }
 
-const Footer: React.FC<FooterProps> = ({ developerLink = "#" }) => {
+const Footer: React.FC<FooterProps> = ({ developerLink = "https://t.me/jerrymanager_bot" }) => {
   const currentYear = new Date().getFullYear();
 
   return (
@@ -26,13 +26,22 @@ const Footer: React.FC<FooterProps> = ({ developerLink = "#" }) => {
       </div>
 
       {/* Classic Phrase */}
-      <p className="text-sm text-[var(--text-secondary)] mb-2">
+      <p className="text-sm text-[var(--text-secondary)] mb-2 flex items-center justify-center gap-1">
+        <a
+          href="https://mohdadnanali.github.io/Todo_Promo/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--text-accent)] transition-colors"
+          title="Learn more"
+        >
+          i
+        </a>
         From the love of{' '}
         <a
           href={developerLink}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[var(--text-accent)] hover:underline"
+          className="text-[var(--text-accent)] hover:text-[var(--text-accent)] hover:underline"
         >
           Developer
         </a>
