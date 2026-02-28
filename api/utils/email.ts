@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { logger } from './logger';
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'localhost',
@@ -36,7 +37,7 @@ export const sendVerificationEmail = async (email: string, token: string): Promi
     });
     return true;
   } catch (err) {
-    console.error('Failed to send verification email:', err);
+    logger.error('Failed to send verification email:', err);
     return false;
   }
 };
@@ -66,7 +67,7 @@ export const sendPasswordResetEmail = async (email: string, token: string): Prom
     });
     return true;
   } catch (err) {
-    console.error('Failed to send password reset email:', err);
+    logger.error('Failed to send password reset email:', err);
     return false;
   }
 };

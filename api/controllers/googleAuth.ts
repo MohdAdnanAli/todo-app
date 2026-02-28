@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
 import { googleCallbackSchema } from '../schemas/auth';
+import { logger } from '../utils/logger';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -36,8 +37,8 @@ if (process.env.RENDER_URL) {
 }
 
 if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-  console.warn('[Google OAuth] Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET environment variables');
-  console.warn('[Google OAuth] Google login will not be available');
+  logger.warn('[Google OAuth] Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET environment variables');
+  logger.warn('[Google OAuth] Google login will not be available');
 }
 
 interface GoogleTokenResponse {
@@ -100,7 +101,7 @@ const exchangeCodeForTokens = async (code: string): Promise<GoogleTokenResponse>
 
   if (!response.ok) {
     const error = await response.text();
-    console.error('[Google OAuth] Token exchange error:', error);
+    logger.error('[Google OAuth] Token exchange error:', error);
     throw new Error('Failed to exchange authorization code');
   }
 
@@ -148,12 +149,12 @@ export const getGoogleAuthUrlHandler = async (req: Request, res: Response) => {
         const url = new URL(frontendUrl);
         validatedFrontendUrl = url.origin;
       } catch {
-        console.warn('[Google OAuth] Invalid frontendUrl provided, using default');
+        logger.warn('[Google OAuth] Invalid frontendUrl provided, using default');
       }
     }
     
-    console.log('[Google OAuth] Using frontend URL for redirect:', validatedFrontendUrl);
-    console.log('[Google OAuth] Redirect URI:', GOOGLE_REDIRECT_URI);
+    logger.info('[Google OAuth] Using frontend URL for redirect:', validatedFrontendUrl);
+    logger.info('[Google OAuth] Redirect URI:', GOOGLE_REDIRECT_URI);
     
     const state = crypto.randomBytes(32).toString('hex');
     
@@ -171,6 +172,17 @@ export const getGoogleAuthUrlHandler = async (req: Request, res: Response) => {
       maxAge: 10 * 60 * 1000,
     });
 
+    // Check if this is a popup request and store it in a cookie
+    const isPopup = req.query.popup === 'true';
+    if (isPopup) {
+      res.cookie('google_oauth_is_popup', 'true', {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? 'none' : 'lax',
+        maxAge: 10 * 60 * 1000,
+      });
+    }
+
     const authUrl = getGoogleAuthUrl(state);
 
     return res.json({ 
@@ -180,7 +192,7 @@ export const getGoogleAuthUrlHandler = async (req: Request, res: Response) => {
       frontendUrl: validatedFrontendUrl 
     });
   } catch (err: unknown) {
-    console.error('[Google OAuth] Get auth URL error:', err);
+    logger.error('[Google OAuth] Get auth URL error:', err);
     if (err instanceof Error && err.message === 'Google OAuth not configured') {
       return res.status(503).json({ error: 'Google OAuth is not configured' });
     }
@@ -299,12 +311,99 @@ export const googleCallback = async (req: Request, res: Response) => {
       });
     }
 
-    // Pass token in URL as fallback for cross-origin cookie issues
-    const googleId = user.googleId || '';
-    const encryptionSalt = user.encryptionSalt || '';
-    return res.redirect(`${frontendUrl}?google_auth=success&token=${token}&googleId=${encodeURIComponent(googleId)}&encryptionSalt=${encodeURIComponent(encryptionSalt)}`);
+    // Check if this is a popup request - read from cookie instead of query param
+    const isPopup = req.cookies?.google_oauth_is_popup === 'true';
+    
+    // Clear the popup cookie
+    res.clearCookie('google_oauth_is_popup', {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+    });
+    
+    // For popup, return HTML that sends message to parent window and closes
+    if (isPopup) {
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Google Sign-In</title>
+          <style>
+            body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f0f0; }
+            .message { text-align: center; padding: 20px; }
+            .success { color: #22c55e; font-size: 18px; }
+          </style>
+        </head>
+        <body>
+          <div class="message">
+            <p class="success">✓ Successfully signed in!</p>
+            <p>You can close this window now.</p>
+          </div>
+          <script>
+            // Try to notify parent window
+            try {
+              window.opener.postMessage({
+                type: 'google-auth-success'
+              }, '*');
+            } catch(e) { console.log('Cannot post message:', e); }
+            
+            // Close this window after a short delay
+            setTimeout(() => {
+              try { window.close(); } catch(e) {}
+            }, 1000);
+          </script>
+        </body>
+        </html>
+      `;
+      return res.status(200).send(html);
+    }
+    
+    // Regular redirect for non-popup flow - just redirect with success, auth is via cookie
+    return res.redirect(`${frontendUrl}?google_auth=success`);
   } catch (err: unknown) {
-    console.error('[Google OAuth] Callback error:', err);
+    logger.error('[Google OAuth] Callback error:', err);
+    
+    // For popup, return error HTML - read from cookie
+    const isPopupError = req.cookies?.google_oauth_is_popup === 'true';
+    if (isPopupError) {
+      res.clearCookie('google_oauth_is_popup', {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? 'none' : 'lax',
+      });
+      const errorHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Google Sign-In</title>
+          <style>
+            body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f0f0; }
+            .message { text-align: center; padding: 20px; }
+            .error { color: #ef4444; font-size: 18px; }
+          </style>
+        </head>
+        <body>
+          <div class="message">
+            <p class="error">✗ Authentication failed</p>
+            <p>You can close this window now.</p>
+          </div>
+          <script>
+            try {
+              window.opener.postMessage({
+                type: 'google-auth-error',
+                message: 'Google authentication failed'
+              }, '*');
+            } catch(e) { console.log('Cannot post message:', e); }
+            setTimeout(() => {
+              try { window.close(); } catch(e) {}
+            }, 1000);
+          </script>
+        </body>
+        </html>
+      `;
+      return res.status(200).send(errorHtml);
+    }
+    
     const frontendUrl = req.cookies?.google_oauth_frontend_url || FRONTEND_URL;
     return res.redirect(`${frontendUrl}?google_error=${encodeURIComponent('Google authentication failed')}`);
   }
@@ -390,7 +489,7 @@ export const linkGoogleAccount = async (req: Request & { user?: { id: string } }
       }
     });
   } catch (err: unknown) {
-    console.error('[Google OAuth] Link account error:', err);
+    logger.error('[Google OAuth] Link account error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -436,7 +535,7 @@ export const unlinkGoogleAccount = async (req: Request & { user?: { id: string }
 
     return res.json({ message: 'Google account unlinked successfully' });
   } catch (err: unknown) {
-    console.error('[Google OAuth] Unlink account error:', err);
+    logger.error('[Google OAuth] Unlink account error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -459,7 +558,7 @@ export const getGoogleAuthStatus = async (req: Request & { user?: { id: string }
       authProvider: user.authProvider,
     });
   } catch (err: unknown) {
-    console.error('[Google OAuth] Get status error:', err);
+    logger.error('[Google OAuth] Get status error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };

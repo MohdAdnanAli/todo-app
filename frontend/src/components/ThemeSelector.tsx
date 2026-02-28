@@ -1,8 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTheme, presetThemes } from '../theme';
 import type { ThemeId, CustomThemeColors } from '../theme/types';
+import type { MessageType } from '../types';
+import LEDIndicator from './LEDIndicator';
 
-const ThemeSelector: React.FC = () => {
+interface ThemeSelectorProps {
+  ledMessage?: string;
+  ledMessageType?: MessageType;
+}
+
+const ThemeSelector: React.FC<ThemeSelectorProps> = ({ ledMessage = '', ledMessageType = 'info' }) => {
   const { themeId, setThemeId, currentTheme, customColors, setCustomColors, isCustomizing, setIsCustomizing } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -38,6 +45,11 @@ const ThemeSelector: React.FC = () => {
 
   return (
     <div className="theme-selector" ref={dropdownRef}>
+      {/* LED Indicator - always visible below toggle on small screens */}
+      <div className="theme-toggle-led">
+        <LEDIndicator message={ledMessage} messageType={ledMessageType} variant="small-screen-header" />
+      </div>
+      
       <button
         className="theme-toggle-button"
         onClick={() => setIsOpen(!isOpen)}

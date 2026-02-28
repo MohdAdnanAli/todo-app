@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { User } from '../models/User';
+import { logger } from '../utils/logger';
 
 /**
  * Admin middleware - checks if the current user is an admin
@@ -25,7 +26,7 @@ export const adminProtect = async (req: AdminRequest, res: Response, next: NextF
   try {
     // Check if admin email is configured
     if (!ADMIN_EMAIL) {
-      console.error('[Admin] ADMIN_EMAIL not configured in environment');
+      logger.error('[Admin] ADMIN_EMAIL not configured in environment');
       return res.status(503).json({ error: 'Admin system not configured' });
     }
 
@@ -40,7 +41,7 @@ export const adminProtect = async (req: AdminRequest, res: Response, next: NextF
     const JWT_SECRET = process.env.JWT_SECRET;
     
     if (!JWT_SECRET) {
-      console.error('[Admin] JWT_SECRET not configured');
+      logger.error('[Admin] JWT_SECRET not configured');
       return res.status(503).json({ error: 'Server configuration error' });
     }
 
@@ -48,7 +49,7 @@ export const adminProtect = async (req: AdminRequest, res: Response, next: NextF
     try {
       decoded = jwt.verify(token, JWT_SECRET) as { id: string; email?: string };
     } catch (err) {
-      console.log('[Admin] Token verification failed');
+      logger.info('[Admin] Token verification failed');
       return res.status(401).json({ error: 'Invalid token' });
     }
 
@@ -60,7 +61,7 @@ export const adminProtect = async (req: AdminRequest, res: Response, next: NextF
 
     // Check if user email matches admin email
     if (user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
-      console.log(`[Admin] Access denied for user: ${user.email}`);
+      logger.info(`[Admin] Access denied for user: ${user.email}`);
       return res.status(403).json({ error: 'Access denied. Admin privileges required.' });
     }
 
@@ -68,7 +69,7 @@ export const adminProtect = async (req: AdminRequest, res: Response, next: NextF
     if (ADMIN_SECRET) {
       const providedSecret = req.headers['x-admin-secret'] as string;
       if (providedSecret !== ADMIN_SECRET) {
-        console.log('[Admin] Invalid admin secret');
+        logger.info('[Admin] Invalid admin secret');
         return res.status(403).json({ error: 'Invalid admin credentials' });
       }
     }
@@ -76,10 +77,10 @@ export const adminProtect = async (req: AdminRequest, res: Response, next: NextF
     // Attach user info to request
     req.user = { id: user._id.toString(), email: user.email };
     
-    console.log(`[Admin] Access granted for: ${user.email}`);
+    logger.info(`[Admin] Access granted for: ${user.email}`);
     next();
   } catch (err) {
-    console.error('[Admin] Middleware error:', err);
+    logger.error('[Admin] Middleware error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

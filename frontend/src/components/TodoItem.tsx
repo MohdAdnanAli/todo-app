@@ -89,10 +89,12 @@ const TodoItem: React.FC<TodoItemProps> = memo(({ todo, onToggle, onDelete }) =>
       <div className="flex-1 min-w-0 py-1">
         <div className="flex items-start gap-2">
           <span
-            className="flex-1 text-sm sm:text-base transition-all duration-200 leading-snug truncate"
+            className="flex-1 text-sm sm:text-base transition-all duration-200 leading-snug"
             style={{
               textDecoration: todo.completed ? 'line-through' : 'none',
               color: todo.completed ? 'var(--text-muted)' : 'var(--text-primary)',
+              wordBreak: 'break-word',
+              whiteSpace: 'pre-wrap',
             }}
           >
             {todo.text}

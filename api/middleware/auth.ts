@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { logger } from '../utils/logger';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -24,7 +25,7 @@ export const protect = (req: AuthRequest, res: Response, next: NextFunction) => 
     next();
   } catch (err: unknown) {
     const error = err as Error;
-    console.log('[protect] Token verification failed:', error.name);
+    logger.info('[protect] Token verification failed:', error.name);
     return res.status(401).json({ error: 'Invalid token' });
   }
 };

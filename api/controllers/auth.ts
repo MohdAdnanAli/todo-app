@@ -7,6 +7,7 @@ import { registerSchema, loginSchema, passwordResetSchema, resetPasswordSchema, 
 import { sanitizeInput, generateVerificationToken, generateResetToken, validatePasswordStrength } from '../utils/security';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/email';
 import { emailDripService } from '../services/emailDrip';
+import { logger } from '../utils/logger';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -78,8 +79,8 @@ export const register = async (req: Request, res: Response) => {
     });
 
     // Schedule email drip sequence (non-blocking)
-    emailDripService.scheduleEmailDrip(user._id.toString(), email, user.displayName).catch(err => {
-      console.log('[Email Drip] Could not schedule email drip (SMTP not configured)');
+    emailDripService.scheduleEmailDrip(user._id.toString(), email, user.displayName || 'User').catch(err => {
+      logger.warn('[Email Drip] Could not schedule email drip (SMTP not configured)');
     });
 
     // Create example todos for the user (non-blocking)
@@ -119,14 +120,14 @@ export const register = async (req: Request, res: Response) => {
       ];
       
       await Todo.insertMany(exampleTodos);
-      console.log(`[Onboarding] Created ${exampleTodos.length} example todos for user ${user._id}`);
+      logger.info(`[Onboarding] Created ${exampleTodos.length} example todos for user ${user._id}`);
     } catch (err) {
-      console.log('[Onboarding] Could not create example todos');
+      logger.warn('[Onboarding] Could not create example todos');
     }
 
     // Send verification email (non-blocking, log error but continue)
     sendVerificationEmail(email, verificationToken).catch(err => {
-      console.log('[Email] Verification email could not be sent (SMTP not configured)');
+      logger.warn('[Email] Verification email could not be sent (SMTP not configured)');
     });
 
     return res.status(201).json({
@@ -135,7 +136,7 @@ export const register = async (req: Request, res: Response) => {
       encryptionSalt: user.encryptionSalt,
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Register error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -165,7 +166,7 @@ export const verifyEmail = async (req: Request, res: Response) => {
 
     return res.json({ message: 'Email verified successfully! You can now login.' });
   } catch (err) {
-    console.error(err);
+    logger.error('VerifyEmail error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -234,7 +235,7 @@ export const login = async (req: Request, res: Response) => {
       encryptionSalt: user.encryptionSalt,
     });
   } catch (err) {
-    console.error(err);
+    logger.error('Login error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -261,12 +262,12 @@ export const requestPasswordReset = async (req: Request, res: Response) => {
 
     // Send reset email (non-blocking)
     sendPasswordResetEmail(email, resetToken).catch(err => {
-      console.log('[Email] Password reset email could not be sent (SMTP not configured)');
+      logger.warn('[Email] Password reset email could not be sent (SMTP not configured)');
     });
 
     return res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
   } catch (err) {
-    console.error(err);
+    logger.error('RequestPasswordReset error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -307,7 +308,7 @@ export const resetPassword = async (req: Request, res: Response) => {
 
     return res.json({ message: 'Password reset successful! You can now login with your new password.' });
   } catch (err) {
-    console.error(err);
+    logger.error('ResetPassword error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -345,7 +346,7 @@ export const updateProfile = async (req: Request & { user?: { id: string } }, re
       user: { id: user._id, email: user.email, displayName: user.displayName, bio: user.bio },
     });
   } catch (err) {
-    console.error(err);
+    logger.error('UpdateProfile error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -365,7 +366,7 @@ export const getProfile = async (req: Request & { user?: { id: string } }, res: 
 
     return res.json(user);
   } catch (err) {
-    console.error(err);
+    logger.error('GetProfile error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -400,7 +401,7 @@ export const deleteUser = async (req: Request & { user?: { id: string } }, res: 
 
     return res.json({ message: 'Account and all data deleted successfully' });
   } catch (err) {
-    console.error(err);
+    logger.error('DeleteUser error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };

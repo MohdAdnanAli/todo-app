@@ -23,6 +23,46 @@ import SortableTodoList from './components/SortableTodoList';
 import { onboardingService } from './services/onboarding';
 import { offlineStorage } from './services/offlineStorage';
 
+// Known temporary/disposable email domains
+const TEMPORARY_EMAIL_DOMAINS = [
+  'mailinator.com',
+  'tempmail.com',
+  '10minutemail.com',
+  'guerrillamail.com',
+  'throwaway.email',
+  'trashmail.com',
+  'fakeinbox.com',
+  'yopmail.com',
+  'sharklasers.com',
+  'spam4.me',
+  'grr.la',
+  'maildrop.cc',
+  'getnada.com',
+  'mohmal.com',
+  'tempail.com',
+  'dispostable.com',
+  'emailondeck.com',
+  'fakeemailgenerator.com',
+  'mailnesia.com',
+  'tempr.email',
+  'discard.email',
+  'meltmail.com',
+  'spambox.us',
+  'mintemail.com',
+  'spamgourmet.com',
+  'mailsac.com',
+  'tmails.net',
+  'tmpmail.org',
+  'tmpmail地址',
+];
+
+// Check if email is a temporary/disposable email
+const isTemporaryEmail = (email: string): boolean => {
+  const domain = email.split('@')[1]?.toLowerCase();
+  if (!domain) return false;
+  return TEMPORARY_EMAIL_DOMAINS.some(temp => domain.includes(temp));
+};
+
 function App() {
   useTheme();
   
@@ -185,29 +225,6 @@ function App() {
     checkAuthAndFetch();
   }, [userPassword, decryptAllTodos]);
 
-  // Handle Google OAuth callback params on initial load
-  useEffect(() => {
-    const handleGoogleOAuthParams = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const googleAuth = urlParams.get('google_auth');
-      const googleId = urlParams.get('googleId');
-      const salt = urlParams.get('encryptionSalt');
-
-      if (googleAuth === 'success' && googleId && salt) {
-        // Set encryption params for Google OAuth
-        setUserPassword(googleId);
-        setEncryptionSalt(salt);
-        
-        // Save password for future reloads
-        await offlineStorage.savePassword(googleId);
-        
-        // Clear URL params
-        window.history.replaceState({}, '', window.location.pathname);
-      }
-    };
-    handleGoogleOAuthParams();
-  }, []);
-
   const handleLogin = async (loginEmail: string, loginPassword: string) => {
     try {
       const response = await axios.post(
@@ -247,6 +264,13 @@ function App() {
     if (!regDisplayName.trim()) {
       setMessage('Display name is required');
       setMessageType('warning');
+      return;
+    }
+
+    // Check for temporary/disposable email
+    if (isTemporaryEmail(regEmail)) {
+      setMessage('Please use a valid email address. Temporary emails are not allowed.');
+      setMessageType('error');
       return;
     }
 
@@ -337,7 +361,6 @@ function App() {
       
       const todoData: Partial<Todo> = { 
         text: encryptedText,
-        order: todos.length,
       };
       if (category) todoData.category = category;
       if (priority) todoData.priority = priority;
@@ -349,10 +372,11 @@ function App() {
         todoData,
         { withCredentials: true }
       );
-      const decryptedTodo = await decryptTodo(res.data);
-      const updatedTodos = [decryptedTodo, ...todos];
-      setTodos(updatedTodos);
-      await offlineStorage.saveTodos(updatedTodos);
+      
+      // Backend returns all todos sorted - decrypt and set directly
+      const decryptedTodos = await decryptAllTodos(res.data);
+      setTodos(decryptedTodos);
+      await offlineStorage.saveTodos(decryptedTodos);
       
       // Auto-complete quick-start tasks
       if (isFirstTask) {
@@ -405,13 +429,14 @@ function App() {
     setDeleteConfirm(prev => ({ ...prev, isDeleting: true }));
 
     try {
-      await axios.delete(`${API_URL}/api/todos/${deleteConfirm.todoId}`, {
+      const res = await axios.delete(`${API_URL}/api/todos/${deleteConfirm.todoId}`, {
         withCredentials: true,
       });
 
-      const updatedTodos = todos.filter(t => t._id !== deleteConfirm.todoId);
-      setTodos(updatedTodos);
-      await offlineStorage.saveTodos(updatedTodos);
+      // Backend returns all todos sorted - decrypt and set directly
+      const decryptedTodos = await decryptAllTodos(res.data);
+      setTodos(decryptedTodos);
+      await offlineStorage.saveTodos(decryptedTodos);
       setMessage('Todo deleted');
       setMessageType('accent');
     } catch (err: any) {
@@ -427,23 +452,30 @@ function App() {
   };
 
   const handleReorder = async (reorderedTodos: Todo[]) => {
+    // Optimistic update - show reordered immediately
     setTodos(reorderedTodos);
     await offlineStorage.saveTodos(reorderedTodos);
     
     // Use batch reorder endpoint for efficiency
     try {
-      const reorderData = reorderedTodos.map((todo, index) => ({
+      const reorderData = reorderedTodos.map((todo) => ({
         id: todo._id,
-        order: index,
+        // Order will be assigned by server based on array index
       }));
       
-      await axios.post(
+      const res = await axios.post(
         `${API_URL}/api/todos/reorder`,
         { todos: reorderData },
         { withCredentials: true }
       );
+      
+      // Server returns all todos with correct order - decrypt and sync
+      const decryptedTodos = await decryptAllTodos(res.data);
+      setTodos(decryptedTodos);
+      await offlineStorage.saveTodos(decryptedTodos);
     } catch (err) {
       console.error('Error saving order:', err);
+      // On error, the optimistic update will remain - user can retry
     }
   };
 
@@ -458,10 +490,28 @@ function App() {
 
   // Check quick-start progress and show checklist for new users
   useEffect(() => {
-    const checkQuickStartStatus = async () => {
+    const checkOnboardingStatus = async () => {
       if (!user || quickStartChecked) return;
       
       try {
+        // Check if onboarding has been completed
+        const onboardingCompleted = await onboardingService.hasCompletedOnboarding();
+        
+        // Show welcome tour for first-time users (onboarding not completed)
+        if (!onboardingCompleted) {
+          setShowWelcomeTour(true);
+          // Pre-populate example todos for new users
+          await onboardingService.createExampleTodos();
+          
+          // Load the example todos from offline storage into UI state
+          const exampleTodos = await offlineStorage.getAllTodos();
+          if (exampleTodos.length > 0) {
+            setTodos(exampleTodos);
+            await offlineStorage.saveTodos(exampleTodos);
+          }
+        }
+        
+        // Check quick-start progress and show checklist
         const isComplete = await onboardingService.isQuickStartComplete();
         
         // Show checklist if user hasn't completed all tasks yet
@@ -470,12 +520,12 @@ function App() {
         }
         setQuickStartChecked(true);
       } catch (error) {
-        console.error('Error checking quick-start status:', error);
+        console.error('Error checking onboarding status:', error);
         setQuickStartChecked(true);
       }
     };
     
-    checkQuickStartStatus();
+    checkOnboardingStatus();
   }, [user, quickStartChecked]);
 
   // Auto-complete quick-start tasks when user performs actions
@@ -501,9 +551,8 @@ function App() {
         }}
       >
         <div className="max-w-[120px] mx-auto mb-4 sm:mb-6">
-          <GeometryLoader />
+          <GeometryLoader initialMessage="Preparing your workspace..." />
         </div>
-        <p className="text-[var(--text-secondary)] text-base mt-2">Preparing your workspace...</p>
       </div>
     );
   }
@@ -516,13 +565,15 @@ function App() {
         boxShadow: 'var(--shadow)'
       }}
     >
-      <ThemeSelector />
+      <ThemeSelector ledMessage={message} ledMessageType={messageType} />
       
       <div className="flex items-center justify-center mb-[2rem] relative">
         <h1 className="text-center bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent text-[2rem] font-semibold m-0">
           Todo App
         </h1>
-        <LEDIndicator message={message} messageType={messageType} />
+        <div className="header-led-container">
+          <LEDIndicator message={message} messageType={messageType} />
+        </div>
       </div>
 
       {user ? (

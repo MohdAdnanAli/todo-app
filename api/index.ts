@@ -14,6 +14,7 @@ import { adminProtect } from './middleware/admin';
 import { getTodos, createTodo, updateTodo, deleteTodo, reorderTodos } from './controllers/todo';
 import { apiLimiter, loginLimiter, registerLimiter, passwordResetLimiter } from './middleware/rateLimiter';
 import { User } from './models/User';
+import { logger } from './utils/logger';
 
 dotenv.config();
 
@@ -82,17 +83,17 @@ const connectWithRetry = async (retries = 5, delay = 5000) => {
         socketTimeoutMS: 45000,
         family: 4,
       });
-      console.log('MongoDB connected');
+      logger.info('MongoDB connected');
       return;
     } catch (err: any) {
-      console.error(`MongoDB connection attempt ${attempt}/${retries} failed:`, err?.message || err);
+      logger.error(`MongoDB connection attempt ${attempt}/${retries} failed:`, err?.message || err);
       if (attempt < retries) {
-        console.log(`Retrying in ${delay / 1000} seconds...`);
+        logger.info(`Retrying in ${delay / 1000} seconds...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
-  console.error('MongoDB connection failed after all retries');
+  logger.error('MongoDB connection failed after all retries');
 };
 
 connectWithRetry();
@@ -201,7 +202,7 @@ app.get('/api/me', protect, async (req: any, res) => {
       encryptionSalt: user.encryptionSalt 
     });
   } catch (err) {
-    console.error('/api/me error:', err);
+    logger.error('/api/me error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -246,7 +247,13 @@ app.get('/api/admin/health', adminProtect, getSystemHealth);
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
+  // In production, don't expose stack traces
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+  if (isProduction) {
+    logger.error('Unhandled error:', err?.message || 'Unknown error');
+  } else {
+    logger.error('Unhandled error:', err?.message || err);
+  }
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
@@ -256,7 +263,7 @@ app.use(async (req, res, next) => {
     await connectDB();
     next();
   } catch (err) {
-    console.error('Database connection error:', err);
+    logger.error('Database connection error:', err);
     res.status(500).json({ error: 'Database connection failed' });
   }
 });
@@ -268,7 +275,7 @@ app.use(async (req, res, next) => {
 const PORT = process.env.PORT || 5000;
 if (process.env.VERCEL !== '1') {
   app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    logger.info(`Server running on http://localhost:${PORT}`);
   });
 }
 

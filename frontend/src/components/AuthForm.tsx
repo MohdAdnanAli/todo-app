@@ -64,12 +64,6 @@ const AuthForm = ({ onLogin, onRegister }: AuthFormProps): JSX.Element => {
   const urlToken = typeof window !== 'undefined' ? getTokenFromUrl() : null;
   const initialMode: AuthMode = urlToken ? 'reset-password' : 'login';
   
-  // Check for Google OAuth callback in URL (backend redirects with google_auth=success or google_error=...)
-  const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-  const googleAuth = urlParams?.get('google_auth') ?? null;
-  const googleError = urlParams?.get('google_error') ?? null;
-  const googleToken = urlParams?.get('token') ?? null;
-  
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -85,67 +79,97 @@ const AuthForm = ({ onLogin, onRegister }: AuthFormProps): JSX.Element => {
   const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
   const [passwordStrength, setPasswordStrength] = useState(0);
 
-  // Handle Google OAuth callback
+  // Check for Google OAuth success or errors in URL
   useEffect(() => {
-    const handleGoogleCallback = async () => {
-      if (googleAuth === 'success') {
-        setIsLoading(true);
-        try {
-          // If token in URL, set it in cookie via API call
-          if (googleToken) {
-            // Set cookie by calling any authenticated endpoint
-            await fetch('/api/me', {
-              method: 'GET',
-              credentials: 'include',
-            });
-          }
-          
-          // Clear URL params without reload
-          window.history.replaceState({}, document.title, window.location.pathname);
-          
-          // Set success message
-          setSuccessMessage('Google sign-in successful! Redirecting...');
-          
-          // Reload to trigger auth check
-          setTimeout(() => window.location.reload(), 1500);
-        } catch (err: unknown) {
-          const message = getApiErrorMessage(err);
-          setError(message);
-        } finally {
-          setIsLoading(false);
-        }
-      }
-    };
-
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const googleAuth = urlParams?.get('google_auth');
+    const googleError = urlParams?.get('google_error') ?? null;
+    
+    // Handle success - just clear the URL, auth is via cookie
     if (googleAuth === 'success') {
-      handleGoogleCallback();
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Don't need to do anything else - the cookie should already be set
+      // and the app will authenticate on reload/re-render
+      return;
     }
-  }, [googleAuth, googleToken]);
-
-  // Handle Google OAuth errors
-  useEffect(() => {
+    
+    // Handle errors
     if (googleError) {
       setError(decodeURIComponent(googleError));
       // Clear URL params
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [googleError]);
+  }, []);
 
-  // Google Sign-In handler
+  // Google Sign-In handler - opens in popup
   const handleGoogleSignIn = useCallback(async () => {
     try {
-      setIsLoading(true);
       setError('');
       
       // Get Google OAuth URL from backend
       const { authUrl } = await googleApi.getAuthUrl();
       
-      // Redirect to Google
-      window.location.href = authUrl;
+      // Add popup parameter to trigger popup flow in backend
+      const popupAuthUrl = authUrl.includes('?') 
+        ? `${authUrl}&popup=true` 
+        : `${authUrl}?popup=true`;
+      
+      // Open Google OAuth in a popup window
+      const width = 500;
+      const height = 600;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      const popup = window.open(
+        popupAuthUrl,
+        'Google Sign-In',
+        `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
+      );
+      
+      if (!popup) {
+        // Fallback to redirect if popup is blocked
+        window.location.href = popupAuthUrl;
+        return;
+      }
+      
+// Listen for messages from the popup
+      const handleMessage = (event: MessageEvent) => {
+        // Verify the origin matches our expected domains
+        const allowedOrigins = [
+          window.location.origin,
+          'https://metb-todo.vercel.app',
+          'https://todo-app-srbx.onrender.com',
+        ];
+        
+        if (allowedOrigins.includes(event.origin) && event.data?.type === 'google-auth-success') {
+          // Close popup if still open
+          try { popup.close(); } catch(e) {}
+          
+          // Reload to trigger auth check - the cookie should now be set
+          window.location.reload();
+        } else if (event.data?.type === 'google-auth-error') {
+          setError(event.data.message || 'Google sign-in failed');
+          try { popup.close(); } catch(e) {}
+        }
+      };
+      
+      window.addEventListener('message', handleMessage);
+      
+      // Clean up when popup closes
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed);
+          window.removeEventListener('message', handleMessage);
+          // Check if user completed authentication by checking for auth token
+          if (!document.cookie.includes('auth_token')) {
+            // User may have cancelled or failed - don't show error, just let them try again
+          }
+        }
+      }, 500);
+      
     } catch (err: unknown) {
       getApiErrorMessage(err);
       setError('Failed to initiate Google sign-in. Please try again.');
-      setIsLoading(false);
     }
   }, []);
 

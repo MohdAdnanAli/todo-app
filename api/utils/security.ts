@@ -1,5 +1,6 @@
 import xss from 'xss';
 import crypto from 'crypto';
+import { logger } from './logger';
 
 // Sanitize user input to prevent XSS
 export const sanitizeInput = (input: string): string => {
@@ -31,7 +32,7 @@ export const generateVerificationToken = (): string => {
     return crypto.randomBytes(32).toString('hex');
   } catch (error) {
     // Fallback to Math.random if crypto fails (should never happen in Node.js)
-    console.error('[Security] Crypto random failed, using fallback');
+    logger.error('[Security] Crypto random failed, using fallback');
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   }
 };
@@ -42,7 +43,7 @@ export const generateResetToken = (): string => {
     return crypto.randomBytes(32).toString('hex');
   } catch (error) {
     // Fallback to Math.random if crypto fails (should never happen in Node.js)
-    console.error('[Security] Crypto random failed, using fallback');
+    logger.error('[Security] Crypto random failed, using fallback');
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   }
 };

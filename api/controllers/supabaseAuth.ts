@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { supabase, signInWithGoogle, exchangeCodeForSession, getCurrentUser, getSupabaseRedirectUrl } from '../supabase';
 import { User } from '../models/User';
+import { logger } from '../utils/logger';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -76,8 +77,8 @@ export const getSupabaseGoogleAuthUrl = async (req: Request, res: Response) => {
     const { data, error } = await signInWithGoogle();
     
     if (error) {
-      console.error('[Supabase Auth] Google sign in error:', error);
-      return res.status(400).json({ 
+      logger.error('[Supabase Auth] Google sign in error:', error);
+      return res.status(400).json({
         error: 'Failed to initiate Google sign-in',
         details: error.message 
       });
@@ -91,7 +92,7 @@ export const getSupabaseGoogleAuthUrl = async (req: Request, res: Response) => {
       authUrl = url.toString();
     }
 
-    console.log('[Supabase Auth] Google OAuth URL generated successfully');
+    logger.info('[Supabase Auth] Google OAuth URL generated successfully');
     
     return res.json({ 
       authUrl,
@@ -99,7 +100,7 @@ export const getSupabaseGoogleAuthUrl = async (req: Request, res: Response) => {
       provider: 'supabase',
     });
   } catch (err: unknown) {
-    console.error('[Supabase Auth] Get auth URL error:', err);
+    logger.error('[Supabase Auth] Get auth URL error:', err);
     return res.status(500).json({ error: 'Failed to initiate Google sign-in' });
   }
 };
@@ -131,7 +132,7 @@ export const handleSupabaseCallback = async (req: Request, res: Response) => {
     const errorDescription = req.query.error_description as string | undefined;
     
     if (error) {
-      console.error('[Supabase Auth] OAuth error:', error, errorDescription);
+      logger.error('[Supabase Auth] OAuth error:', error, errorDescription);
       return res.redirect(`${frontendUrl}?google_error=${encodeURIComponent(errorDescription || error)}`);
     }
 
@@ -152,7 +153,7 @@ export const handleSupabaseCallback = async (req: Request, res: Response) => {
     const { data: sessionData, error: sessionError } = await exchangeCodeForSession(code);
     
     if (sessionError) {
-      console.error('[Supabase Auth] Session exchange error:', sessionError);
+      logger.error('[Supabase Auth] Session exchange error:', sessionError);
       return res.redirect(`${frontendUrl}?google_error=${encodeURIComponent('Failed to complete Google sign-in')}`);
     }
 
@@ -162,7 +163,7 @@ export const handleSupabaseCallback = async (req: Request, res: Response) => {
       return res.redirect(`${frontendUrl}?google_error=${encodeURIComponent('Could not get email from Google')}`);
     }
 
-    console.log('[Supabase Auth] User signed in via Supabase:', supabaseUser.email);
+    logger.info('[Supabase Auth] User signed in via Supabase:', supabaseUser.email);
 
     // Check for email conflict in MongoDB
     const conflict = await checkEmailConflict(supabaseUser.email);
@@ -199,7 +200,7 @@ export const handleSupabaseCallback = async (req: Request, res: Response) => {
         avatar: supabaseUser.user_metadata?.avatar_url || supabaseUser.user_metadata?.picture,
       });
       
-      console.log('[Supabase Auth] Created MongoDB user for Supabase user:', supabaseUser.email);
+      logger.info('[Supabase Auth] Created MongoDB user for Supabase user:', supabaseUser.email);
     }
 
     // Update last login
@@ -218,11 +219,11 @@ export const handleSupabaseCallback = async (req: Request, res: Response) => {
     });
 
     // Redirect to frontend with success
-    console.log('[Supabase Auth] Successfully authenticated:', supabaseUser.email);
+    logger.info('[Supabase Auth] Successfully authenticated:', supabaseUser.email);
     
     return res.redirect(`${frontendUrl}?google_auth=success&token=${token}`);
   } catch (err: unknown) {
-    console.error('[Supabase Auth] Callback error:', err);
+    logger.error('[Supabase Auth] Callback error:', err);
     const frontendUrl = req.cookies?.supabase_oauth_frontend || FRONTEND_URL;
     return res.redirect(`${frontendUrl}?google_error=${encodeURIComponent('Google authentication failed')}`);
   }
@@ -254,7 +255,7 @@ export const getSupabaseAuthStatus = async (req: Request & { user?: { id: string
       emailVerified: user.emailVerified,
     });
   } catch (err: unknown) {
-    console.error('[Supabase Auth] Get status error:', err);
+    logger.error('[Supabase Auth] Get status error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -278,7 +279,7 @@ export const signOutSupabase = async (req: Request, res: Response) => {
 
     return res.json({ message: 'Signed out successfully' });
   } catch (err: unknown) {
-    console.error('[Supabase Auth] Sign out error:', err);
+    logger.error('[Supabase Auth] Sign out error:', err);
     return res.status(500).json({ error: 'Failed to sign out' });
   }
 };
@@ -312,7 +313,7 @@ export const checkEmailAvailability = async (req: Request, res: Response) => {
       message: 'Email is available',
     });
   } catch (err: unknown) {
-    console.error('[Supabase Auth] Check email error:', err);
+    logger.error('[Supabase Auth] Check email error:', err);
     return res.status(500).json({ error: 'Failed to check email availability' });
   }
 };

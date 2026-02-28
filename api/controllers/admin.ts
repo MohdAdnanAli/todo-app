@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { User } from '../models/User';
 import { Todo } from '../models/Todo';
+import { logger } from '../utils/logger';
 
 /**
  * Admin Controller - Full backend management
@@ -61,7 +62,7 @@ export const getDashboardStats = async (req: AdminRequest, res: Response) => {
       recentUsers,
     });
   } catch (err) {
-    console.error('[Admin] getDashboardStats error:', err);
+    logger.error('[Admin] getDashboardStats error:', err);
     res.status(500).json({ error: 'Failed to fetch dashboard stats' });
   }
 };
@@ -131,7 +132,7 @@ export const getAllUsers = async (req: AdminRequest, res: Response) => {
       },
     });
   } catch (err) {
-    console.error('[Admin] getAllUsers error:', err);
+    logger.error('[Admin] getAllUsers error:', err);
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 };
@@ -170,7 +171,7 @@ export const getUserDetails = async (req: AdminRequest, res: Response) => {
       },
     });
   } catch (err) {
-    console.error('[Admin] getUserDetails error:', err);
+    logger.error('[Admin] getUserDetails error:', err);
     res.status(500).json({ error: 'Failed to fetch user details' });
   }
 };
@@ -201,7 +202,7 @@ export const updateUser = async (req: AdminRequest, res: Response) => {
 
     res.json({ message: 'User updated successfully', user });
   } catch (err) {
-    console.error('[Admin] updateUser error:', err);
+    logger.error('[Admin] updateUser error:', err);
     res.status(500).json({ error: 'Failed to update user' });
   }
 };
@@ -229,7 +230,7 @@ export const deleteUser = async (req: AdminRequest, res: Response) => {
 
     res.json({ message: 'User and all associated data deleted successfully' });
   } catch (err) {
-    console.error('[Admin] deleteUser error:', err);
+    logger.error('[Admin] deleteUser error:', err);
     res.status(500).json({ error: 'Failed to delete user' });
   }
 };
@@ -288,7 +289,7 @@ export const getAllTodos = async (req: AdminRequest, res: Response) => {
       },
     });
   } catch (err) {
-    console.error('[Admin] getAllTodos error:', err);
+    logger.error('[Admin] getAllTodos error:', err);
     res.status(500).json({ error: 'Failed to fetch todos' });
   }
 };
@@ -307,7 +308,7 @@ export const deleteTodo = async (req: AdminRequest, res: Response) => {
 
     res.json({ message: 'Todo deleted successfully' });
   } catch (err) {
-    console.error('[Admin] deleteTodo error:', err);
+    logger.error('[Admin] deleteTodo error:', err);
     res.status(500).json({ error: 'Failed to delete todo' });
   }
 };
@@ -330,7 +331,7 @@ export const deleteMultipleTodos = async (req: AdminRequest, res: Response) => {
       deletedCount: result.deletedCount,
     });
   } catch (err) {
-    console.error('[Admin] deleteMultipleTodos error:', err);
+    logger.error('[Admin] deleteMultipleTodos error:', err);
     res.status(500).json({ error: 'Failed to delete todos' });
   }
 };
@@ -375,7 +376,7 @@ export const getSystemHealth = async (req: AdminRequest, res: Response) => {
       environment: process.env.NODE_ENV || 'development',
     });
   } catch (err) {
-    console.error('[Admin] getSystemHealth error:', err);
+    logger.error('[Admin] getSystemHealth error:', err);
     res.status(500).json({ error: 'Failed to get system health' });
   }
 };

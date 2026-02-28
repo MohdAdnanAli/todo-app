@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { User } from '../models/User';
+import { logger } from '../utils/logger';
 
 interface EmailTemplate {
   subject: string;
@@ -227,7 +228,7 @@ export const emailDripService = {
 
       await this.sendWelcomeEmail(userId, email, displayName);
     } catch (error) {
-      console.error('Error scheduling email drip:', error);
+      logger.error('Error scheduling email drip:', error);
     }
   },
 
@@ -248,9 +249,9 @@ export const emailDripService = {
         'emailDripSchedule.day1WelcomeSentAt': new Date(),
       });
 
-      console.log(`Welcome email sent to ${email}`);
+      logger.info(`Welcome email sent to ${email}`);
     } catch (error) {
-      console.error('Error sending welcome email:', error);
+      logger.error('Error sending welcome email:', error);
     }
   },
 
@@ -271,9 +272,9 @@ export const emailDripService = {
         'emailDripSchedule.day3TipsSentAt': new Date(),
       });
 
-      console.log(`Tips email sent to ${email}`);
+      logger.info(`Tips email sent to ${email}`);
     } catch (error) {
-      console.error('Error sending tips email:', error);
+      logger.error('Error sending tips email:', error);
     }
   },
 
@@ -311,9 +312,9 @@ export const emailDripService = {
         'emailDripSchedule.day7CheckInSentAt': new Date(),
       });
 
-      console.log(`Check-in email sent to ${email}`);
+      logger.info(`Check-in email sent to ${email}`);
     } catch (error) {
-      console.error('Error sending check-in email:', error);
+      logger.error('Error sending check-in email:', error);
     }
   },
 
@@ -329,7 +330,7 @@ export const emailDripService = {
       });
 
       for (const user of day3Users) {
-        await this.sendTipsEmail(user._id, user.email, user.displayName);
+        await this.sendTipsEmail(user._id.toString(), user.email, user.displayName);
       }
 
       const day7Users = await User.find({
@@ -338,12 +339,12 @@ export const emailDripService = {
       });
 
       for (const user of day7Users) {
-        await this.sendCheckInEmail(user._id, user.email, user.displayName);
+        await this.sendCheckInEmail(user._id.toString(), user.email, user.displayName);
       }
 
-      console.log('Processed pending email drips');
+      logger.info('Processed pending email drips');
     } catch (error) {
-      console.error('Error processing pending emails:', error);
+      logger.error('Error processing pending emails:', error);
     }
   },
 };

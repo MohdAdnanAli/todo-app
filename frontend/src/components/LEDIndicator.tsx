@@ -5,9 +5,10 @@ import { LED_COLORS } from '../types';
 interface LEDIndicatorProps {
   message: string;
   messageType: MessageType;
+  variant?: 'default' | 'small-screen-header';
 }
 
-const LEDIndicator: React.FC<LEDIndicatorProps> = memo(({ message, messageType }) => {
+const LEDIndicator: React.FC<LEDIndicatorProps> = memo(({ message, messageType, variant = 'default' }) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const [showAutoMessage, setShowAutoMessage] = useState(false);
   const colors = LED_COLORS[messageType];
@@ -24,11 +25,16 @@ const LEDIndicator: React.FC<LEDIndicatorProps> = memo(({ message, messageType }
   
   const shouldShowMessage = showAutoMessage || showTooltip;
   
+  // Different positioning for small screen header variant
+  const containerClass = variant === 'small-screen-header' 
+    ? "flex items-center" 
+    : "absolute right-16 top-1/2 -translate-y-1/2 cursor-pointer";
+  
   return (
     <div 
-      className="absolute right-16 top-1/2 -translate-y-1/2 cursor-pointer"
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
+      className={containerClass}
+      onMouseEnter={() => variant === 'default' && setShowTooltip(true)}
+      onMouseLeave={() => variant === 'default' && setShowTooltip(false)}
     >
       <div
         className="w-4 h-4 rounded-full transition-all duration-300"

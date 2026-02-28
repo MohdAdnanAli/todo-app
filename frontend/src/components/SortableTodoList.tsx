@@ -4,6 +4,7 @@ import {
   closestCenter,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragEndEvent,
@@ -53,7 +54,17 @@ const SortableTodoList: React.FC<SortableTodoListProps> = memo(
     const [activeId, setActiveId] = useState<string | null>(null);
 
     const sensors = useSensors(
-      useSensor(PointerSensor),
+      useSensor(PointerSensor, {
+        activationConstraint: {
+          distance: 5,
+        },
+      }),
+      useSensor(TouchSensor, {
+        activationConstraint: {
+          delay: 250,
+          tolerance: 5,
+        },
+      }),
       useSensor(KeyboardSensor, {
         coordinateGetter: sortableKeyboardCoordinates,
       })
@@ -117,38 +128,27 @@ const SortableTodoList: React.FC<SortableTodoListProps> = memo(
         return;
       }
 
-      // Find the indices in the FILTERED list
-      const oldIndex = filteredTodos.findIndex(todo => todo._id === active.id);
-      const newIndex = filteredTodos.findIndex(todo => todo._id === over.id);
+      // Find the indices in the FULL sorted todos list (not filtered)
+      const oldIndex = todos.findIndex(todo => todo._id === active.id);
+      const newIndex = todos.findIndex(todo => todo._id === over.id);
 
       if (oldIndex === -1 || newIndex === -1) {
         return;
       }
 
-      // Move within filtered list
-      const reorderedFiltered = arrayMove(filteredTodos, oldIndex, newIndex);
+      // Move within the full todos list using arrayMove
+      const reorderedTodos = arrayMove(todos, oldIndex, newIndex);
 
-      // Create a map of new positions based on filtered order
-      // Only update the order for items that are in the filtered list
-      const updatedTodos = todos.map(todo => {
-        const newPosition = reorderedFiltered.findIndex(t => t._id === todo._id);
-        if (newPosition !== -1) {
-          return { ...todo, order: newPosition };
-        }
-        // Items not in filtered list keep their original relative order
-        // but we need to ensure they don't conflict with new positions
-        return todo;
-      });
+      // Assign new order values based on the new positions
+      // Order values will be 0, 1, 2, 3... (sequential)
+      const updatedTodos = reorderedTodos.map((todo, index) => ({
+        ...todo,
+        order: index,
+      }));
 
-      // Sort all todos by the new order values to maintain proper ordering
-      const sortedTodos = [...updatedTodos].sort((a, b) => {
-        const orderA = a.order ?? 0;
-        const orderB = b.order ?? 0;
-        return orderA - orderB;
-      });
-
-      onReorder(sortedTodos);
-    }, [filteredTodos, todos, onReorder]);
+      // Call onReorder with the reordered todos
+      onReorder(updatedTodos);
+    }, [todos, onReorder]);
 
     const handleDragCancel = () => {
       setActiveId(null);
@@ -335,7 +335,7 @@ const SortableTodoList: React.FC<SortableTodoListProps> = memo(
             onDragCancel={handleDragCancel}
           >
             <SortableContext
-              items={filteredTodos.map(t => t._id)}
+              items={todos.map(t => t._id)}
               strategy={verticalListSortingStrategy}
               disabled={!isDragEnabled}
             >
