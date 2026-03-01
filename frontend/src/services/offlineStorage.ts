@@ -234,6 +234,36 @@ export const offlineStorage = {
     }
   },
 
+  // Store encryption salt (for Google OAuth users)
+  async saveEncryptionSalt(salt: string): Promise<void> {
+    try {
+      await this.updateMetadata('encryption-salt', { salt, savedAt: Date.now() });
+    } catch (error) {
+      console.error('Error saving encryption salt:', error);
+    }
+  },
+
+  // Retrieve stored encryption salt
+  async getEncryptionSalt(): Promise<string | null> {
+    try {
+      const data = await this.getMetadata('encryption-salt');
+      return data?.salt || null;
+    } catch (error) {
+      console.error('Error retrieving encryption salt:', error);
+      return null;
+    }
+  },
+
+  // Clear stored encryption salt
+  async clearEncryptionSalt(): Promise<void> {
+    try {
+      const db = await getDB();
+      await db.delete('metadata', 'encryption-salt');
+    } catch (error) {
+      console.error('Error clearing encryption salt:', error);
+    }
+  },
+
   // ===== FALLBACK: LocalStorage methods =====
 
   getTodosFromLocalStorage(): Todo[] {

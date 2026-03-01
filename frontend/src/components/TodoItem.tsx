@@ -38,6 +38,11 @@ const TodoItemCore: React.FC<TodoItemProps> = memo(({
   dragDisabled = false,
   isDragging = false,
 }) => {
+  // Defensive check: ensure todo has required properties
+  if (!todo || !todo._id || typeof todo.text !== 'string') {
+    return null;
+  }
+  
   const { category = 'other', priority = 'medium', tags = [], dueDate } = todo;
   
   const SmartIcon: LucideIcon = React.useMemo(
@@ -45,7 +50,7 @@ const TodoItemCore: React.FC<TodoItemProps> = memo(({
     [todo.text]
   );
   
-  const iconColor = useIconColor(todo.text, todo.completed, category);
+  const iconColor = useIconColor(todo.text, !!todo.completed, category);
   const priorityStyle = usePriorityStyle(priority);
   const formattedDueDate = formatDueDate(dueDate);
 

@@ -84,12 +84,20 @@ const AuthForm = ({ onLogin, onRegister }: AuthFormProps): JSX.Element => {
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
     const googleAuth = urlParams?.get('google_auth');
     const googleError = urlParams?.get('google_error') ?? null;
+    const encryptionSalt = urlParams?.get('encryptionSalt') ?? null;
     
-    // Handle success - just clear the URL, auth is via cookie
+    // Handle success - save encryptionSalt and clear URL, auth is via cookie
     if (googleAuth === 'success') {
+      // If encryptionSalt is in URL, save it for todo encryption
+      // The googleId serves as the "password" for Google users
+      if (encryptionSalt) {
+        import('../services/offlineStorage').then(({ offlineStorage }) => {
+          offlineStorage.savePassword('google').catch(console.error);
+          offlineStorage.saveEncryptionSalt(encryptionSalt).catch(console.error);
+        });
+      }
+      // Clear URL params
       window.history.replaceState({}, document.title, window.location.pathname);
-      // Don't need to do anything else - the cookie should already be set
-      // and the app will authenticate on reload/re-render
       return;
     }
     

@@ -151,6 +151,31 @@ function App() {
       }
     };
     loadOfflineTodos();
+    // Try to restore encryption salt from storage
+    const storedSalt = await offlineStorage.getEncryptionSalt();
+    if (storedSalt) {
+      setEncryptionSalt(storedSalt);
+    }
+  }, []);
+
+  // Handle Google OAuth params - runs once on mount
+  useEffect(() => {
+    const handleGoogleOAuthParams = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const googleAuth = urlParams.get('google_auth');
+      const encryptionSalt = urlParams.get('encryptionSalt');
+
+      if (googleAuth === 'success' && encryptionSalt) {
+        // Save encryption salt for Google users
+        await offlineStorage.saveEncryptionSalt(encryptionSalt);
+        // For Google users, we use 'google' as the "password" identifier
+        await offlineStorage.savePassword('google');
+        
+        // Clear URL params
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    };
+    handleGoogleOAuthParams();
   }, []);
 
   // Separate effect to handle auth check - runs AFTER userPassword is restored
@@ -331,6 +356,7 @@ function App() {
     
     // Clear stored password on logout
     await offlineStorage.clearPassword();
+    await offlineStorage.clearEncryptionSalt();
     
     // Redirect directly to login page (home)
     window.location.href = '/';
@@ -351,6 +377,7 @@ function App() {
     
     // Clear stored password on account deletion
     offlineStorage.clearPassword().catch(err => console.error('Error clearing password:', err));
+    offlineStorage.clearEncryptionSalt().catch(err => console.error('Error clearing encryption salt:', err));
   };
 
   const handleAddTodo = async (text: string, category?: TodoCategory, priority?: TodoPriority, tags?: string[], dueDate?: string) => {

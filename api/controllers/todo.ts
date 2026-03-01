@@ -6,6 +6,24 @@ import { logger } from '../utils/logger';
 const CATEGORIES = ['work', 'personal', 'shopping', 'health', 'other'] as const;
 const PRIORITIES = ['low', 'medium', 'high'] as const;
 
+// Helper function to serialize todo objects from MongoDB
+const serializeTodo = (todo: any) => ({
+  _id: todo._id?.toString(),
+  text: todo.text,
+  completed: todo.completed,
+  category: todo.category,
+  priority: todo.priority,
+  tags: todo.tags || [],
+  dueDate: todo.dueDate ? new Date(todo.dueDate).toISOString() : null,
+  order: todo.order ?? 0,
+  participants: todo.participants || [],
+  createdAt: todo.createdAt ? new Date(todo.createdAt).toISOString() : new Date().toISOString(),
+  updatedAt: todo.updatedAt ? new Date(todo.updatedAt).toISOString() : undefined,
+});
+
+// Helper to serialize array of todos
+const serializeTodos = (todos: any[]) => todos.map(serializeTodo);
+
 const createTodoSchema = z.object({
   text: z.string().min(1, 'Task text is required').max(500),
   category: z.enum(CATEGORIES).optional().default('other'),
@@ -51,7 +69,8 @@ export const getTodos = async (req: Request & { user?: { id: string } }, res: Re
       .sort({ order: 1, createdAt: -1 })
       .lean();
 
-    return res.json(todos);
+    // Serialize todos to ensure proper JSON serialization
+    return res.json(serializeTodos(todos));
   } catch (err) {
     logger.error('GetTodos error:', err);
     return res.status(500).json({ error: 'Failed to fetch todos' });
@@ -96,7 +115,8 @@ export const createTodo = async (req: Request & { user?: { id: string } }, res: 
       .sort({ order: 1, createdAt: -1 })
       .lean();
 
-    return res.status(201).json(allTodos);
+    // Serialize todos to ensure proper JSON serialization
+    return res.status(201).json(serializeTodos(allTodos));
   } catch (err) {
     logger.error('CreateTodo error:', err);
     return res.status(500).json({ error: 'Failed to create todo' });
@@ -127,7 +147,8 @@ export const updateTodo = async (req: Request & { user?: { id: string } }, res: 
       return res.status(404).json({ error: 'Todo not found or not owned by user' });
     }
 
-    return res.json(todo);
+    // Serialize todo to ensure proper JSON serialization
+    return res.json(serializeTodo(todo));
   } catch (err) {
     logger.error('UpdateTodo error:', err);
     return res.status(500).json({ error: 'Failed to update todo' });
@@ -172,7 +193,8 @@ export const deleteTodo = async (req: Request & { user?: { id: string } }, res: 
       .sort({ order: 1, createdAt: -1 })
       .lean();
 
-    return res.json(allTodos);
+    // Serialize todos to ensure proper JSON serialization
+    return res.json(serializeTodos(allTodos));
   } catch (err) {
     logger.error('DeleteTodo error:', err);
     return res.status(500).json({ error: 'Failed to delete todo' });
@@ -212,7 +234,8 @@ export const reorderTodos = async (req: Request & { user?: { id: string } }, res
       .sort({ order: 1, createdAt: -1 })
       .lean();
 
-    return res.json(allTodos);
+    // Serialize todos to ensure proper JSON serialization
+    return res.json(serializeTodos(allTodos));
   } catch (err) {
     logger.error('ReorderTodos error:', err);
     return res.status(500).json({ error: 'Failed to reorder todos' });

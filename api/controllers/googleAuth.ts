@@ -409,8 +409,10 @@ export const googleCallback = async (req: Request, res: Response) => {
       return res.status(200).send(html);
     }
     
-    // Regular redirect for non-popup flow - just redirect with success, auth is via cookie
-    return res.redirect(`${frontendUrl}?google_auth=success`);
+    // Regular redirect for non-popup flow - include encryptionSalt in URL for todo encryption
+    // This is needed because the cookie-based auth doesn't include the salt
+    const encryptionSalt = user.encryptionSalt || '';
+    return res.redirect(`${frontendUrl}?google_auth=success&encryptionSalt=${encodeURIComponent(encryptionSalt)}`);
   } catch (err: unknown) {
     logger.error('[Google OAuth] Callback error:', err);
     
