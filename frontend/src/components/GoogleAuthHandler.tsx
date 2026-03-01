@@ -1,13 +1,20 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { API_URL } from '../types';
 import { offlineStorage } from '../services/offlineStorage';
 
 interface GoogleAuthHandlerProps {
-  onGoogleAuth: (token: string, googleId: string, encryptionSalt: string) => void;
+  onGoogleAuth?: (token: string, googleId: string, encryptionSalt: string) => void;
 }
 
+/**
+ * GoogleAuthHandler - Handles Google OAuth redirect after authentication
+ * 
+ * This component listens for URL parameters from Google OAuth redirect
+ * and saves the encryptionSalt and googleId for todo encryption.
+ * 
+ * Note: Authentication is primarily cookie-based, so token handling
+ * is minimal. The main purpose is to capture encryption credentials.
+ */
 export const GoogleAuthHandler: React.FC<GoogleAuthHandlerProps> = ({ onGoogleAuth }) => {
   const navigate = useNavigate();
 
@@ -26,23 +33,29 @@ export const GoogleAuthHandler: React.FC<GoogleAuthHandlerProps> = ({ onGoogleAu
         return;
       }
 
-      if (googleAuth === 'success' && token && googleId && salt) {
-        try {
-          // Set token via backend to ensure proper cookie settings (httpOnly, secure, sameSite)
-          await axios.post(`${API_URL}/api/auth/set-token`, { token }, {
-            withCredentials: true
-          });
-        } catch (err) {
-          console.error('Failed to set token via backend, falling back to manual cookie');
-          // Fallback: set cookie manually (less secure but functional)
-          document.cookie = `auth_token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+      if (googleAuth === 'success') {
+        // Save encryption salt for todo decryption
+        if (salt) {
+          try {
+            await offlineStorage.saveEncryptionSalt(salt);
+          } catch (err) {
+            console.error('Failed to save encryption salt:', err);
+          }
         }
         
         // Save googleId as password for encryption
-        await offlineStorage.savePassword(googleId);
+        if (googleId) {
+          try {
+            await offlineStorage.savePassword(googleId);
+          } catch (err) {
+            console.error('Failed to save googleId:', err);
+          }
+        }
         
-        // Notify parent component
-        onGoogleAuth(token, googleId, salt);
+        // Call optional callback if provided
+        if (onGoogleAuth && token && googleId && salt) {
+          onGoogleAuth(token, googleId, salt);
+        }
 
         // Clear URL params
         window.history.replaceState({}, '', window.location.pathname);
@@ -54,3 +67,5 @@ export const GoogleAuthHandler: React.FC<GoogleAuthHandlerProps> = ({ onGoogleAu
 
   return null; // This component doesn't render anything
 };
+
+export default GoogleAuthHandler;

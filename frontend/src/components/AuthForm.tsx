@@ -85,17 +85,24 @@ const AuthForm = ({ onLogin, onRegister }: AuthFormProps): JSX.Element => {
     const googleAuth = urlParams?.get('google_auth');
     const googleError = urlParams?.get('google_error') ?? null;
     const encryptionSalt = urlParams?.get('encryptionSalt') ?? null;
+    const googleId = urlParams?.get('googleId') ?? null;
     
-    // Handle success - save encryptionSalt and clear URL, auth is via cookie
+    // Handle success - save encryptionSalt and googleId, clear URL, auth is via cookie
     if (googleAuth === 'success') {
-      // If encryptionSalt is in URL, save it for todo encryption
-      // The googleId serves as the "password" for Google users
+      // Save encryptionSalt for todo encryption
       if (encryptionSalt) {
         import('../services/offlineStorage').then(({ offlineStorage }) => {
-          offlineStorage.savePassword('google').catch(console.error);
           offlineStorage.saveEncryptionSalt(encryptionSalt).catch(console.error);
         });
       }
+      
+      // Save googleId as the "password" for Google users - this is used for encryption
+      if (googleId) {
+        import('../services/offlineStorage').then(({ offlineStorage }) => {
+          offlineStorage.savePassword(googleId).catch(console.error);
+        });
+      }
+      
       // Clear URL params
       window.history.replaceState({}, document.title, window.location.pathname);
       return;
@@ -157,6 +164,21 @@ const AuthForm = ({ onLogin, onRegister }: AuthFormProps): JSX.Element => {
             
             // Remove listener to prevent duplicate handling
             window.removeEventListener('message', handleMessage);
+            
+            // Save encryption data from popup message
+            const { encryptionSalt, googleId } = event.data || {};
+            
+            if (encryptionSalt) {
+              import('../services/offlineStorage').then(({ offlineStorage }) => {
+                offlineStorage.saveEncryptionSalt(encryptionSalt).catch(console.error);
+              });
+            }
+            
+            if (googleId) {
+              import('../services/offlineStorage').then(({ offlineStorage }) => {
+                offlineStorage.savePassword(googleId).catch(console.error);
+              });
+            }
             
             // Reload to trigger auth check - the cookie should now be set
             window.location.reload();

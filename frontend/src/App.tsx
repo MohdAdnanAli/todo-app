@@ -164,12 +164,18 @@ function App() {
       const urlParams = new URLSearchParams(window.location.search);
       const googleAuth = urlParams.get('google_auth');
       const encryptionSalt = urlParams.get('encryptionSalt');
+      const googleId = urlParams.get('googleId');
 
-      if (googleAuth === 'success' && encryptionSalt) {
+      if (googleAuth === 'success') {
         // Save encryption salt for Google users
-        await offlineStorage.saveEncryptionSalt(encryptionSalt);
-        // For Google users, we use 'google' as the "password" identifier
-        await offlineStorage.savePassword('google');
+        if (encryptionSalt) {
+          await offlineStorage.saveEncryptionSalt(encryptionSalt);
+        }
+        
+        // Save googleId as password for Google users - this is used for encryption
+        if (googleId) {
+          await offlineStorage.savePassword(googleId);
+        }
         
         // Clear URL params
         window.history.replaceState({}, '', window.location.pathname);

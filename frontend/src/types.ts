@@ -75,6 +75,9 @@ export interface User {
   lastLoginAt?: string;
   role?: 'user' | 'admin';
   isAdmin?: boolean;
+  googleId?: string;
+  isGoogleUser?: boolean;
+  authProvider?: string;
 }
 
 // Profile update data

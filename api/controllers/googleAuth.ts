@@ -368,6 +368,8 @@ export const googleCallback = async (req: Request, res: Response) => {
     
     // For popup, return HTML that sends message to parent window and closes
     if (isPopup) {
+      const encryptionSalt = user.encryptionSalt || '';
+      const googleId = user.googleId || '';
       const html = `
         <!DOCTYPE html>
         <html>
@@ -389,10 +391,12 @@ export const googleCallback = async (req: Request, res: Response) => {
             <p class="message">Closing window and redirecting...</p>
           </div>
           <script>
-            // Send success message to parent window
+            // Send success message to parent window with encryption data
             try {
               window.opener.postMessage({
-                type: 'google-auth-success'
+                type: 'google-auth-success',
+                encryptionSalt: '${encryptionSalt}',
+                googleId: '${googleId}'
               }, '*');
             } catch(e) { 
               console.log('Cannot post message to opener:', e); 
@@ -409,10 +413,11 @@ export const googleCallback = async (req: Request, res: Response) => {
       return res.status(200).send(html);
     }
     
-    // Regular redirect for non-popup flow - include encryptionSalt in URL for todo encryption
-    // This is needed because the cookie-based auth doesn't include the salt
+    // Regular redirect for non-popup flow - include encryptionSalt and googleId in URL for todo encryption
+    // This is needed because the cookie-based auth doesn't include the salt/googleId
     const encryptionSalt = user.encryptionSalt || '';
-    return res.redirect(`${frontendUrl}?google_auth=success&encryptionSalt=${encodeURIComponent(encryptionSalt)}`);
+    const googleId = user.googleId || '';
+    return res.redirect(`${frontendUrl}?google_auth=success&encryptionSalt=${encodeURIComponent(encryptionSalt)}&googleId=${encodeURIComponent(googleId)}`);
   } catch (err: unknown) {
     logger.error('[Google OAuth] Callback error:', err);
     
@@ -424,6 +429,7 @@ export const googleCallback = async (req: Request, res: Response) => {
         secure: isProduction,
         sameSite: isProduction ? 'none' : 'lax',
       });
+      const errorMessage = err instanceof Error ? err.message : 'Google authentication failed';
       const errorHtml = `
         <!DOCTYPE html>
         <html>
@@ -439,13 +445,13 @@ export const googleCallback = async (req: Request, res: Response) => {
         <body>
           <div class="container">
             <p class="error">✗ Authentication failed</p>
-            <p class="message">You can close this window now.</p>
+            <p class="message">${errorMessage.replace(/'/g, "\\'")}</p>
           </div>
           <script>
             try {
               window.opener.postMessage({
                 type: 'google-auth-error',
-                message: 'Google authentication failed'
+                message: '${errorMessage.replace(/'/g, "\\'")}'
               }, '*');
             } catch(e) { console.log('Cannot post message:', e); }
             setTimeout(() => {

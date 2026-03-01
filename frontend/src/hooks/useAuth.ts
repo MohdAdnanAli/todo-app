@@ -80,6 +80,11 @@ export const useAuthCheck = (
           setEncryptionSalt(res.data.encryptionSalt);
         }
 
+        // For Google users, use googleId as password for encryption
+        if (res.data.googleId) {
+          setUserPassword(res.data.googleId);
+        }
+
         setIsLoading(false);
         return true;
       } catch (err: any) {

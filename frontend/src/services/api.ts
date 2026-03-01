@@ -72,8 +72,8 @@ export const authApi = {
     return res.data;
   },
 
-  getMe: async (): Promise<{ user: User; encryptionSalt: string; isAdmin?: boolean }> => {
-    const res = await api.get<{ user: User; encryptionSalt: string; isAdmin?: boolean }>('/api/me');
+  getMe: async (): Promise<{ user: User; encryptionSalt: string; googleId?: string; isAdmin?: boolean }> => {
+    const res = await api.get<{ user: User; encryptionSalt: string; googleId?: string; isAdmin?: boolean }>('/api/me');
     return res.data;
   },
 

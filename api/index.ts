@@ -196,10 +196,12 @@ app.get('/api/me', protect, async (req: any, res) => {
         role: user.role,
         authProvider: user.authProvider,
         isGoogleUser: user.isGoogleUser,
+        googleId: user.googleId,
         googleProfile: user.googleProfile,
       },
       isAdmin,
-      encryptionSalt: user.encryptionSalt 
+      encryptionSalt: user.encryptionSalt,
+      googleId: user.googleId // Also return at top level for convenience
     });
   } catch (err) {
     logger.error('/api/me error:', err);
