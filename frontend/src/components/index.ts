@@ -19,3 +19,4 @@ export { default as SortableTodoList } from './SortableTodoList';
 export { default as SmartTodoList } from './SmartTodoList';
 export { GoogleAuthHandler } from './GoogleAuthHandler';
 export { ConfirmDialog } from './ConfirmDialog';
+export { default as PremiumFeaturesModal } from './PremiumFeaturesModal';

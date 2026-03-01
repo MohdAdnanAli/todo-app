@@ -52,7 +52,7 @@ const updateTodoSchema = z.object({
 const reorderTodosSchema = z.object({
   todos: z.array(z.object({
     id: z.string(),
-    order: z.number(),
+    order: z.number().optional(),
   })),
 });
 
@@ -91,14 +91,16 @@ export const createTodo = async (req: Request & { user?: { id: string } }, res: 
 
     const { text, category, priority, tags } = result.data;
 
-    // Atomic approach: find max order and add new todo at max+1
-    // This prevents race conditions when multiple devices create todos simultaneously
-    const maxOrderTodo = await Todo.findOne({ user: userId })
-      .sort({ order: -1 })
+    // Atomic approach: find min order and add new todo at min-1
+    // This ensures new todos appear at the TOP (lower order = displayed first)
+    const minOrderTodo = await Todo.findOne({ user: userId })
+      .sort({ order: 1 })
       .select('order')
       .lean();
     
-    const newOrder = maxOrderTodo ? (maxOrderTodo.order || 0) + 1 : 0;
+    // New todos go to the TOP (lowest order value)
+    // If no todos exist, order is 0; otherwise use minOrder - 1
+    const newOrder = minOrderTodo ? (minOrderTodo.order || 0) - 1 : 0;
 
     // Create new todo with order at the top (highest order = displayed at top)
     const todo = await Todo.create({
@@ -216,12 +218,12 @@ export const reorderTodos = async (req: Request & { user?: { id: string } }, res
 
     const { todos } = result.data;
 
-    // Use ordered array of IDs - assign sequential orders based on array position
-    // This ensures proper ordering regardless of initial order values
-    const bulkOps = todos.map(({ id }, index) => ({
+    // Use the order values provided by frontend (based on array position after drag/drop)
+    // If order is not provided, fall back to using array index
+    const bulkOps = todos.map(({ id, order }, index) => ({
       updateOne: {
         filter: { _id: id, user: userId },
-        update: { $set: { order: index } },
+        update: { $set: { order: order ?? index } },
       },
     }));
 

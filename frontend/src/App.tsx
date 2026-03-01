@@ -18,6 +18,7 @@ import {
   PWAInstallPrompt,
   ConfirmDialog,
   Footer,
+  PremiumFeaturesModal,
 } from './components';
 import SmartTodoList from './components/SmartTodoList';
 import { onboardingService } from './services/onboarding';
@@ -76,11 +77,12 @@ function App() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [encryptionSalt, setEncryptionSalt] = useState<string>('');
   const [userPassword, setUserPassword] = useState<string>('');
-  const [showWelcomeTour, setShowWelcomeTour] = useState(false);
+const [showWelcomeTour, setShowWelcomeTour] = useState(false);
   const [showQuickStart, setShowQuickStart] = useState(false);
   const [quickStartChecked, setQuickStartChecked] = useState(false);
   const [showWelcomeBackModal, setShowWelcomeBackModal] = useState(false);
   const [isLoadingTodos, setIsLoadingTodos] = useState(false);
+  const [showPremiumFeatures, setShowPremiumFeatures] = useState(false);
   
   // Delete confirmation dialog state
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -146,16 +148,16 @@ function App() {
         if (storedPassword) {
           setUserPassword(storedPassword);
         }
+        // Try to restore encryption salt from storage
+        const storedSalt = await offlineStorage.getEncryptionSalt();
+        if (storedSalt) {
+          setEncryptionSalt(storedSalt);
+        }
       } catch (error) {
         console.error('Error loading offline todos:', error);
       }
     };
     loadOfflineTodos();
-    // Try to restore encryption salt from storage
-    const storedSalt = await offlineStorage.getEncryptionSalt();
-    if (storedSalt) {
-      setEncryptionSalt(storedSalt);
-    }
   }, []);
 
   // Handle Google OAuth params - runs once on mount
@@ -275,6 +277,7 @@ function App() {
       setUserPassword(loginPassword);
       setMessage('Login successful');
       setMessageType('success');
+      setIsLoading(false); // Stop loading screen after successful login
 
       // Save password for future reloads
       await offlineStorage.savePassword(loginPassword);
@@ -325,6 +328,7 @@ function App() {
       setUserPassword(regPassword);
       setMessage('Account created and logged in! Please check your email to verify your account.');
       setMessageType('success');
+      setIsLoading(false); // Stop loading screen after successful registration
 
       // Save password for future reloads
       await offlineStorage.savePassword(regPassword);
@@ -506,9 +510,10 @@ function App() {
     
     // Use batch reorder endpoint for efficiency
     try {
-      const reorderData = reorderedTodos.map((todo) => ({
+      // Send todos with their new order values based on array position
+      const reorderData = reorderedTodos.map((todo, index) => ({
         id: todo._id,
-        // Order will be assigned by server based on array index
+        order: index, // Assign sequential order based on array position
       }));
       
       const res = await axios.post(
@@ -658,13 +663,13 @@ function App() {
 
             <div className="flex items-center gap-2 ml-auto sm:ml-0">
               <button
-                
-                title="Premium Feature is in Beta"
+                onClick={() => setShowPremiumFeatures(true)}
+                title="Premium Features (Beta)"
                 className="px-4 py-2 rounded-lg font-medium text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white
                   shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
                 style={{ boxShadow: 'var(--glow)' }}
               >
-                ⏰
+                ⏰ Premium
               </button>
               {isAdmin && (
                 <button
@@ -758,6 +763,12 @@ function App() {
         onConfirm={handleDeleteConfirm}
         onCancel={handleDeleteCancel}
         isLoading={deleteConfirm.isDeleting}
+      />
+
+      {/* Premium Features Modal */}
+      <PremiumFeaturesModal
+        isOpen={showPremiumFeatures}
+        onClose={() => setShowPremiumFeatures(false)}
       />
 
       <Footer />
