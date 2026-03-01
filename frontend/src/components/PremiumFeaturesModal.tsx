@@ -189,7 +189,7 @@ export const PremiumFeaturesModal: React.FC<PremiumFeaturesModalProps> = ({
     >
       <div
         className="
-          w-full max-w-2xl max-h-[90vh] overflow-hidden
+          w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden
           bg-[var(--bg-primary)] rounded-3xl
           border border-[var(--border-secondary)]
           shadow-[0_25px_50px_rgba(0,0,0,0.4)]
@@ -197,16 +197,16 @@ export const PremiumFeaturesModal: React.FC<PremiumFeaturesModalProps> = ({
         "
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-[var(--border-secondary)]">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600">
-              <Zap size={24} className="text-white" />
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[var(--border-secondary)]">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600">
+              <Zap size={18} className="sm:w-6 sm:h-6 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-[var(--text-primary)]">
+              <h2 className="text-lg sm:text-xl font-bold text-[var(--text-primary)]">
                 Premium Features
               </h2>
-              <p className="text-sm text-[var(--text-muted)]">
+              <p className="text-xs sm:text-sm text-[var(--text-muted)]">
                 Coming soon to elevate your productivity
               </p>
             </div>
@@ -220,42 +220,42 @@ export const PremiumFeaturesModal: React.FC<PremiumFeaturesModalProps> = ({
         </div>
 
         {/* Carousel Content */}
-        <div className="p-8">
+        <div className="p-6 sm:p-8">
           {/* Feature Display */}
-          <div className="text-center mb-8">
+          <div className="text-center mb-6">
             {/* Icon */}
             <div className={`
-              inline-flex items-center justify-center w-32 h-32 rounded-3xl mb-6
+              inline-flex items-center justify-center w-24 h-24 sm:w-32 sm:h-32 rounded-2xl sm:rounded-3xl mb-4 sm:mb-6
               bg-gradient-to-br ${currentFeature.color}
               shadow-lg transform transition-all duration-300 hover:scale-110
             `}>
-              <div className="text-white">
+              <div className="text-white p-2 sm:p-0">
                 {currentFeature.icon}
               </div>
             </div>
 
             {/* Title */}
-            <h3 className="text-2xl font-bold mb-3 text-[var(--text-primary)]">
+            <h3 className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3 text-[var(--text-primary)]">
               {currentFeature.title}
             </h3>
 
             {/* Description */}
-            <p className="text-[var(--text-muted)] leading-relaxed max-w-md mx-auto">
+            <p className="text-sm sm:text-base text-[var(--text-muted)] leading-relaxed max-w-md mx-auto px-2">
               {currentFeature.description}
             </p>
           </div>
 
           {/* Navigation Dots */}
-          <div className="flex items-center justify-center gap-2 mb-6">
+          <div className="flex items-center justify-center gap-3 mb-8 px-4 overflow-x-auto">
             {premiumFeatures.map((_, index) => (
               <button
                 key={index}
                 onClick={() => goToSlide(index)}
                 className={`
-                  w-2.5 h-2.5 rounded-full transition-all duration-300
+                  flex-shrink-0 h-3 rounded-full transition-all duration-300
                   ${index === currentIndex 
-                    ? 'bg-gradient-to-r from-indigo-500 to-purple-500 w-8' 
-                    : 'bg-[var(--border-secondary)] hover:bg-[var(--text-muted)]'
+                    ? 'bg-gradient-to-r from-indigo-500 to-purple-500 w-12' 
+                    : 'bg-[var(--border-secondary)] hover:bg-[var(--text-muted)] w-3'
                   }
                 `}
               />
@@ -298,8 +298,8 @@ export const PremiumFeaturesModal: React.FC<PremiumFeaturesModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-[var(--border-secondary)] bg-[var(--bg-secondary)] rounded-b-3xl">
-          <p className="text-center text-sm text-[var(--text-muted)]">
+        <div className="p-3 sm:p-4 border-t border-[var(--border-secondary)] bg-[var(--bg-secondary)] rounded-b-3xl">
+          <p className="text-center text-xs sm:text-sm text-[var(--text-muted)]">
             🚀 We're working hard to bring these features to life!
           </p>
         </div>
