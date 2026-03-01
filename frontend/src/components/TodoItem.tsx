@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import type { Todo, TodoCategory, TodoPriority } from '../types';
 import { getSmartIcon } from '../utils/todoIcons';
+import { getIconColor, CATEGORY_COLORS, PRIORITY_COLORS, formatDueDate } from '../utils/todoHelpers';
 import type { LucideIcon } from 'lucide-react';
 import { Trash2, Tag, AlertCircle } from 'lucide-react';
 
@@ -8,70 +9,77 @@ interface TodoItemProps {
   todo: Todo;
   onToggle: (todo: Todo) => void;
   onDelete: (todoId: string) => void;
+  dragHandle?: React.ReactNode;
+  dragDisabled?: boolean;
+  isDragging?: boolean;
 }
 
-const CATEGORY_COLORS: Record<TodoCategory, string> = {
-  work: '#818cf8',
-  personal: '#f43f5e',
-  shopping: '#fb923c',
-  health: '#34d399',
-  other: '#94a3b8',
+// Stable memoized icon color calculation
+const useIconColor = (text: string, completed: boolean, category?: TodoCategory) => {
+  return React.useMemo(
+    () => getIconColor(text, completed, category),
+    [text, completed, category]
+  );
 };
 
-const PRIORITY_COLORS: Record<TodoPriority, { bg: string; border: string; label: string }> = {
-  low: { bg: 'rgba(156, 163, 175, 0.15)', border: '#9ca3af', label: 'Low' },
-  medium: { bg: 'rgba(234, 179, 8, 0.15)', border: '#eab308', label: 'Med' },
-  high: { bg: 'rgba(239, 68, 68, 0.15)', border: '#ef4444', label: 'High' },
+// Stable memoized priority style
+const usePriorityStyle = (priority: TodoPriority) => {
+  return React.useMemo(
+    () => PRIORITY_COLORS[priority],
+    [priority]
+  );
 };
 
-function getIconColor(todoText: string, isCompleted: boolean, category?: TodoCategory): string {
-  if (isCompleted) return '#9ca3af';
-  if (category && CATEGORY_COLORS[category]) return CATEGORY_COLORS[category];
-  
-  const lowerText = todoText.toLowerCase();
-  if (lowerText.includes('work') || lowerText.includes('meeting') || lowerText.includes('project') || 
-      lowerText.includes('deadline') || lowerText.includes('office')) return '#818cf8';
-  if (lowerText.includes('buy') || lowerText.includes('shopping') || lowerText.includes('order') || 
-      lowerText.includes('grocery')) return '#fb923c';
-  if (lowerText.includes('health') || lowerText.includes('doctor') || lowerText.includes('medicine') || 
-      lowerText.includes('fitness') || lowerText.includes('gym') || lowerText.includes('workout')) return '#f43f5e';
-  if (lowerText.includes('bill') || lowerText.includes('payment') || lowerText.includes('money') || 
-      lowerText.includes('budget') || lowerText.includes('tax')) return '#34d399';
-  if (lowerText.includes('travel') || lowerText.includes('trip') || lowerText.includes('flight') || 
-      lowerText.includes('vacation')) return '#22d3ee';
-  if (lowerText.includes('study') || lowerText.includes('learn') || lowerText.includes('course') || 
-      lowerText.includes('homework') || lowerText.includes('exam')) return '#c084fc';
-  if (lowerText.includes('code') || lowerText.includes('programming') || lowerText.includes('computer') || 
-      lowerText.includes('server')) return '#94a3b8';
-  if (lowerText.includes('urgent') || lowerText.includes('important') || lowerText.includes('asap')) return '#fbbf24';
-  
-  return '#818cf8';
-}
-
-const TodoItem: React.FC<TodoItemProps> = memo(({ todo, onToggle, onDelete }) => {
+const TodoItemCore: React.FC<TodoItemProps> = memo(({ 
+  todo, 
+  onToggle, 
+  onDelete,
+  dragHandle,
+  dragDisabled = false,
+  isDragging = false,
+}) => {
   const { category = 'other', priority = 'medium', tags = [], dueDate } = todo;
   
-  const SmartIcon: LucideIcon = getSmartIcon(todo.text);
-  const iconColor = getIconColor(todo.text, todo.completed, category);
-  const priorityStyle = PRIORITY_COLORS[priority];
+  const SmartIcon: LucideIcon = React.useMemo(
+    () => getSmartIcon(todo.text),
+    [todo.text]
+  );
+  
+  const iconColor = useIconColor(todo.text, todo.completed, category);
+  const priorityStyle = usePriorityStyle(priority);
+  const formattedDueDate = formatDueDate(dueDate);
 
-  const formattedDueDate = dueDate
-    ? new Date(dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    : null;
+  // Stable handlers that don't cause re-renders
+  const handleToggle = React.useCallback(() => {
+    onToggle(todo);
+  }, [onToggle, todo]);
+
+  const handleDelete = React.useCallback(() => {
+    onDelete(todo._id);
+  }, [onDelete, todo._id]);
 
   return (
     <li
-      className="p-2 sm:p-3 mb-2 sm:mb-3 rounded-xl flex items-center gap-1 sm:gap-2 transition-all duration-200 border
-        hover:bg-[var(--hover-bg)] hover:border-[var(--border-primary)] hover:translate-x-0.5
-        bg-[var(--card-bg)] border-[var(--border-secondary)]"
+      className={`
+        p-2 sm:p-3 mb-2 sm:mb-3 rounded-xl flex items-center gap-1 sm:gap-2 
+        transition-all duration-200 border
+        ${isDragging 
+          ? 'bg-[var(--accent-primary)] border-[var(--border-primary)] shadow-lg scale-105' 
+          : 'hover:bg-[var(--hover-bg)] hover:border-[var(--border-primary)] hover:translate-x-0.5 bg-[var(--card-bg)] border-[var(--border-secondary)]'
+        }
+      `}
     >
+      {/* Drag handle (optional) */}
+      {dragHandle}
+
       {/* Column 1: Icon with padding */}
       <div className="flex-shrink-0">
         <button
-          onClick={() => onToggle(todo)}
+          onClick={handleToggle}
           className="bg-transparent border-none cursor-pointer rounded-lg transition-all duration-200
             hover:scale-110 active:scale-95"
           aria-label={todo.completed ? 'Mark as incomplete' : 'Mark as complete'}
+          disabled={dragDisabled}
         >
           <div 
             className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-200"
@@ -100,7 +108,6 @@ const TodoItem: React.FC<TodoItemProps> = memo(({ todo, onToggle, onDelete }) =>
             {todo.text}
           </span>
         </div>
-        
         
         {/* Badges row - show on all screen sizes */}
         <div className="flex items-center gap-1.5 flex-wrap mt-1">
@@ -150,12 +157,13 @@ const TodoItem: React.FC<TodoItemProps> = memo(({ todo, onToggle, onDelete }) =>
 
       {/* Column 4: Delete button - always show text */}
       <button
-        onClick={() => onDelete(todo._id)}
+        onClick={handleDelete}
         className="p-2 sm:px-3 py-1.5 rounded-lg font-medium text-xs sm:text-sm flex items-center justify-center gap-1 transition-all duration-200
           bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md flex-shrink-0 whitespace-nowrap
           hover:shadow-lg hover:scale-[1.02] hover:-translate-y-0.5"
         style={{ boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)' }}
         aria-label="Delete todo"
+        disabled={dragDisabled}
       >
         <Trash2 size={16} />
         <span>Delete</span>
@@ -164,7 +172,17 @@ const TodoItem: React.FC<TodoItemProps> = memo(({ todo, onToggle, onDelete }) =>
   );
 });
 
+TodoItemCore.displayName = 'TodoItemCore';
+
+// Default export for non-sortable usage
+const TodoItem: React.FC<Omit<TodoItemProps, 'dragHandle' | 'dragDisabled' | 'isDragging'>> = memo(
+  ({ todo, onToggle, onDelete }) => (
+    <TodoItemCore todo={todo} onToggle={onToggle} onDelete={onDelete} />
+  )
+);
+
 TodoItem.displayName = 'TodoItem';
 
+export { TodoItem, TodoItemCore };
 export default TodoItem;
 

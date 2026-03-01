@@ -11,30 +11,46 @@ if (!JWT_SECRET) {
 }
 
 const COOKIE_NAME = 'auth_token';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // Google OAuth configuration
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
 // CRITICAL: The redirect URI must ALWAYS point to the BACKEND callback, not frontend
-// Priority: RENDER_URL > VERCEL_URL > API_URL > localhost
-let GOOGLE_REDIRECT_URI = 'http://localhost:5000/api/auth/google/callback';
+// Production detection - check multiple sources
+const isProduction = process.env.NODE_ENV === 'production' || 
+  process.env.VERCEL === '1' || 
+  process.env.RENDER === 'true' ||
+  !!process.env.RENDER_URL ||
+  !!process.env.VERCEL_URL;
 
-// Check for production deployment and set appropriate redirect URI
-const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+// Hardcoded production URLs as ultimate fallback
+const PRODUCTION_BACKEND_URL = 'https://todo-app-srbx.onrender.com';
+const PRODUCTION_FRONTEND_URL = 'https://metb-todo.vercel.app';
 
-if (process.env.RENDER_URL) {
-  // Render deployment - explicit URL set in environment
-  GOOGLE_REDIRECT_URI = `${process.env.RENDER_URL.replace(/\/$/, '')}/api/auth/google/callback`;
-} else if (process.env.VERCEL_URL) {
-  // Vercel deployment - VERCEL_URL is automatically set by Vercel
-  GOOGLE_REDIRECT_URI = `https://${process.env.VERCEL_URL}/api/auth/google/callback`;
-} else if (process.env.API_URL && process.env.API_URL.startsWith('http')) {
-  // Custom API URL specified
-  const apiUrl = process.env.API_URL.replace(/\/$/, '');
-  GOOGLE_REDIRECT_URI = `${apiUrl}/api/auth/google/callback`;
+// Determine backend URL based on environment
+let BACKEND_URL = 'http://localhost:5000';
+if (isProduction) {
+  BACKEND_URL = PRODUCTION_BACKEND_URL;
+} else if (process.env.API_URL) {
+  BACKEND_URL = process.env.API_URL;
 }
+
+// Determine frontend URL based on environment
+let FRONTEND_URL = 'http://localhost:5173';
+if (isProduction) {
+  FRONTEND_URL = PRODUCTION_FRONTEND_URL;
+} else if (process.env.FRONTEND_URL) {
+  FRONTEND_URL = process.env.FRONTEND_URL;
+}
+
+// CRITICAL: The redirect URI must ALWAYS point to the BACKEND callback
+let GOOGLE_REDIRECT_URI = `${BACKEND_URL}/api/auth/google/callback`;
+
+logger.info('[Google OAuth] Production mode:', isProduction);
+logger.info('[Google OAuth] Backend URL:', BACKEND_URL);
+logger.info('[Google OAuth] Frontend URL:', FRONTEND_URL);
+logger.info('[Google OAuth] Redirect URI:', GOOGLE_REDIRECT_URI);
 
 if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
   logger.warn('[Google OAuth] Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET environment variables');

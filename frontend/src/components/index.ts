@@ -15,5 +15,7 @@ export { default as QuickStartChecklist } from './QuickStartChecklist';
 export { default as PWAInstallPrompt } from './PWAInstallPrompt';
 export { default as SortableTodoItem } from './SortableTodoItem';
 export { default as SortableTodoList } from './SortableTodoList';
+// New optimized component - SmartTodoList replaces both TodoList and SortableTodoList
+export { default as SmartTodoList } from './SmartTodoList';
 export { GoogleAuthHandler } from './GoogleAuthHandler';
 export { ConfirmDialog } from './ConfirmDialog';

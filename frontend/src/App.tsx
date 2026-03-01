@@ -19,7 +19,7 @@ import {
   ConfirmDialog,
   Footer,
 } from './components';
-import SortableTodoList from './components/SortableTodoList';
+import SmartTodoList from './components/SmartTodoList';
 import { onboardingService } from './services/onboarding';
 import { offlineStorage } from './services/offlineStorage';
 
@@ -654,11 +654,12 @@ function App() {
               
               <TodoForm onAdd={handleAddTodo} />
 
-              <SortableTodoList 
+              <SmartTodoList 
                 todos={todos} 
                 onToggle={handleToggle} 
                 onDelete={handleDeleteClick}
                 onReorder={handleReorder}
+                sortable={true}
               />
 
               <div className="flex gap-3 mt-[2rem]">
