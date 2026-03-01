@@ -132,7 +132,7 @@ const AuthForm = ({ onLogin, onRegister }: AuthFormProps): JSX.Element => {
         return;
       }
       
-// Listen for messages from the popup
+      // Listen for messages from the popup
       const handleMessage = (event: MessageEvent) => {
         // Verify the origin matches our expected domains
         const allowedOrigins = [
@@ -141,29 +141,40 @@ const AuthForm = ({ onLogin, onRegister }: AuthFormProps): JSX.Element => {
           'https://todo-app-srbx.onrender.com',
         ];
         
-        if (allowedOrigins.includes(event.origin) && event.data?.type === 'google-auth-success') {
-          // Close popup if still open
-          try { popup.close(); } catch(e) {}
-          
-          // Reload to trigger auth check - the cookie should now be set
-          window.location.reload();
-        } else if (event.data?.type === 'google-auth-error') {
-          setError(event.data.message || 'Google sign-in failed');
-          try { popup.close(); } catch(e) {}
+        // Also accept messages with no origin (some browser scenarios)
+        if (!event.origin || allowedOrigins.includes(event.origin)) {
+          if (event.data?.type === 'google-auth-success') {
+            // Close popup immediately
+            try { popup.close(); } catch(e) {}
+            
+            // Remove listener to prevent duplicate handling
+            window.removeEventListener('message', handleMessage);
+            
+            // Reload to trigger auth check - the cookie should now be set
+            window.location.reload();
+          } else if (event.data?.type === 'google-auth-error') {
+            setError(event.data.message || 'Google sign-in failed');
+            try { popup.close(); } catch(e) {}
+            window.removeEventListener('message', handleMessage);
+          }
         }
       };
       
       window.addEventListener('message', handleMessage);
       
-      // Clean up when popup closes
+      // Poll for popup closure as backup
       const checkClosed = setInterval(() => {
         if (popup.closed) {
           clearInterval(checkClosed);
           window.removeEventListener('message', handleMessage);
-          // Check if user completed authentication by checking for auth token
-          if (!document.cookie.includes('auth_token')) {
-            // User may have cancelled or failed - don't show error, just let them try again
-          }
+          
+          // Check if authentication was successful by checking cookie
+          // Small delay to allow cookie to be set
+          setTimeout(() => {
+            if (document.cookie.includes('auth_token')) {
+              window.location.reload();
+            }
+          }, 500);
         }
       }, 500);
       

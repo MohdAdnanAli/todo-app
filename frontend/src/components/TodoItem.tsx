@@ -101,8 +101,9 @@ const TodoItem: React.FC<TodoItemProps> = memo(({ todo, onToggle, onDelete }) =>
           </span>
         </div>
         
-        {/* Badges row - hidden on very small screens */}
-        <div className="hidden sm:flex items-center gap-1.5 flex-wrap mt-1">
+        
+        {/* Badges row - show on all screen sizes */}
+        <div className="flex items-center gap-1.5 flex-wrap mt-1">
           {priority !== 'medium' && (
             <span
               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold uppercase"
@@ -134,7 +135,7 @@ const TodoItem: React.FC<TodoItemProps> = memo(({ todo, onToggle, onDelete }) =>
             </span>
           )}
           
-          {tags.slice(0, 2).map(tag => (
+          {tags.map(tag => (
             <span
               key={tag}
               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium
@@ -144,23 +145,20 @@ const TodoItem: React.FC<TodoItemProps> = memo(({ todo, onToggle, onDelete }) =>
               {tag}
             </span>
           ))}
-          {tags.length > 2 && (
-            <span className="text-xs text-[var(--text-muted)]">+{tags.length - 2}</span>
-          )}
         </div>
       </div>
 
-      {/* Column 4: Delete button - icon only on small, text+icon on larger */}
+      {/* Column 4: Delete button - always show text */}
       <button
         onClick={() => onDelete(todo._id)}
-        className="p-1.5 sm:px-3 sm:py-1.5 rounded-lg font-medium text-xs sm:text-sm flex items-center justify-center gap-1 transition-all duration-200
-          bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md flex-shrink-0
+        className="p-2 sm:px-3 py-1.5 rounded-lg font-medium text-xs sm:text-sm flex items-center justify-center gap-1 transition-all duration-200
+          bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md flex-shrink-0 whitespace-nowrap
           hover:shadow-lg hover:scale-[1.02] hover:-translate-y-0.5"
         style={{ boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)' }}
         aria-label="Delete todo"
       >
         <Trash2 size={16} />
-        <span className="hidden sm:inline">Delete</span>
+        <span>Delete</span>
       </button>
     </li>
   );

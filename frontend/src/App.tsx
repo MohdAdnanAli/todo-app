@@ -110,14 +110,18 @@ function App() {
       const todosRes = await axios.get(`${API_URL}/api/todos`, {
         withCredentials: true,
       });
+      
+      // Ensure we have an array before mapping
+      const todosData = Array.isArray(todosRes.data) ? todosRes.data : [];
+      
       // If no password is set, just load the todos as-is (encrypted)
       if (!userPassword) {
-        setTodos(todosRes.data);
+        setTodos(todosData);
       } else {
-        const decryptedTodos = await decryptAllTodos(todosRes.data);
+        const decryptedTodos = await decryptAllTodos(todosData);
         setTodos(decryptedTodos);
       }
-      await offlineStorage.saveTodos(todosRes.data);
+      await offlineStorage.saveTodos(todosData);
       setShowWelcomeBackModal(false);
       setMessage('Ready to go!');
       setMessageType('success');
@@ -170,14 +174,17 @@ function App() {
             withCredentials: true,
           });
           
+          // Ensure we have an array before mapping
+          const todosData = Array.isArray(todosRes.data) ? todosRes.data : [];
+          
           // Use the current userPassword value (which may have been restored from storage)
           if (userPassword) {
-            const decryptedTodos = await decryptAllTodos(todosRes.data);
+            const decryptedTodos = await decryptAllTodos(todosData);
             setTodos(decryptedTodos);
             await offlineStorage.saveTodos(decryptedTodos);
           } else {
-            setTodos(todosRes.data);
-            await offlineStorage.saveTodos(todosRes.data);
+            setTodos(todosData);
+            await offlineStorage.saveTodos(todosData);
           }
           
           // Only show welcome modal on first visit (no todos in offline storage AND no userPassword)
@@ -244,7 +251,9 @@ function App() {
       const todosRes = await axios.get(`${API_URL}/api/todos`, {
         withCredentials: true,
       });
-      const decryptedTodos = await decryptAllTodos(todosRes.data);
+      // Ensure we have an array before mapping
+      const todosData = Array.isArray(todosRes.data) ? todosRes.data : [];
+      const decryptedTodos = await decryptAllTodos(todosData);
       setTodos(decryptedTodos);
       await offlineStorage.saveTodos(decryptedTodos);
     } catch (err: any) {
@@ -292,7 +301,9 @@ function App() {
       const todosRes = await axios.get(`${API_URL}/api/todos`, {
         withCredentials: true,
       });
-      const decryptedTodos = await decryptAllTodos(todosRes.data);
+      // Ensure we have an array before mapping
+      const todosData = Array.isArray(todosRes.data) ? todosRes.data : [];
+      const decryptedTodos = await decryptAllTodos(todosData);
       setTodos(decryptedTodos);
       await offlineStorage.saveTodos(decryptedTodos);
     } catch (err: any) {
@@ -374,7 +385,9 @@ function App() {
       );
       
       // Backend returns all todos sorted - decrypt and set directly
-      const decryptedTodos = await decryptAllTodos(res.data);
+      // Ensure we have an array before mapping
+      const todosData = Array.isArray(res.data) ? res.data : [];
+      const decryptedTodos = await decryptAllTodos(todosData);
       setTodos(decryptedTodos);
       await offlineStorage.saveTodos(decryptedTodos);
       
@@ -434,7 +447,9 @@ function App() {
       });
 
       // Backend returns all todos sorted - decrypt and set directly
-      const decryptedTodos = await decryptAllTodos(res.data);
+      // Ensure we have an array before mapping
+      const todosData = Array.isArray(res.data) ? res.data : [];
+      const decryptedTodos = await decryptAllTodos(todosData);
       setTodos(decryptedTodos);
       await offlineStorage.saveTodos(decryptedTodos);
       setMessage('Todo deleted');
@@ -470,7 +485,9 @@ function App() {
       );
       
       // Server returns all todos with correct order - decrypt and sync
-      const decryptedTodos = await decryptAllTodos(res.data);
+      // Ensure we have an array before mapping
+      const todosData = Array.isArray(res.data) ? res.data : [];
+      const decryptedTodos = await decryptAllTodos(todosData);
       setTodos(decryptedTodos);
       await offlineStorage.saveTodos(decryptedTodos);
     } catch (err) {

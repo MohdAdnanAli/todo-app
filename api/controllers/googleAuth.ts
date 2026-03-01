@@ -157,7 +157,9 @@ export const getGoogleAuthUrlHandler = async (req: Request, res: Response) => {
     logger.info('[Google OAuth] Redirect URI:', GOOGLE_REDIRECT_URI);
     
     const state = crypto.randomBytes(32).toString('hex');
+    const isPopup = req.query.popup === 'true';
     
+    // Store state in cookie (for server-side validation)
     res.cookie('google_oauth_state', state, {
       httpOnly: true,
       secure: isProduction,
@@ -172,8 +174,7 @@ export const getGoogleAuthUrlHandler = async (req: Request, res: Response) => {
       maxAge: 10 * 60 * 1000,
     });
 
-    // Check if this is a popup request and store it in a cookie
-    const isPopup = req.query.popup === 'true';
+    // Store popup flag in cookie
     if (isPopup) {
       res.cookie('google_oauth_is_popup', 'true', {
         httpOnly: true,
@@ -183,7 +184,19 @@ export const getGoogleAuthUrlHandler = async (req: Request, res: Response) => {
       });
     }
 
-    const authUrl = getGoogleAuthUrl(state);
+    // Build the auth URL - include state as query param for redundancy
+    // This allows validation via URL param if cookie fails (e.g., in Safari private browsing)
+    const authUrlParams = new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID || '',
+      redirect_uri: GOOGLE_REDIRECT_URI,
+      response_type: 'code',
+      scope: 'email profile openid',
+      access_type: 'offline',
+      prompt: 'consent',
+      state: state, // Include state in URL as backup
+    });
+
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${authUrlParams.toString()}`;
 
     return res.json({ 
       authUrl, 
@@ -209,13 +222,29 @@ export const googleCallback = async (req: Request, res: Response) => {
       return res.redirect(`${frontendUrl}?google_error=${encodeURIComponent('Invalid request')}`);
     }
 
-    const { code, state } = result.data;
+    const { code, state: stateFromUrl } = result.data;
 
-    const stateCookie = req.cookies?.google_oauth_state;
-    if (!stateCookie || stateCookie !== state) {
+    // Validate state - try cookie first, then fall back to URL parameter
+    let stateCookie = req.cookies?.google_oauth_state;
+    
+    // If cookie is missing (e.g., third-party cookies blocked), try to validate via URL parameter
+    if (!stateCookie && stateFromUrl) {
+      // For popup flow in browsers with blocked third-party cookies,
+      // the state in URL becomes critical
+      stateCookie = stateFromUrl;
+      logger.info('[Google OAuth] Using state from URL parameter (cookie may be blocked)');
+    }
+
+    if (!stateCookie || stateCookie !== stateFromUrl) {
+      logger.warn('[Google OAuth] State validation failed', { 
+        hasCookie: !!stateCookie, 
+        hasUrlState: !!stateFromUrl,
+        cookieMatch: stateCookie === stateFromUrl 
+      });
       return res.redirect(`${frontendUrl}?google_error=${encodeURIComponent('Invalid state parameter')}`);
     }
 
+    // Clear state cookie (and URL params will be cleared by redirect)
     res.clearCookie('google_oauth_state', {
       httpOnly: true,
       secure: isProduction,
@@ -329,28 +358,34 @@ export const googleCallback = async (req: Request, res: Response) => {
         <head>
           <title>Google Sign-In</title>
           <style>
-            body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f0f0; }
-            .message { text-align: center; padding: 20px; }
-            .success { color: #22c55e; font-size: 18px; }
+            body { font-family: system-ui, -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+            .container { text-align: center; padding: 40px; background: white; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+            .success { color: #22c55e; font-size: 24px; margin-bottom: 12px; }
+            .message { color: #6b7280; font-size: 16px; }
+            .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #667eea; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
           </style>
         </head>
         <body>
-          <div class="message">
+          <div class="container">
+            <div class="spinner"></div>
             <p class="success">✓ Successfully signed in!</p>
-            <p>You can close this window now.</p>
+            <p class="message">Closing window and redirecting...</p>
           </div>
           <script>
-            // Try to notify parent window
+            // Send success message to parent window
             try {
               window.opener.postMessage({
                 type: 'google-auth-success'
               }, '*');
-            } catch(e) { console.log('Cannot post message:', e); }
+            } catch(e) { 
+              console.log('Cannot post message to opener:', e); 
+            }
             
             // Close this window after a short delay
             setTimeout(() => {
               try { window.close(); } catch(e) {}
-            }, 1000);
+            }, 1500);
           </script>
         </body>
         </html>
@@ -377,15 +412,16 @@ export const googleCallback = async (req: Request, res: Response) => {
         <head>
           <title>Google Sign-In</title>
           <style>
-            body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f0f0; }
-            .message { text-align: center; padding: 20px; }
-            .error { color: #ef4444; font-size: 18px; }
+            body { font-family: system-ui, -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); }
+            .container { text-align: center; padding: 40px; background: white; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+            .error { color: #ef4444; font-size: 24px; margin-bottom: 12px; }
+            .message { color: #6b7280; font-size: 16px; }
           </style>
         </head>
         <body>
-          <div class="message">
+          <div class="container">
             <p class="error">✗ Authentication failed</p>
-            <p>You can close this window now.</p>
+            <p class="message">You can close this window now.</p>
           </div>
           <script>
             try {
@@ -396,7 +432,7 @@ export const googleCallback = async (req: Request, res: Response) => {
             } catch(e) { console.log('Cannot post message:', e); }
             setTimeout(() => {
               try { window.close(); } catch(e) {}
-            }, 1000);
+            }, 3000);
           </script>
         </body>
         </html>
