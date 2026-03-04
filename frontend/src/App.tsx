@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useTheme } from './theme';
 import type { Todo, User, MessageType, TodoCategory, TodoPriority } from './types';
@@ -77,7 +77,7 @@ function App() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [encryptionSalt, setEncryptionSalt] = useState<string>('');
   const [userPassword, setUserPassword] = useState<string>('');
-const [showWelcomeTour, setShowWelcomeTour] = useState(false);
+  const [showWelcomeTour, setShowWelcomeTour] = useState(false);
   const [showQuickStart, setShowQuickStart] = useState(false);
   const [quickStartChecked, setQuickStartChecked] = useState(false);
   const [showWelcomeBackModal, setShowWelcomeBackModal] = useState(false);
@@ -91,20 +91,24 @@ const [showWelcomeTour, setShowWelcomeTour] = useState(false);
     isDeleting: boolean;
   }>({ isOpen: false, todoId: null, isDeleting: false });
 
-  const decryptTodo = useCallback(async (todo: Todo): Promise<Todo> => {
-    if (!userPassword || !encryptionSalt) return todo;
+  // Track if we've processed Google OAuth redirect
+  const googleOAuthProcessed = useRef(false);
+
+  const decryptTodo = useCallback(async (todo: Todo, password: string, salt: string): Promise<Todo> => {
+    if (!password || !salt) return todo;
     try {
-      const decryptedText = await decrypt(todo.text, userPassword, encryptionSalt);
+      const decryptedText = await decrypt(todo.text, password, salt);
       return { ...todo, text: decryptedText };
     } catch (err) {
+      console.warn('Failed to decrypt todo, showing encrypted text:', todo._id);
       return todo;
     }
-  }, [userPassword, encryptionSalt]);
+  }, []);
 
-  const decryptAllTodos = useCallback(async (todosToDecrypt: Todo[]): Promise<Todo[]> => {
-    if (!userPassword || !encryptionSalt || todosToDecrypt.length === 0) return todosToDecrypt;
-    return Promise.all(todosToDecrypt.map(decryptTodo));
-  }, [userPassword, encryptionSalt, decryptTodo]);
+  const decryptAllTodos = useCallback(async (todosToDecrypt: Todo[], password: string, salt: string): Promise<Todo[]> => {
+    if (!password || !salt || todosToDecrypt.length === 0) return todosToDecrypt;
+    return Promise.all(todosToDecrypt.map(todo => decryptTodo(todo, password, salt)));
+  }, [decryptTodo]);
 
   const handleGetIn = async () => {
     setIsLoadingTodos(true);
@@ -120,7 +124,7 @@ const [showWelcomeTour, setShowWelcomeTour] = useState(false);
       if (!userPassword) {
         setTodos(todosData);
       } else {
-        const decryptedTodos = await decryptAllTodos(todosData);
+        const decryptedTodos = await decryptAllTodos(todosData, userPassword, encryptionSalt);
         setTodos(decryptedTodos);
       }
       await offlineStorage.saveTodos(todosData);
@@ -165,22 +169,66 @@ const [showWelcomeTour, setShowWelcomeTour] = useState(false);
     const handleGoogleOAuthParams = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const googleAuth = urlParams.get('google_auth');
-      const encryptionSalt = urlParams.get('encryptionSalt');
-      const googleId = urlParams.get('googleId');
+      const encryptionSaltParam = urlParams.get('encryptionSalt');
+      const googleIdParam = urlParams.get('googleId');
 
       if (googleAuth === 'success') {
+        // Mark as processed to prevent second effect from running
+        googleOAuthProcessed.current = true;
+        
         // Save encryption salt for Google users
-        if (encryptionSalt) {
-          await offlineStorage.saveEncryptionSalt(encryptionSalt);
+        if (encryptionSaltParam) {
+          await offlineStorage.saveEncryptionSalt(encryptionSaltParam);
+          setEncryptionSalt(encryptionSaltParam);
         }
         
         // Save googleId as password for Google users - this is used for encryption
-        if (googleId) {
-          await offlineStorage.savePassword(googleId);
+        if (googleIdParam) {
+          await offlineStorage.savePassword(googleIdParam);
+          setUserPassword(googleIdParam);
         }
         
-        // Clear URL params
+        // Clear URL params immediately
         window.history.replaceState({}, '', window.location.pathname);
+        
+        // Immediately check auth and fetch todos - don't wait for other effects
+        try {
+          const res = await axios.get(`${API_URL}/api/me`, {
+            withCredentials: true,
+          });
+          
+          setUser(res.data.user || null);
+          setIsAdmin(res.data.isAdmin || false);
+          
+          if (res.data.encryptionSalt) {
+            setEncryptionSalt(res.data.encryptionSalt);
+          }
+
+          // Fetch todos from server
+          const todosRes = await axios.get(`${API_URL}/api/todos`, {
+            withCredentials: true,
+          });
+          
+          const todosData = Array.isArray(todosRes.data) ? todosRes.data : [];
+          
+          // Use the googleIdParam (which is now in userPassword state)
+          if (googleIdParam) {
+            const decryptedTodos = await decryptAllTodos(todosData, googleIdParam, encryptionSaltParam || '');
+            setTodos(decryptedTodos);
+            await offlineStorage.saveTodos(decryptedTodos);
+          } else {
+            setTodos(todosData);
+            await offlineStorage.saveTodos(todosData);
+          }
+          
+          setIsLoading(false);
+          setMessage('Welcome back!');
+          setMessageType('success');
+        } catch (err) {
+          console.error('Google OAuth auth check failed:', err);
+          // If auth fails, still stop loading to show the page
+          setIsLoading(false);
+        }
       }
     };
     handleGoogleOAuthParams();
@@ -188,6 +236,11 @@ const [showWelcomeTour, setShowWelcomeTour] = useState(false);
 
   // Separate effect to handle auth check - runs AFTER userPassword is restored
   useEffect(() => {
+    // Skip if Google OAuth was already processed
+    if (googleOAuthProcessed.current) {
+      return;
+    }
+    
     const checkAuthAndFetch = async (retries = 3) => {
       for (let attempt = 1; attempt <= retries; attempt++) {
         try {
@@ -212,7 +265,7 @@ const [showWelcomeTour, setShowWelcomeTour] = useState(false);
           
           // Use the current userPassword value (which may have been restored from storage)
           if (userPassword) {
-            const decryptedTodos = await decryptAllTodos(todosData);
+            const decryptedTodos = await decryptAllTodos(todosData, userPassword, encryptionSalt);
             setTodos(decryptedTodos);
             await offlineStorage.saveTodos(decryptedTodos);
           } else {
@@ -263,34 +316,69 @@ const [showWelcomeTour, setShowWelcomeTour] = useState(false);
       }
     };
     checkAuthAndFetch();
-  }, [userPassword, decryptAllTodos]);
+  }, [userPassword, encryptionSalt]);
 
   const handleLogin = async (loginEmail: string, loginPassword: string) => {
+    setMessage('Logging in...');
+    setMessageType('loading');
     try {
       const response = await axios.post(
         `${API_URL}/api/auth/login`,
         { email: loginEmail, password: loginPassword },
         { withCredentials: true }
       );
-      setUser(response.data.user);
-      setEncryptionSalt(response.data.encryptionSalt || '');
+      
+      // Get data from response - use local variables to avoid state race conditions
+      const { user: userData, encryptionSalt: salt } = response.data;
+      
+      // Set user data first
+      setUser(userData);
+      setEncryptionSalt(salt || '');
       setUserPassword(loginPassword);
-      setMessage('Login successful');
-      setMessageType('success');
-      setIsLoading(false); // Stop loading screen after successful login
 
       // Save password for future reloads
       await offlineStorage.savePassword(loginPassword);
 
-      const todosRes = await axios.get(`${API_URL}/api/todos`, {
-        withCredentials: true,
-      });
-      // Ensure we have an array before mapping
-      const todosData = Array.isArray(todosRes.data) ? todosRes.data : [];
-      const decryptedTodos = await decryptAllTodos(todosData);
-      setTodos(decryptedTodos);
-      await offlineStorage.saveTodos(decryptedTodos);
+      // Fetch todos - handle errors gracefully
+      try {
+        const todosRes = await axios.get(`${API_URL}/api/todos`, {
+          withCredentials: true,
+        });
+        const todosData = Array.isArray(todosRes.data) ? todosRes.data : [];
+        
+        // Decrypt todos using local variables instead of state to avoid race condition
+        let decryptedTodos = todosData;
+        if (loginPassword && salt) {
+          try {
+            decryptedTodos = await Promise.all(
+              todosData.map(async (todo: Todo) => {
+                try {
+                  const decryptedText = await decrypt(todo.text, loginPassword, salt);
+                  return { ...todo, text: decryptedText };
+                } catch {
+                  return todo; // Return encrypted if decrypt fails
+                }
+              })
+            );
+          } catch (decryptErr) {
+            console.warn('Decryption failed, showing encrypted todos:', decryptErr);
+          }
+        }
+        
+        setTodos(decryptedTodos);
+        await offlineStorage.saveTodos(decryptedTodos);
+      } catch (todoErr) {
+        console.warn('Failed to fetch todos after login:', todoErr);
+        setTodos([]);
+      }
+      
+      // Only set loading to false AFTER everything is done
+      setMessage('Login successful');
+      setMessageType('success');
+      setIsLoading(false);
     } catch (err: any) {
+      // Always stop loading on error
+      setIsLoading(false);
       const errorMsg = err.response?.data?.error || err.message;
       
       if (errorMsg.toLowerCase().includes('locked')) {
@@ -317,31 +405,66 @@ const [showWelcomeTour, setShowWelcomeTour] = useState(false);
       return;
     }
 
+    setMessage('Creating account...');
+    setMessageType('loading');
     try {
       const response = await axios.post(
         `${API_URL}/api/auth/register`,
         { email: regEmail, password: regPassword, displayName: regDisplayName },
         { withCredentials: true }
       );
-      setUser(response.data.user);
-      setEncryptionSalt(response.data.encryptionSalt || '');
+      
+      // Get data from response - use local variables to avoid state race conditions
+      const { user: userData, encryptionSalt: salt } = response.data;
+      
+      // Set user data first
+      setUser(userData);
+      setEncryptionSalt(salt || '');
       setUserPassword(regPassword);
-      setMessage('Account created and logged in! Please check your email to verify your account.');
-      setMessageType('success');
-      setIsLoading(false); // Stop loading screen after successful registration
 
       // Save password for future reloads
       await offlineStorage.savePassword(regPassword);
       
-      const todosRes = await axios.get(`${API_URL}/api/todos`, {
-        withCredentials: true,
-      });
-      // Ensure we have an array before mapping
-      const todosData = Array.isArray(todosRes.data) ? todosRes.data : [];
-      const decryptedTodos = await decryptAllTodos(todosData);
-      setTodos(decryptedTodos);
-      await offlineStorage.saveTodos(decryptedTodos);
+      // Fetch todos - handle errors gracefully
+      try {
+        const todosRes = await axios.get(`${API_URL}/api/todos`, {
+          withCredentials: true,
+        });
+        const todosData = Array.isArray(todosRes.data) ? todosRes.data : [];
+        
+        // Decrypt todos using local variables instead of state to avoid race condition
+        let decryptedTodos = todosData;
+        if (regPassword && salt) {
+          try {
+            decryptedTodos = await Promise.all(
+              todosData.map(async (todo: Todo) => {
+                try {
+                  const decryptedText = await decrypt(todo.text, regPassword, salt);
+                  return { ...todo, text: decryptedText };
+                } catch {
+                  return todo; // Return encrypted if decrypt fails
+                }
+              })
+            );
+          } catch (decryptErr) {
+            console.warn('Decryption failed, showing encrypted todos:', decryptErr);
+          }
+        }
+        
+        setTodos(decryptedTodos);
+        await offlineStorage.saveTodos(decryptedTodos);
+      } catch (todoErr) {
+        console.warn('Failed to fetch todos after registration:', todoErr);
+        setTodos([]);
+      }
+      
+      // Only set loading to false AFTER everything is done
+      setMessage('Account created and logged in! Please check your email to verify your account.');
+      setMessageType('success');
+      setIsLoading(false);
     } catch (err: any) {
+      // Always stop loading on error
+      setIsLoading(false);
       setMessage('Error: ' + (err.response?.data?.error || err.message));
       setMessageType('error');
     }
@@ -405,7 +528,16 @@ const [showWelcomeTour, setShowWelcomeTour] = useState(false);
     setMessage('Adding...');
     setMessageType('loading');
     try {
-      const encryptedText = await encrypt(text, userPassword, encryptionSalt);
+      // Encrypt the todo text if we have password and salt
+      let encryptedText = text;
+      if (userPassword && encryptionSalt) {
+        try {
+          encryptedText = await encrypt(text, userPassword, encryptionSalt);
+        } catch (encryptErr) {
+          console.warn('Encryption failed, saving as plain text:', encryptErr);
+          // Continue with plain text if encryption fails
+        }
+      }
       
       const todoData: Partial<Todo> = { 
         text: encryptedText,
@@ -424,7 +556,7 @@ const [showWelcomeTour, setShowWelcomeTour] = useState(false);
       // Backend returns all todos sorted - decrypt and set directly
       // Ensure we have an array before mapping
       const todosData = Array.isArray(res.data) ? res.data : [];
-      const decryptedTodos = await decryptAllTodos(todosData);
+      const decryptedTodos = await decryptAllTodos(todosData, userPassword, encryptionSalt);
       setTodos(decryptedTodos);
       await offlineStorage.saveTodos(decryptedTodos);
       
@@ -455,7 +587,7 @@ const [showWelcomeTour, setShowWelcomeTour] = useState(false);
         { withCredentials: true }
       );
 
-      const decryptedTodo = await decryptTodo(res.data);
+      const decryptedTodo = await decryptTodo(res.data, userPassword, encryptionSalt);
       const updatedTodos = todos.map(t =>
         t._id === todo._id ? decryptedTodo : t
       );
@@ -486,7 +618,7 @@ const [showWelcomeTour, setShowWelcomeTour] = useState(false);
       // Backend returns all todos sorted - decrypt and set directly
       // Ensure we have an array before mapping
       const todosData = Array.isArray(res.data) ? res.data : [];
-      const decryptedTodos = await decryptAllTodos(todosData);
+      const decryptedTodos = await decryptAllTodos(todosData, userPassword, encryptionSalt);
       setTodos(decryptedTodos);
       await offlineStorage.saveTodos(decryptedTodos);
       setMessage('Todo deleted');
@@ -525,7 +657,7 @@ const [showWelcomeTour, setShowWelcomeTour] = useState(false);
       // Server returns all todos with correct order - decrypt and sync
       // Ensure we have an array before mapping
       const todosData = Array.isArray(res.data) ? res.data : [];
-      const decryptedTodos = await decryptAllTodos(todosData);
+      const decryptedTodos = await decryptAllTodos(todosData, userPassword, encryptionSalt);
       setTodos(decryptedTodos);
       await offlineStorage.saveTodos(decryptedTodos);
     } catch (err) {
@@ -777,4 +909,3 @@ const [showWelcomeTour, setShowWelcomeTour] = useState(false);
 }
 
 export default App;
-

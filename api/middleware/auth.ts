@@ -2,10 +2,15 @@ import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger';
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required');
-}
+// JWT_SECRET is now checked lazily inside functions that need it
+// This allows dotenv to load first from index.ts
+const getJwtSecret = () => {
+  const JWT_SECRET = process.env.JWT_SECRET;
+  if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+  return JWT_SECRET;
+};
 
 interface AuthRequest extends Request {
   user?: { id: string };
@@ -20,7 +25,7 @@ export const protect = (req: AuthRequest, res: Response, next: NextFunction) => 
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as unknown as { id: string };
+const decoded = jwt.verify(token, getJwtSecret()) as unknown as { id: string };
     req.user = { id: decoded.id };
     next();
   } catch (err: unknown) {

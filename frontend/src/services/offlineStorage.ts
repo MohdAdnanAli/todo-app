@@ -1,6 +1,14 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import type { Todo } from '../types';
 
+// Console wrapper for consistent logging
+const logger = {
+  error: (msg: string, ...args: unknown[]) => console.error(`[OfflineStorage] ERROR: ${msg}`, ...args),
+  warn: (msg: string, ...args: unknown[]) => console.warn(`[OfflineStorage] WARN: ${msg}`, ...args),
+  info: (msg: string, ...args: unknown[]) => console.info(`[OfflineStorage] INFO: ${msg}`, ...args),
+  debug: (msg: string, ...args: unknown[]) => console.debug(`[OfflineStorage] DEBUG: ${msg}`, ...args),
+};
+
 interface TodoDB extends DBSchema {
   todos: {
     key: string;
@@ -64,7 +72,7 @@ export const offlineStorage = {
       const todos = await db.getAll('todos');
       return todos.sort((a, b) => (a.order || 0) - (b.order || 0));
     } catch (error) {
-      console.error('Error getting todos from IndexedDB:', error);
+      logger.error('Failed to get todos from IndexedDB, falling back to localStorage', error);
       return this.getTodosFromLocalStorage();
     }
   },
@@ -75,7 +83,7 @@ export const offlineStorage = {
       const db = await getDB();
       return await db.get('todos', id);
     } catch (error) {
-      console.error('Error getting todo from IndexedDB:', error);
+      logger.error('Failed to get todo from IndexedDB', error);
       const todos = this.getTodosFromLocalStorage();
       return todos.find(t => t._id === id);
     }
@@ -89,7 +97,7 @@ export const offlineStorage = {
       // Also update localStorage as fallback
       this.saveTodoToLocalStorage(todo);
     } catch (error) {
-      console.error('Error saving todo to IndexedDB:', error);
+      logger.error('Failed to save todo to IndexedDB, using localStorage fallback', error);
       this.saveTodoToLocalStorage(todo);
     }
   },
@@ -105,7 +113,7 @@ export const offlineStorage = {
       await tx.done;
       this.saveTodosToLocalStorage(todos);
     } catch (error) {
-      console.error('Error saving todos to IndexedDB:', error);
+      logger.error('Failed to save todos to IndexedDB, using localStorage fallback', error);
       this.saveTodosToLocalStorage(todos);
     }
   },
@@ -117,7 +125,7 @@ export const offlineStorage = {
       await db.delete('todos', id);
       this.deleteTodoFromLocalStorage(id);
     } catch (error) {
-      console.error('Error deleting todo from IndexedDB:', error);
+      logger.error('Failed to delete todo from IndexedDB, using localStorage fallback', error);
       this.deleteTodoFromLocalStorage(id);
     }
   },
@@ -129,7 +137,7 @@ export const offlineStorage = {
       await db.clear('todos');
       localStorage.removeItem('todos');
     } catch (error) {
-      console.error('Error clearing todos from IndexedDB:', error);
+      logger.error('Failed to clear todos from IndexedDB', error);
       localStorage.removeItem('todos');
     }
   },
@@ -148,7 +156,7 @@ export const offlineStorage = {
         timestamp: Date.now(),
       });
     } catch (error) {
-      console.error('Error adding to sync queue:', error);
+      logger.error('Failed to add to sync queue', error);
     }
   },
 
@@ -158,7 +166,7 @@ export const offlineStorage = {
       const db = await getDB();
       return await db.getAll('syncQueue');
     } catch (error) {
-      console.error('Error getting sync queue:', error);
+      logger.error('Failed to get sync queue', error);
       return [];
     }
   },
@@ -169,7 +177,7 @@ export const offlineStorage = {
       const db = await getDB();
       await db.clear('syncQueue');
     } catch (error) {
-      console.error('Error clearing sync queue:', error);
+      logger.error('Failed to clear sync queue', error);
     }
   },
 
@@ -179,7 +187,7 @@ export const offlineStorage = {
       const db = await getDB();
       await db.delete('syncQueue', id);
     } catch (error) {
-      console.error('Error removing from sync queue:', error);
+      logger.error('Failed to remove from sync queue', error);
     }
   },
 
@@ -189,7 +197,7 @@ export const offlineStorage = {
       const db = await getDB();
       await db.put('metadata', { ...value }, key);
     } catch (error) {
-      console.error('Error updating metadata:', error);
+      logger.error('Failed to update metadata', error);
     }
   },
 
@@ -199,7 +207,7 @@ export const offlineStorage = {
       const db = await getDB();
       return await db.get('metadata', key);
     } catch (error) {
-      console.error('Error getting metadata:', error);
+      logger.error('Failed to get metadata', error);
       return null;
     }
   },
@@ -209,7 +217,7 @@ export const offlineStorage = {
     try {
       await this.updateMetadata('user-password', { password, savedAt: Date.now() });
     } catch (error) {
-      console.error('Error saving password:', error);
+      logger.error('Failed to save password', error);
     }
   },
 
@@ -219,7 +227,7 @@ export const offlineStorage = {
       const data = await this.getMetadata('user-password');
       return data?.password || null;
     } catch (error) {
-      console.error('Error retrieving password:', error);
+      logger.error('Failed to retrieve password', error);
       return null;
     }
   },
@@ -230,7 +238,7 @@ export const offlineStorage = {
       const db = await getDB();
       await db.delete('metadata', 'user-password');
     } catch (error) {
-      console.error('Error clearing password:', error);
+      logger.error('Failed to clear password', error);
     }
   },
 
@@ -239,7 +247,7 @@ export const offlineStorage = {
     try {
       await this.updateMetadata('encryption-salt', { salt, savedAt: Date.now() });
     } catch (error) {
-      console.error('Error saving encryption salt:', error);
+      logger.error('Failed to save encryption salt', error);
     }
   },
 
@@ -249,7 +257,7 @@ export const offlineStorage = {
       const data = await this.getMetadata('encryption-salt');
       return data?.salt || null;
     } catch (error) {
-      console.error('Error retrieving encryption salt:', error);
+      logger.error('Failed to retrieve encryption salt', error);
       return null;
     }
   },
@@ -260,7 +268,7 @@ export const offlineStorage = {
       const db = await getDB();
       await db.delete('metadata', 'encryption-salt');
     } catch (error) {
-      console.error('Error clearing encryption salt:', error);
+      logger.error('Failed to clear encryption salt', error);
     }
   },
 
@@ -269,8 +277,11 @@ export const offlineStorage = {
   getTodosFromLocalStorage(): Todo[] {
     try {
       const stored = localStorage.getItem('todos');
-      return stored ? JSON.parse(stored) : [];
+      if (!stored) return [];
+      const parsed = JSON.parse(stored);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
+      logger.warn('Failed to parse todos from localStorage');
       return [];
     }
   },
@@ -286,7 +297,7 @@ export const offlineStorage = {
       }
       localStorage.setItem('todos', JSON.stringify(todos));
     } catch (error) {
-      console.error('Error saving to localStorage:', error);
+      logger.error('Failed to save todo to localStorage', error);
     }
   },
 
@@ -294,7 +305,7 @@ export const offlineStorage = {
     try {
       localStorage.setItem('todos', JSON.stringify(todos));
     } catch (error) {
-      console.error('Error saving todos to localStorage:', error);
+      logger.error('Failed to save todos to localStorage', error);
     }
   },
 
@@ -304,7 +315,7 @@ export const offlineStorage = {
       const filtered = todos.filter(t => t._id !== id);
       localStorage.setItem('todos', JSON.stringify(filtered));
     } catch (error) {
-      console.error('Error deleting from localStorage:', error);
+      logger.error('Failed to delete todo from localStorage', error);
     }
   },
 
@@ -316,6 +327,7 @@ export const offlineStorage = {
       localStorage.removeItem(test);
       return true;
     } catch {
+      logger.warn('LocalStorage is not available');
       return false;
     }
   },

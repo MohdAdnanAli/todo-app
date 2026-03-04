@@ -5,10 +5,15 @@ import { User } from '../models/User';
 import { googleCallbackSchema } from '../schemas/auth';
 import { logger } from '../utils/logger';
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required');
-}
+// JWT_SECRET is now checked lazily inside functions that need it
+// This allows dotenv to load first from index.ts
+const getJwtSecret = () => {
+  const JWT_SECRET = process.env.JWT_SECRET;
+  if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+  return JWT_SECRET;
+};
 
 const COOKIE_NAME = 'auth_token';
 
@@ -346,7 +351,7 @@ export const googleCallback = async (req: Request, res: Response) => {
       await user.save();
 
       // Generate our own JWT for the todo app
-      token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '7d' });
+token = jwt.sign({ id: user._id }, getJwtSecret(), { expiresIn: '7d' });
 
       res.cookie(COOKIE_NAME, token, {
         httpOnly: true,

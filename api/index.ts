@@ -1,20 +1,24 @@
+// Load environment variables FIRST, before any other imports
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import mongoose from 'mongoose';
-import dotenv from 'dotenv';
 import path from 'path';
 
 import { register, login, verifyEmail, requestPasswordReset, resetPassword, updateProfile, getProfile, deleteUser } from './controllers/auth';
 import { getDashboardStats, getAllUsers, getUserDetails, updateUser, deleteUser as adminDeleteUser, getAllTodos, deleteTodo as adminDeleteTodo, deleteMultipleTodos, getSystemHealth } from './controllers/admin';
-import { getSupabaseGoogleAuthUrl, handleSupabaseCallback, getSupabaseAuthStatus, signOutSupabase, checkEmailAvailability } from './controllers/supabaseAuth';
 import { getGoogleAuthUrlHandler, googleCallback, googleError, linkGoogleAccount, unlinkGoogleAccount, getGoogleAuthStatus } from './controllers/googleAuth';
+import { checkEmailAvailability } from './controllers/emailCheck';
 import { protect } from './middleware/auth';
 import { adminProtect } from './middleware/admin';
 import { getTodos, createTodo, updateTodo, deleteTodo, reorderTodos } from './controllers/todo';
 import { apiLimiter, loginLimiter, registerLimiter, passwordResetLimiter } from './middleware/rateLimiter';
 import { User } from './models/User';
+import mongoose from 'mongoose';
 import { logger } from './utils/logger';
+import { connectDB, gracefulShutdown, getDBState } from './utils/database';
 
 dotenv.config();
 
@@ -67,54 +71,19 @@ const dns = require('dns');
 dns.setServers(['8.8.8.8', '8.8.4.4']);
 
 // ────────────────────────────────────────────────
-// Database
+// Database - Using new improved database utility
 // ────────────────────────────────────────────────
 
-const MONGODB_URI = process.env.MONGODB_URI;
-if (!MONGODB_URI) {
-  throw new Error('MONGODB_URI environment variable is required');
-}
-
-const connectWithRetry = async (retries = 5, delay = 5000) => {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      await mongoose.connect(process.env.MONGO_URI || MONGODB_URI, {
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 45000,
-        family: 4,
-      });
-      logger.info('MongoDB connected');
-      return;
-    } catch (err: any) {
-      logger.error(`MongoDB connection attempt ${attempt}/${retries} failed:`, err?.message || err);
-      if (attempt < retries) {
-        logger.info(`Retrying in ${delay / 1000} seconds...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-  }
-  logger.error('MongoDB connection failed after all retries');
-};
-
-connectWithRetry();
-
-let isConnected = false;
-const connectDB = async () => {
-  if (isConnected) return;
-  if (mongoose.connection.readyState === 1) {
-    isConnected = true;
-    return;
-  }
-  await connectWithRetry(3, 3000);
-  isConnected = true;
-};
+// Register shutdown handlers for graceful shutdown
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // ────────────────────────────────────────────────
 // Routes
 // ────────────────────────────────────────────────
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected' });
+  res.json({ status: 'ok', db: getDBState() });
 });
 
 // Serve frontend for email auth routes
@@ -133,11 +102,7 @@ app.post('/api/auth/verify-email', verifyEmail);
 app.post('/api/auth/request-password-reset', passwordResetLimiter, requestPasswordReset);
 app.post('/api/auth/reset-password', resetPassword);
 
-// Supabase Google OAuth (PARALLEL system)
-app.get('/api/auth/supabase/google/url', getSupabaseGoogleAuthUrl);
-app.get('/auth/callback', handleSupabaseCallback);
-app.get('/api/auth/supabase/status', protect, getSupabaseAuthStatus);
-app.post('/api/auth/supabase/signout', signOutSupabase);
+// Email availability check
 app.get('/api/auth/check-email', checkEmailAvailability);
 
 // Google OAuth routes
@@ -221,7 +186,6 @@ app.post('/api/auth/logout', (req, res) => {
     sameSite: isProduction ? 'none' : 'lax',
   });
 
-
   res.status(200).json({ message: 'Logged out successfully' });
 });
 
@@ -245,9 +209,23 @@ app.post('/api/admin/todos/delete-many', adminProtect, deleteMultipleTodos);
 // System health
 app.get('/api/admin/health', adminProtect, getSystemHealth);
 
-// Legacy admin routes (deprecated - use new adminProtect routes above)
+// Lazy connection middleware - MUST be before error handler
+// This ensures database is connected before each request in serverless environments
+app.use(async (req, res, next) => {
+  try {
+    const connected = await connectDB();
+    if (!connected) {
+      logger.error('Database connection failed in middleware');
+      return res.status(503).json({ error: 'Database temporarily unavailable. Please try again.' });
+    }
+    next();
+  } catch (err) {
+    logger.error('Database connection error:', err);
+    return res.status(500).json({ error: 'Database connection failed' });
+  }
+});
 
-// Error handler
+// Error handler - MUST be after all routes and middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   // In production, don't expose stack traces
   const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
@@ -256,18 +234,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   } else {
     logger.error('Unhandled error:', err?.message || err);
   }
-  res.status(500).json({ error: 'Internal Server Error' });
-});
-
-// Lazy connection middleware
-app.use(async (req, res, next) => {
-  try {
-    await connectDB();
-    next();
-  } catch (err) {
-    logger.error('Database connection error:', err);
-    res.status(500).json({ error: 'Database connection failed' });
-  }
+  return res.status(500).json({ error: 'Internal Server Error' });
 });
 
 // ────────────────────────────────────────────────

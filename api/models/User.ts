@@ -1,30 +1,27 @@
-import { Schema, model } from 'mongoose';
+import { Schema, model, Types } from 'mongoose';
 
 const userSchema = new Schema({
-  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
   password: { type: String, default: null },
-  displayName: { type: String, trim: true, default: null },
+  displayName: { type: String, trim: true, default: null, index: true },
   
   // User role - 'user' or 'admin'
-  role: { type: String, enum: ['user', 'admin'], default: 'user' },
+  role: { type: String, enum: ['user', 'admin'], default: 'user', index: true },
   
-  // Auth provider - 'local' for email/password, 'google' for Google OAuth, 'supabase' for Supabase OAuth
-  authProvider: { type: String, enum: ['local', 'google', 'supabase'], default: 'local' },
+  // Auth provider - 'local' for email/password, 'google' for Google OAuth
+  authProvider: { type: String, enum: ['local', 'google'], default: 'local' },
   
   // Google OAuth specific fields
-  isGoogleUser: { type: Boolean, default: false },
-  googleId: { type: String, default: null, unique: true, sparse: true },
+  isGoogleUser: { type: Boolean, default: false, index: true },
+  googleId: { type: String, unique: true, sparse: true },
   googleProfile: {
     picture: { type: String, default: null },
     givenName: { type: String, default: null },
     familyName: { type: String, default: null },
   },
   
-  // Supabase OAuth specific fields
-  supabaseId: { type: String, default: null, unique: true, sparse: true },
-  
   // Email verification
-  emailVerified: { type: Boolean, default: false },
+  emailVerified: { type: Boolean, default: false, index: true },
   emailVerificationToken: { type: String, default: null },
   emailVerificationExpires: { type: Date, default: null },
   
@@ -34,8 +31,8 @@ const userSchema = new Schema({
   
   // Account security
   failedLoginAttempts: { type: Number, default: 0 },
-  accountLockedUntil: { type: Date, default: null },
-  lastLoginAt: { type: Date, default: null },
+  accountLockedUntil: { type: Date, default: null, index: true },
+  lastLoginAt: { type: Date, default: null, index: true },
   
   // Profile
   bio: { type: String, trim: true, default: null, maxlength: 500 },
@@ -44,8 +41,26 @@ const userSchema = new Schema({
   // Client-side encryption
   encryptionSalt: { type: String, default: null },
   
+  // Email drip schedule - embedded document
+  emailDripSchedule: {
+    day1WelcomeSent: { type: Boolean, default: false },
+    day1WelcomeSentAt: { type: Date, default: null },
+    day3TipsSent: { type: Boolean, default: false },
+    day3TipsSentAt: { type: Date, default: null },
+    day7CheckInSent: { type: Boolean, default: false },
+    day7CheckInSentAt: { type: Date, default: null },
+    createdAt: { type: Date, default: null },
+  },
+  
 }, { timestamps: true });
 
-// Note: email, googleId, and supabaseId indexes are already created via unique: true in schema fields
+// Compound indexes for common queries
+userSchema.index({ email: 1, emailVerified: 1 });
+userSchema.index({ lastLoginAt: -1 });
+userSchema.index({ createdAt: -1 });
+userSchema.index({ isGoogleUser: 1, googleId: 1 });
+userSchema.index({ 'emailDripSchedule.day1WelcomeSent': 1, 'emailDripSchedule.createdAt': 1 });
+userSchema.index({ 'emailDripSchedule.day3TipsSent': 1, 'emailDripSchedule.createdAt': 1 });
+userSchema.index({ 'emailDripSchedule.day7CheckInSent': 1, 'emailDripSchedule.createdAt': 1 });
 
 export const User = model('User', userSchema);

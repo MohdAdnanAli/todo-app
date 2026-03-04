@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { JSX } from 'react';
 import { authApi, googleApi, getApiErrorMessage, isRateLimitError, isAccountLockedError } from '../services/api';
 import type { AuthMode } from '../types';
@@ -79,6 +79,36 @@ const AuthForm = ({ onLogin, onRegister }: AuthFormProps): JSX.Element => {
   const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
   const [passwordStrength, setPasswordStrength] = useState(0);
 
+  // Refs for cleanup
+  const googleMessageHandler = useRef<((event: MessageEvent) => void) | null>(null);
+  const popupCheckInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const popupRef = useRef<Window | null>(null);
+
+  // Cleanup function for Google OAuth handlers
+  const cleanupGoogleOAuth = useCallback(() => {
+    if (googleMessageHandler.current) {
+      window.removeEventListener('message', googleMessageHandler.current);
+      googleMessageHandler.current = null;
+    }
+    if (popupCheckInterval.current) {
+      clearInterval(popupCheckInterval.current);
+      popupCheckInterval.current = null;
+    }
+    if (popupRef.current && !popupRef.current.closed) {
+      try {
+        popupRef.current.close();
+      } catch (e) {
+        // Ignore close errors
+      }
+      popupRef.current = null;
+    }
+  }, []);
+
+  // Cleanup on unmount - call cleanupGoogleOAuth to prevent memory leaks
+  useEffect(() => {
+    return cleanupGoogleOAuth;
+  }, [cleanupGoogleOAuth]);
+
   // Check for Google OAuth success or errors in URL
   useEffect(() => {
     const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
@@ -116,101 +146,23 @@ const AuthForm = ({ onLogin, onRegister }: AuthFormProps): JSX.Element => {
     }
   }, []);
 
-  // Google Sign-In handler - opens in popup
+  // Google Sign-In handler - redirect flow (no popup)
   const handleGoogleSignIn = useCallback(async () => {
     try {
       setError('');
+      setIsLoading(true);
       
       // Get Google OAuth URL from backend
       const { authUrl } = await googleApi.getAuthUrl();
       
-      // Add popup parameter to trigger popup flow in backend
-      const popupAuthUrl = authUrl.includes('?') 
-        ? `${authUrl}&popup=true` 
-        : `${authUrl}?popup=true`;
-      
-      // Open Google OAuth in a popup window
-      const width = 500;
-      const height = 600;
-      const left = window.screenX + (window.outerWidth - width) / 2;
-      const top = window.screenY + (window.outerHeight - height) / 2;
-      
-      const popup = window.open(
-        popupAuthUrl,
-        'Google Sign-In',
-        `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
-      );
-      
-      if (!popup) {
-        // Fallback to redirect if popup is blocked
-        window.location.href = popupAuthUrl;
-        return;
-      }
-      
-      // Listen for messages from the popup
-      const handleMessage = (event: MessageEvent) => {
-        // Verify the origin matches our expected domains
-        const allowedOrigins = [
-          window.location.origin,
-          'https://metb-todo.vercel.app',
-          'https://todo-app-srbx.onrender.com',
-        ];
-        
-        // Also accept messages with no origin (some browser scenarios)
-        if (!event.origin || allowedOrigins.includes(event.origin)) {
-          if (event.data?.type === 'google-auth-success') {
-            // Close popup immediately
-            try { popup.close(); } catch(e) {}
-            
-            // Remove listener to prevent duplicate handling
-            window.removeEventListener('message', handleMessage);
-            
-            // Save encryption data from popup message
-            const { encryptionSalt, googleId } = event.data || {};
-            
-            if (encryptionSalt) {
-              import('../services/offlineStorage').then(({ offlineStorage }) => {
-                offlineStorage.saveEncryptionSalt(encryptionSalt).catch(console.error);
-              });
-            }
-            
-            if (googleId) {
-              import('../services/offlineStorage').then(({ offlineStorage }) => {
-                offlineStorage.savePassword(googleId).catch(console.error);
-              });
-            }
-            
-            // Reload to trigger auth check - the cookie should now be set
-            window.location.reload();
-          } else if (event.data?.type === 'google-auth-error') {
-            setError(event.data.message || 'Google sign-in failed');
-            try { popup.close(); } catch(e) {}
-            window.removeEventListener('message', handleMessage);
-          }
-        }
-      };
-      
-      window.addEventListener('message', handleMessage);
-      
-      // Poll for popup closure as backup
-      const checkClosed = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(checkClosed);
-          window.removeEventListener('message', handleMessage);
-          
-          // Check if authentication was successful by checking cookie
-          // Small delay to allow cookie to be set
-          setTimeout(() => {
-            if (document.cookie.includes('auth_token')) {
-              window.location.reload();
-            }
-          }, 500);
-        }
-      }, 500);
+      // Use redirect flow instead of popup - no popup parameter
+      // This will redirect the entire window to Google, then back to the app
+      window.location.href = authUrl;
       
     } catch (err: unknown) {
       getApiErrorMessage(err);
       setError('Failed to initiate Google sign-in. Please try again.');
+      setIsLoading(false);
     }
   }, []);
 

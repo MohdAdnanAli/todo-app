@@ -330,7 +330,7 @@ export const emailDripService = {
       });
 
       for (const user of day3Users) {
-        await this.sendTipsEmail(user._id.toString(), user.email, user.displayName);
+        await this.sendTipsEmail(user._id.toString(), user.email, user.displayName || 'User');
       }
 
       const day7Users = await User.find({
@@ -339,7 +339,7 @@ export const emailDripService = {
       });
 
       for (const user of day7Users) {
-        await this.sendCheckInEmail(user._id.toString(), user.email, user.displayName);
+        await this.sendCheckInEmail(user._id.toString(), user.email, user.displayName || 'User');
       }
 
       logger.info('Processed pending email drips');

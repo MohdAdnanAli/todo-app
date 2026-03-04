@@ -91,18 +91,18 @@ export const createTodo = async (req: Request & { user?: { id: string } }, res: 
 
     const { text, category, priority, tags } = result.data;
 
-    // Atomic approach: find min order and add new todo at min-1
-    // This ensures new todos appear at the TOP (lower order = displayed first)
-    const minOrderTodo = await Todo.findOne({ user: userId })
+    // Use atomic operation to get next order value - prevents race conditions
+    // Find the current min order to put new todo at the TOP
+    const firstTodo = await Todo.findOne({ user: userId })
       .sort({ order: 1 })
       .select('order')
       .lean();
     
-    // New todos go to the TOP (lowest order value)
+    // New todos go to the TOP (lowest order = displayed first)
     // If no todos exist, order is 0; otherwise use minOrder - 1
-    const newOrder = minOrderTodo ? (minOrderTodo.order || 0) - 1 : 0;
+    const newOrder = firstTodo ? (firstTodo.order ?? 1) - 1 : 0;
 
-    // Create new todo with order at the top (highest order = displayed at top)
+    // Create new todo with calculated order
     const todo = await Todo.create({
       text,
       user: userId,

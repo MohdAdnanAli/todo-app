@@ -81,7 +81,7 @@ export const adminProtect = async (req: AdminRequest, res: Response, next: NextF
     next();
   } catch (err) {
     logger.error('[Admin] Middleware error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };
 
@@ -98,7 +98,6 @@ export const isAdminConfigured = (): boolean => {
 export const getAdminEmail = (): string => {
   if (!ADMIN_EMAIL) return 'Not configured';
   const parts = ADMIN_EMAIL.split('@');
-  if (parts.length !== 2) return 'Invalid';
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return 'Invalid';
   return `${parts[0].substring(0, 2)}***@${parts[1]}`;
 };
-

@@ -9,10 +9,15 @@ import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/email';
 import { emailDripService } from '../services/emailDrip';
 import { logger } from '../utils/logger';
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required');
-}
+// JWT_SECRET is now checked lazily inside functions that need it
+// This allows dotenv to load first from index.ts
+const getJwtSecret = () => {
+  const JWT_SECRET = process.env.JWT_SECRET;
+  if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+  return JWT_SECRET;
+};
 
 const COOKIE_NAME = 'auth_token';
 const MAX_LOGIN_ATTEMPTS = 5;
@@ -83,7 +88,8 @@ export const register = async (req: Request, res: Response) => {
       logger.warn('[Email Drip] Could not schedule email drip (SMTP not configured)');
     });
 
-    // Create example todos for the user (non-blocking)
+    // Create example todos for the user (non-blocking with error isolation)
+    // Don't let todo creation failure prevent user registration
     try {
       const { Todo } = await import('../models/Todo');
       const exampleTodos = [
@@ -121,8 +127,9 @@ export const register = async (req: Request, res: Response) => {
       
       await Todo.insertMany(exampleTodos);
       logger.info(`[Onboarding] Created ${exampleTodos.length} example todos for user ${user._id}`);
-    } catch (err) {
-      logger.warn('[Onboarding] Could not create example todos');
+    } catch (todoErr) {
+      // Log but don't fail - user can still use the app
+      logger.warn('[Onboarding] Could not create example todos:', todoErr instanceof Error ? todoErr.message : 'Unknown error');
     }
 
     // Send verification email (non-blocking, log error but continue)
@@ -206,21 +213,23 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Reset failed attempts on successful login
-    await resetLoginAttempts(user);
-    user.lastLoginAt = new Date();
+    // Use atomic update to reset failed attempts, update lastLoginAt, and set encryptionSalt in one operation
+    // This prevents race conditions from separate save() calls
+    const encryptionSalt = user.encryptionSalt || crypto.randomBytes(16).toString('hex');
     
-    // Generate encryptionSalt for existing users who don't have one
-    if (!user.encryptionSalt) {
-      user.encryptionSalt = crypto.randomBytes(16).toString('hex');
-    }
-    
-    await user.save();
+    await User.findByIdAndUpdate(user._id, {
+      $set: {
+        failedLoginAttempts: 0,
+        accountLockedUntil: null,
+        lastLoginAt: new Date(),
+        encryptionSalt: encryptionSalt,
+      }
+    });
 
     // Determine if we're in production (including Vercel deployment)
     const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
     
-    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '7d' });
+const token = jwt.sign({ id: user._id }, getJwtSecret(), { expiresIn: '7d' });
 
     res.cookie(COOKIE_NAME, token, {
       httpOnly: true,
@@ -232,7 +241,7 @@ export const login = async (req: Request, res: Response) => {
     return res.json({
       message: 'Logged in',
       user: { id: user._id, email: user.email, displayName: user.displayName },
-      encryptionSalt: user.encryptionSalt,
+      encryptionSalt: encryptionSalt,
     });
   } catch (err) {
     logger.error('Login error:', err);

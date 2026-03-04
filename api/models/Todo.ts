@@ -6,10 +6,12 @@ const todoSchema = new Schema({
     required: true,
     trim: true,
     maxlength: 500,
+    index: 'text',
   },
   completed: {
     type: Boolean,
     default: false,
+    index: true,
   },
   user: {
     type: Types.ObjectId,
@@ -21,6 +23,7 @@ const todoSchema = new Schema({
     type: String,
     enum: ['work', 'personal', 'shopping', 'health', 'other'],
     default: 'other',
+    index: true,
   },
   tags: [{
     type: String,
@@ -31,10 +34,12 @@ const todoSchema = new Schema({
     type: String,
     enum: ['low', 'medium', 'high'],
     default: 'medium',
+    index: true,
   },
   dueDate: {
     type: Date,
     default: null,
+    index: true,
   },
   order: {
     type: Number,
@@ -50,7 +55,14 @@ const todoSchema = new Schema({
   timestamps: true,
 });
 
-// Compound index for efficient querying by user and order
+// Compound indexes for efficient querying
 todoSchema.index({ user: 1, order: 1 });
+todoSchema.index({ user: 1, completed: 1 });
+todoSchema.index({ user: 1, category: 1 });
+todoSchema.index({ user: 1, dueDate: 1 });
+todoSchema.index({ completed: 1, createdAt: -1 });
+todoSchema.index({ category: 1, priority: 1 });
+todoSchema.index({ createdAt: -1 });
+todoSchema.index({ updatedAt: -1 });
 
 export const Todo = model('Todo', todoSchema);
