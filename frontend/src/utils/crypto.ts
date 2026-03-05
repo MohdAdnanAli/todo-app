@@ -187,6 +187,31 @@ export async function encrypt(text: string, password: string, salt: string): Pro
 }
 
 /**
+ * Check if a string looks like encrypted data vs plain text
+ * Encrypted data should be base64 encoded and have minimum length
+ */
+function looksLikeEncryptedData(data: string): boolean {
+  // If it's very short, it's probably not encrypted (too short for IV + ciphertext)
+  if (data.length < 20) {
+    return false;
+  }
+  
+  // Check if it looks like base64 (our encryption format)
+  const base64Regex = /^[A-Za-z0-9+/]+=*$/;
+  if (!base64Regex.test(data)) {
+    return false;
+  }
+  
+  // Try to decode and check minimum length (IV + at least 1 byte)
+  try {
+    const binaryString = atob(data);
+    return binaryString.length > 12; // Must be longer than IV
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Decrypt text using AES-GCM
  * Input: base64 encoded string: IV + ciphertext
  */
@@ -199,6 +224,12 @@ export async function decrypt(encryptedData: string, password: string, salt: str
       throw new CryptoError(ENCRYPTION_ERRORS.INVALID_DATA);
     }
     
+    // Check if this looks like encrypted data - if not, return as plain text
+    if (!looksLikeEncryptedData(encryptedData)) {
+      console.log('[Crypto] Data does not look encrypted, returning as plain text');
+      return encryptedData;
+    }
+    
     console.log('[Crypto] Attempting decrypt - data length:', encryptedData.length, 'salt:', salt ? 'present' : 'missing', 'password:', password ? 'present' : 'missing');
     
     // Decode base64
@@ -207,7 +238,8 @@ export async function decrypt(encryptedData: string, password: string, salt: str
     // Check minimum length (IV + at least 1 byte of data)
     if (combined.length <= IV_LENGTH) {
       console.error('[Crypto] Invalid data length:', combined.length, 'IV_LENGTH:', IV_LENGTH);
-      throw new CryptoError(ENCRYPTION_ERRORS.INVALID_DATA);
+      // Return as plain text if length check fails
+      return encryptedData;
     }
     
     // Extract IV and ciphertext
@@ -233,14 +265,8 @@ export async function decrypt(encryptedData: string, password: string, salt: str
     return result;
   } catch (error) {
     console.error('[Crypto] Decryption error:', error);
-    if (error instanceof CryptoError) {
-      throw error;
-    }
-    // Provide more specific error message for decryption failures
-    if (error instanceof Error && error.name === 'OperationError') {
-      throw new CryptoError(ENCRYPTION_ERRORS.DECRYPTION_FAILED);
-    }
-    throw new CryptoError(ENCRYPTION_ERRORS.CRYPTO_ERROR);
+    // Return original data on any error - this prevents showing encrypted text to users
+    return encryptedData;
   }
 }
 

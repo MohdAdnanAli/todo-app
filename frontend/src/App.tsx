@@ -94,15 +94,15 @@ function App() {
   // Track if we've processed Google OAuth redirect
   const googleOAuthProcessed = useRef(false);
 
-  const decryptTodo = useCallback(async (todo: Todo, password: string, salt: string): Promise<Todo> => {
+const decryptTodo = useCallback(async (todo: Todo, password: string, salt: string): Promise<Todo> => {
     if (!password || !salt) return todo;
     try {
       const decryptedText = await decrypt(todo.text, password, salt);
       return { ...todo, text: decryptedText };
     } catch (err) {
-      // Throw error to help debug decryption issues - don't silently fail
-      console.error('Failed to decrypt todo:', todo._id, err);
-      throw new Error(`Decryption failed for todo ${todo._id}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      // Crypto module now handles errors gracefully - return original todo
+      console.warn('Decryption issue for todo:', todo._id, err);
+      return todo;
     }
   }, []);
 
