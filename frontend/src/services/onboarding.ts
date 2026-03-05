@@ -140,7 +140,8 @@ export const onboardingService = {
   // Get current tour step
   async getCurrentTourStep(): Promise<string> {
     const metadata = await offlineStorage.getMetadata('tour-step');
-    return metadata?.step || 'welcome';
+    const step = metadata?.step;
+    return typeof step === 'string' ? step : 'welcome';
   },
 
   // Update tour step
@@ -154,7 +155,11 @@ export const onboardingService = {
   // Get quick-start progress
   async getQuickStartProgress(): Promise<QuickStartTask[]> {
     const metadata = await offlineStorage.getMetadata('quick-start-progress');
-    return metadata?.tasks || QUICK_START_TASKS;
+    const tasks = metadata?.tasks;
+    if (Array.isArray(tasks)) {
+      return tasks as QuickStartTask[];
+    }
+    return QUICK_START_TASKS;
   },
 
   // Update quick-start task
@@ -222,6 +227,8 @@ export const onboardingService = {
   async resetOnboarding(): Promise<void> {
     await offlineStorage.updateMetadata('onboarding-completed', { completed: false });
     await offlineStorage.updateMetadata('tour-step', { step: 'welcome' });
-    await offlineStorage.updateMetadata('quick-start-progress', { tasks: QUICK_START_TASKS });
+    await offlineStorage.updateMetadata('quick-start-progress', { 
+      tasks: QUICK_START_TASKS as unknown as Array<{ id: string; text: string; completed: boolean; hint: string }> 
+    });
   },
 };

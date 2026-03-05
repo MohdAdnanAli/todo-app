@@ -1,4 +1,4 @@
-import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import Dexie, { type Table } from 'dexie';
 import type { Todo } from '../types';
 
 // Console wrapper for consistent logging
@@ -9,67 +9,90 @@ const logger = {
   debug: (msg: string, ...args: unknown[]) => console.debug(`[OfflineStorage] DEBUG: ${msg}`, ...args),
 };
 
-interface TodoDB extends DBSchema {
-  todos: {
-    key: string;
-    value: Todo;
-    indexes: { 'by-order': number };
-  };
-  syncQueue: {
-    key: string;
-    value: {
+// Sync queue item type
+export interface SyncQueueItem {
+  id?: number;
+  todoId: string;
+  action: 'create' | 'update' | 'delete';
+  data: Partial<Todo>;
+  timestamp: number;
+}
+
+// Metadata type
+export interface StorageMetadata {
+  key: string;
+  value: {
+    [key: string]: unknown;
+    savedAt?: number;
+    updatedAt?: number;
+    completedAt?: number;
+    completed?: boolean;
+    step?: string;
+    tasks?: Array<{
       id: string;
-      action: 'create' | 'update' | 'delete';
-      data: Partial<Todo>;
-      timestamp: number;
-    };
-  };
-  metadata: {
-    key: string;
-    value: {
-      lastSync: number;
-      syncInProgress: boolean;
-    };
+      text: string;
+      completed: boolean;
+      hint: string;
+    }>;
   };
 }
 
-let dbInstance: IDBPDatabase<TodoDB> | null = null;
+// Dexie Database class
+class TodoAppDatabase extends Dexie {
+  todos!: Table<Todo, string>;
+  syncQueue!: Table<SyncQueueItem, number>;
+  metadata!: Table<StorageMetadata, string>;
 
-const DB_NAME = 'TodoAppDB';
-const DB_VERSION = 1;
+  constructor() {
+    super('TodoAppDB');
+    
+    this.version(1).stores({
+      todos: '_id, order, category, priority, completed, createdAt',
+      syncQueue: '++id, todoId, action, timestamp',
+      metadata: 'key',
+    });
+  }
+}
 
-const getDB = async (): Promise<IDBPDatabase<TodoDB>> => {
-  if (dbInstance) return dbInstance;
+// Initialize database
+const db = new TodoAppDatabase();
 
-  dbInstance = await openDB<TodoDB>(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      // Todos store
-      if (!db.objectStoreNames.contains('todos')) {
-        const todoStore = db.createObjectStore('todos', { keyPath: '_id' });
-        todoStore.createIndex('by-order', 'order');
-      }
+// Track online status
+let isOnline = navigator.onLine;
+let syncInProgress = false;
 
-      // Sync queue store
-      if (!db.objectStoreNames.contains('syncQueue')) {
-        db.createObjectStore('syncQueue', { keyPath: 'id', autoIncrement: true });
-      }
-
-      // Metadata store
-      if (!db.objectStoreNames.contains('metadata')) {
-        db.createObjectStore('metadata');
-      }
-    },
+// Listen for online/offline events
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    logger.info('Network is online, triggering sync...');
+    isOnline = true;
+    // Trigger sync when coming back online
+    offlineStorage.syncPendingChanges();
   });
 
-  return dbInstance;
+  window.addEventListener('offline', () => {
+    logger.warn('Network is offline, operating in offline mode');
+    isOnline = false;
+  });
+}
+
+// API service for syncing (will be imported lazily to avoid circular deps)
+let api: typeof import('axios').default | null = null;
+const getApi = async () => {
+  if (!api) {
+    const axios = await import('axios');
+    api = axios.default;
+  }
+  return api;
 };
 
 export const offlineStorage = {
+  // ===== IndexedDB Methods (via Dexie.js) =====
+  
   // Get all todos from IndexedDB
   async getAllTodos(): Promise<Todo[]> {
     try {
-      const db = await getDB();
-      const todos = await db.getAll('todos');
+      const todos = await db.todos.toArray();
       return todos.sort((a, b) => (a.order || 0) - (b.order || 0));
     } catch (error) {
       logger.error('Failed to get todos from IndexedDB, falling back to localStorage', error);
@@ -80,8 +103,7 @@ export const offlineStorage = {
   // Get single todo
   async getTodo(id: string): Promise<Todo | undefined> {
     try {
-      const db = await getDB();
-      return await db.get('todos', id);
+      return await db.todos.get(id);
     } catch (error) {
       logger.error('Failed to get todo from IndexedDB', error);
       const todos = this.getTodosFromLocalStorage();
@@ -92,8 +114,7 @@ export const offlineStorage = {
   // Save todo to IndexedDB
   async saveTodo(todo: Todo): Promise<void> {
     try {
-      const db = await getDB();
-      await db.put('todos', todo);
+      await db.todos.put(todo);
       // Also update localStorage as fallback
       this.saveTodoToLocalStorage(todo);
     } catch (error) {
@@ -105,12 +126,7 @@ export const offlineStorage = {
   // Save multiple todos
   async saveTodos(todos: Todo[]): Promise<void> {
     try {
-      const db = await getDB();
-      const tx = db.transaction('todos', 'readwrite');
-      for (const todo of todos) {
-        await tx.store.put(todo);
-      }
-      await tx.done;
+      await db.todos.bulkPut(todos);
       this.saveTodosToLocalStorage(todos);
     } catch (error) {
       logger.error('Failed to save todos to IndexedDB, using localStorage fallback', error);
@@ -121,8 +137,7 @@ export const offlineStorage = {
   // Delete todo from IndexedDB
   async deleteTodo(id: string): Promise<void> {
     try {
-      const db = await getDB();
-      await db.delete('todos', id);
+      await db.todos.delete(id);
       this.deleteTodoFromLocalStorage(id);
     } catch (error) {
       logger.error('Failed to delete todo from IndexedDB, using localStorage fallback', error);
@@ -133,8 +148,7 @@ export const offlineStorage = {
   // Clear all todos
   async clearAllTodos(): Promise<void> {
     try {
-      const db = await getDB();
-      await db.clear('todos');
+      await db.todos.clear();
       localStorage.removeItem('todos');
     } catch (error) {
       logger.error('Failed to clear todos from IndexedDB', error);
@@ -142,29 +156,35 @@ export const offlineStorage = {
     }
   },
 
+  // ===== Sync Queue Methods =====
+  
   // Add to sync queue
   async addToSyncQueue(
     action: 'create' | 'update' | 'delete',
+    todoId: string,
     data: Partial<Todo>
   ): Promise<void> {
     try {
-      const db = await getDB();
-      await db.add('syncQueue', {
-        id: `${action}-${Date.now()}-${Math.random()}`,
+      await db.syncQueue.add({
+        todoId,
         action,
         data,
         timestamp: Date.now(),
       });
+      
+      // Try to sync immediately if online
+      if (isOnline) {
+        this.syncPendingChanges();
+      }
     } catch (error) {
       logger.error('Failed to add to sync queue', error);
     }
   },
 
   // Get sync queue
-  async getSyncQueue(): Promise<any[]> {
+  async getSyncQueue(): Promise<SyncQueueItem[]> {
     try {
-      const db = await getDB();
-      return await db.getAll('syncQueue');
+      return await db.syncQueue.orderBy('timestamp').toArray();
     } catch (error) {
       logger.error('Failed to get sync queue', error);
       return [];
@@ -174,41 +194,104 @@ export const offlineStorage = {
   // Clear sync queue
   async clearSyncQueue(): Promise<void> {
     try {
-      const db = await getDB();
-      await db.clear('syncQueue');
+      await db.syncQueue.clear();
     } catch (error) {
       logger.error('Failed to clear sync queue', error);
     }
   },
 
   // Remove item from sync queue
-  async removeFromSyncQueue(id: string): Promise<void> {
+  async removeFromSyncQueue(id: number): Promise<void> {
     try {
-      const db = await getDB();
-      await db.delete('syncQueue', id);
+      await db.syncQueue.delete(id);
     } catch (error) {
       logger.error('Failed to remove from sync queue', error);
     }
   },
 
-  // Update metadata
-  async updateMetadata(key: string, value: any): Promise<void> {
+  // Sync pending changes to server
+  async syncPendingChanges(): Promise<{ success: boolean; synced: number; failed: number }> {
+    if (syncInProgress) {
+      logger.info('Sync already in progress, skipping...');
+      return { success: false, synced: 0, failed: 0 };
+    }
+    
+    if (!isOnline) {
+      logger.info('Offline, skipping sync');
+      return { success: false, synced: 0, failed: 0 };
+    }
+
+    syncInProgress = true;
+    let synced = 0;
+    let failed = 0;
+
     try {
-      const db = await getDB();
-      await db.put('metadata', { ...value }, key);
+      const queue = await this.getSyncQueue();
+      
+      if (queue.length === 0) {
+        logger.info('No pending changes to sync');
+        syncInProgress = false;
+        return { success: true, synced: 0, failed: 0 };
+      }
+
+      logger.info(`Syncing ${queue.length} pending changes...`);
+      const axios = await getApi();
+      const API_URL = (await import('../types')).API_URL;
+
+      for (const item of queue) {
+        try {
+          switch (item.action) {
+            case 'create':
+              await axios.post(`${API_URL}/api/todos`, item.data, { withCredentials: true });
+              break;
+            case 'update':
+              await axios.put(`${API_URL}/api/todos/${item.todoId}`, item.data, { withCredentials: true });
+              break;
+            case 'delete':
+              await axios.delete(`${API_URL}/api/todos/${item.todoId}`, { withCredentials: true });
+              break;
+          }
+          
+          // Remove from queue on success
+          if (item.id) {
+            await this.removeFromSyncQueue(item.id);
+          }
+          synced++;
+        } catch (error) {
+          logger.error(`Failed to sync item ${item.id}:`, error);
+          failed++;
+        }
+      }
+
+      logger.info(`Sync complete: ${synced} synced, ${failed} failed`);
+    } catch (error) {
+      logger.error('Sync failed:', error);
+    } finally {
+      syncInProgress = false;
+    }
+
+    return { success: failed === 0, synced, failed };
+  },
+
+  // ===== Metadata Methods =====
+  
+  // Update metadata
+  async updateMetadata(key: string, value: Record<string, unknown>): Promise<void> {
+    try {
+      await db.metadata.put({ key, value: { ...value, savedAt: Date.now() } }, key);
     } catch (error) {
       logger.error('Failed to update metadata', error);
     }
   },
 
   // Get metadata
-  async getMetadata(key: string): Promise<any> {
+  async getMetadata(key: string): Promise<Record<string, unknown> | undefined> {
     try {
-      const db = await getDB();
-      return await db.get('metadata', key);
+      const result = await db.metadata.get(key);
+      return result?.value;
     } catch (error) {
       logger.error('Failed to get metadata', error);
-      return null;
+      return undefined;
     }
   },
 
@@ -225,7 +308,7 @@ export const offlineStorage = {
   async getPassword(): Promise<string | null> {
     try {
       const data = await this.getMetadata('user-password');
-      return data?.password || null;
+      return (data?.password as string) || null;
     } catch (error) {
       logger.error('Failed to retrieve password', error);
       return null;
@@ -235,8 +318,7 @@ export const offlineStorage = {
   // Clear stored password
   async clearPassword(): Promise<void> {
     try {
-      const db = await getDB();
-      await db.delete('metadata', 'user-password');
+      await db.metadata.delete('user-password');
     } catch (error) {
       logger.error('Failed to clear password', error);
     }
@@ -255,7 +337,7 @@ export const offlineStorage = {
   async getEncryptionSalt(): Promise<string | null> {
     try {
       const data = await this.getMetadata('encryption-salt');
-      return data?.salt || null;
+      return (data?.salt as string) || null;
     } catch (error) {
       logger.error('Failed to retrieve encryption salt', error);
       return null;
@@ -265,15 +347,31 @@ export const offlineStorage = {
   // Clear stored encryption salt
   async clearEncryptionSalt(): Promise<void> {
     try {
-      const db = await getDB();
-      await db.delete('metadata', 'encryption-salt');
+      await db.metadata.delete('encryption-salt');
     } catch (error) {
       logger.error('Failed to clear encryption salt', error);
     }
   },
 
-  // ===== FALLBACK: LocalStorage methods =====
+  // ===== Network Status =====
+  
+  // Check if online
+  isOnline(): boolean {
+    return isOnline;
+  },
 
+  // Get sync status
+  async getSyncStatus(): Promise<{ pendingCount: number; isOnline: boolean; syncInProgress: boolean }> {
+    const pendingCount = await db.syncQueue.count();
+    return {
+      pendingCount,
+      isOnline,
+      syncInProgress,
+    };
+  },
+
+  // ===== Fallback: LocalStorage Methods =====
+  
   getTodosFromLocalStorage(): Todo[] {
     try {
       const stored = localStorage.getItem('todos');
@@ -332,3 +430,6 @@ export const offlineStorage = {
     }
   },
 };
+
+export default offlineStorage;
+

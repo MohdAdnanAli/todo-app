@@ -14,6 +14,7 @@ import {
   TodoForm, 
   GeometryLoader,
   WelcomeTour,
+  JoyrideTour,
   QuickStartChecklist,
   PWAInstallPrompt,
   ConfirmDialog,
@@ -908,6 +909,13 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
       )}
 
       <WelcomeTour 
+        isOpen={showWelcomeTour}
+        onClose={() => setShowWelcomeTour(false)}
+        onComplete={handleTourComplete}
+      />
+
+      {/* React Joyride Tour - Enhanced onboarding experience */}
+      <JoyrideTour
         isOpen={showWelcomeTour}
         onClose={() => setShowWelcomeTour(false)}
         onComplete={handleTourComplete}

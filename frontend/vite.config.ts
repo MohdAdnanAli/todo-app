@@ -6,15 +6,18 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
         name: 'Todo Advanced Pro',
         short_name: 'TodoPro',
         description: 'Advanced Todo app with offline support, drag-and-drop, and more',
-        theme_color: '#ffffff',
-        background_color: '#ffffff',
+        theme_color: '#6366f1',
+        background_color: '#1e1b4b',
         display: 'standalone',
+        orientation: 'portrait',
+        scope: '/',
+        start_url: '/',
         icons: [
           {
             src: '/icon-192.png',
@@ -60,6 +63,10 @@ export default defineConfig({
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 7, // 1 week
+              },
+              networkTimeoutSeconds: 10,
+              cacheableResponse: {
+                statuses: [0, 200],
               },
             },
           },

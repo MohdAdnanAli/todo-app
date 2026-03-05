@@ -11,6 +11,7 @@ export { default as TodoForm } from './TodoForm';
 export { default as TodoItem } from './TodoItem';
 export { default as TodoList } from './TodoList';
 export { default as WelcomeTour } from './WelcomeTour';
+export { default as JoyrideTour } from './JoyrideTour';
 export { default as QuickStartChecklist } from './QuickStartChecklist';
 export { default as PWAInstallPrompt } from './PWAInstallPrompt';
 export { default as SortableTodoItem } from './SortableTodoItem';
