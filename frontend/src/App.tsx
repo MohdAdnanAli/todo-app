@@ -100,8 +100,9 @@ function App() {
       const decryptedText = await decrypt(todo.text, password, salt);
       return { ...todo, text: decryptedText };
     } catch (err) {
-      console.warn('Failed to decrypt todo, showing encrypted text:', todo._id);
-      return todo;
+      // Throw error to help debug decryption issues - don't silently fail
+      console.error('Failed to decrypt todo:', todo._id, err);
+      throw new Error(`Decryption failed for todo ${todo._id}: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   }, []);
 

@@ -145,6 +145,8 @@ export async function encrypt(text: string, password: string, salt: string): Pro
       throw new CryptoError('Text is required for encryption');
     }
     
+    console.log('[Crypto] Encrypting - text length:', text.length, 'salt:', salt ? 'present' : 'missing');
+    
     const encoder = new TextEncoder();
     const data = encoder.encode(text);
     
@@ -153,6 +155,7 @@ export async function encrypt(text: string, password: string, salt: string): Pro
     
     // Derive key from password and salt
     const key = await deriveKey(password, salt);
+    console.log('[Crypto] Key derived for encryption');
     
     // Encrypt
     const ciphertext = await crypto.subtle.encrypt(
@@ -171,8 +174,11 @@ export async function encrypt(text: string, password: string, salt: string): Pro
     for (let i = 0; i < combined.length; i++) {
       binary += String.fromCharCode(combined[i]);
     }
-    return btoa(binary);
+    const result = btoa(binary);
+    console.log('[Crypto] Encryption successful, result length:', result.length);
+    return result;
   } catch (error) {
+    console.error('[Crypto] Encryption error:', error);
     if (error instanceof CryptoError) {
       throw error;
     }
@@ -193,11 +199,14 @@ export async function decrypt(encryptedData: string, password: string, salt: str
       throw new CryptoError(ENCRYPTION_ERRORS.INVALID_DATA);
     }
     
+    console.log('[Crypto] Attempting decrypt - data length:', encryptedData.length, 'salt:', salt ? 'present' : 'missing', 'password:', password ? 'present' : 'missing');
+    
     // Decode base64
     const combined = base64ToUint8Array(encryptedData);
     
     // Check minimum length (IV + at least 1 byte of data)
     if (combined.length <= IV_LENGTH) {
+      console.error('[Crypto] Invalid data length:', combined.length, 'IV_LENGTH:', IV_LENGTH);
       throw new CryptoError(ENCRYPTION_ERRORS.INVALID_DATA);
     }
     
@@ -205,8 +214,11 @@ export async function decrypt(encryptedData: string, password: string, salt: str
     const iv = combined.slice(0, IV_LENGTH);
     const ciphertext = combined.slice(IV_LENGTH);
     
+    console.log('[Crypto] IV length:', iv.length, 'ciphertext length:', ciphertext.length);
+    
     // Derive key from password and salt
     const key = await deriveKey(password, salt);
+    console.log('[Crypto] Key derived successfully');
     
     // Decrypt
     const decrypted = await crypto.subtle.decrypt(
@@ -216,8 +228,11 @@ export async function decrypt(encryptedData: string, password: string, salt: str
     );
     
     const decoder = new TextDecoder();
-    return decoder.decode(decrypted);
+    const result = decoder.decode(decrypted);
+    console.log('[Crypto] Decryption successful, result length:', result.length);
+    return result;
   } catch (error) {
+    console.error('[Crypto] Decryption error:', error);
     if (error instanceof CryptoError) {
       throw error;
     }
