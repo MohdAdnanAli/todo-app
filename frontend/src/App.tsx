@@ -23,6 +23,7 @@ import {
 import SmartTodoList from './components/SmartTodoList';
 import { onboardingService } from './services/onboarding';
 import { offlineStorage } from './services/offlineStorage';
+import { ArrowRight } from 'lucide-react';
 
 // Known temporary/disposable email domains
 const TEMPORARY_EMAIL_DOMAINS = [
@@ -827,19 +828,20 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
                 onClick={() => setShowPremiumFeatures(true)}
                 title="Premium Features (Beta)"
                 className="px-4 py-2 rounded-lg font-medium text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white
-                  shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
+                  shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap flex items-center gap-1.5"
                 style={{ boxShadow: 'var(--glow)' }}
               >
-                ⏰ Premium
+                <ArrowRight size={16} className="transform -rotate-45" />
+                Go Premium
               </button>
               {isAdmin && (
                 <button
-                  onClick={() => setShowAdminDashboard(true)}
+                  onClick={() => setShowAdminDashboard(prev => !prev)}
                   className="px-3 py-2 rounded-lg font-medium text-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white
                     shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
                   style={{ boxShadow: 'var(--glow)' }}
                 >
-                  ⚙️ Admin
+                  {showAdminDashboard ? '✕ Close' : '⚙️ Admin'}
                 </button>
               )}
             </div>

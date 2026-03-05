@@ -37,10 +37,10 @@ const LEDIndicator: React.FC<LEDIndicatorProps> = memo(({ message, messageType, 
       onMouseLeave={() => variant === 'default' && setShowTooltip(false)}
     >
       <div
-        className="w-4 h-4 rounded-full transition-all duration-300"
+        className="w-3 h-3 rounded-full transition-all duration-300"
         style={{
           backgroundColor: colors.bg,
-          boxShadow: `0 0 10px ${colors.glow}, 0 0 4px ${colors.bg}`,
+          boxShadow: `0 0 15px ${colors.glow}, 0 0 8px ${colors.glow}, 0 0 4px ${colors.bg}`,
           border: `2px solid ${colors.border}`,
           animation: message ? 'pulse 1s ease-in-out' : 'none',
         }}

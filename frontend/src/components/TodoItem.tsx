@@ -160,18 +160,18 @@ const TodoItemCore: React.FC<TodoItemProps> = memo(({
         </div>
       </div>
 
-      {/* Column 4: Delete button - always show text */}
+      {/* Column 4: Delete button - show only icon on small screens */}
       <button
         onClick={handleDelete}
         className="p-2 sm:px-3 py-1.5 rounded-lg font-medium text-xs sm:text-sm flex items-center justify-center gap-1 transition-all duration-200
-          bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md flex-shrink-0 whitespace-nowrap
+          bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md flex-shrink-0
           hover:shadow-lg hover:scale-[1.02] hover:-translate-y-0.5"
         style={{ boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)' }}
         aria-label="Delete todo"
         disabled={dragDisabled}
       >
         <Trash2 size={16} />
-        <span>Delete</span>
+        <span className="hidden sm:inline">Delete</span>
       </button>
     </li>
   );
