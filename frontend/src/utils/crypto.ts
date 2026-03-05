@@ -9,8 +9,15 @@ const IV_LENGTH = 12; // bytes for AES-GCM
 const KEY_LENGTH = 256; // bits
 
 // Key cache to avoid re-deriving keys on every operation
-const keyCache = new Map<string, CryptoKey>();
+// Implements TTL-based expiration for security
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache TTL
+
+interface CacheEntry {
+  key: CryptoKey;
+  timestamp: number;
+}
+
+const keyCache = new Map<string, CacheEntry>();
 
 // Error messages for better debugging
 const ENCRYPTION_ERRORS = {
@@ -62,15 +69,21 @@ function base64ToUint8Array(base64: string): Uint8Array {
 
 /**
  * Derive an AES-GCM key from password and salt using PBKDF2
- * Uses caching to improve performance for repeated operations
+ * Uses caching with TTL expiration to improve performance for repeated operations
  */
 async function deriveKey(password: string, salt: string): Promise<CryptoKey> {
   const cacheKey = `${password}:${salt}`;
+  const now = Date.now();
   
-  // Check cache first
-  const cachedKey = keyCache.get(cacheKey);
-  if (cachedKey) {
-    return cachedKey;
+  // Check cache first and verify TTL hasn't expired
+  const cachedEntry = keyCache.get(cacheKey);
+  if (cachedEntry && (now - cachedEntry.timestamp) < CACHE_TTL) {
+    return cachedEntry.key;
+  }
+  
+  // Remove expired entry if exists
+  if (cachedEntry) {
+    keyCache.delete(cacheKey);
   }
   
   try {
@@ -103,8 +116,8 @@ async function deriveKey(password: string, salt: string): Promise<CryptoKey> {
       ['encrypt', 'decrypt']
     );
     
-    // Store in cache
-    keyCache.set(cacheKey, key);
+    // Store in cache with timestamp
+    keyCache.set(cacheKey, { key, timestamp: now });
     
     return key;
   } catch (error) {
