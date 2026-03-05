@@ -52,18 +52,29 @@ function validateEncryptionParams(password: string, salt: string): void {
 }
 
 /**
- * Convert base64 string to Uint8Array
+ * Convert base64 or hex string to Uint8Array
+ * Handles both formats for backward compatibility
  */
-function base64ToUint8Array(base64: string): Uint8Array {
+function base64ToUint8Array(encoded: string): Uint8Array {
   try {
-    const binaryString = atob(base64);
+    // First try base64
+    const binaryString = atob(encoded);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
       bytes[i] = binaryString.charCodeAt(i);
     }
     return bytes;
-  } catch (error) {
-    throw new CryptoError(ENCRYPTION_ERRORS.BASE64_ERROR);
+  } catch {
+    // If base64 fails, try hex (legacy format)
+    try {
+      const bytes = new Uint8Array(encoded.length / 2);
+      for (let i = 0; i < encoded.length; i += 2) {
+        bytes[i / 2] = parseInt(encoded.substr(i, 2), 16);
+      }
+      return bytes;
+    } catch {
+      throw new CryptoError(ENCRYPTION_ERRORS.BASE64_ERROR);
+    }
   }
 }
 

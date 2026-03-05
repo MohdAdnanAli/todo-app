@@ -74,6 +74,22 @@ dns.setServers(['8.8.8.8', '8.8.4.4']);
 // Database - Using new improved database utility
 // ────────────────────────────────────────────────
 
+// Lazy connection middleware - MUST be before routes
+// This ensures database is connected before each request in serverless environments
+app.use(async (req, res, next) => {
+  try {
+    const connected = await connectDB();
+    if (!connected) {
+      logger.error('Database connection failed in middleware');
+      return res.status(503).json({ error: 'Database temporarily unavailable. Please try again.' });
+    }
+    next();
+  } catch (err) {
+    logger.error('Database connection error:', err);
+    return res.status(500).json({ error: 'Database connection failed' });
+  }
+});
+
 // Register shutdown handlers for graceful shutdown
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
@@ -208,22 +224,6 @@ app.post('/api/admin/todos/delete-many', adminProtect, deleteMultipleTodos);
 
 // System health
 app.get('/api/admin/health', adminProtect, getSystemHealth);
-
-// Lazy connection middleware - MUST be before error handler
-// This ensures database is connected before each request in serverless environments
-app.use(async (req, res, next) => {
-  try {
-    const connected = await connectDB();
-    if (!connected) {
-      logger.error('Database connection failed in middleware');
-      return res.status(503).json({ error: 'Database temporarily unavailable. Please try again.' });
-    }
-    next();
-  } catch (err) {
-    logger.error('Database connection error:', err);
-    return res.status(500).json({ error: 'Database connection failed' });
-  }
-});
 
 // Error handler - MUST be after all routes and middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

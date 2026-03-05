@@ -33,8 +33,8 @@ export const LED_COLORS: Record<MessageType, { bg: string; glow: string; border:
 
 // API URL - use empty string in development to use Vite proxy (same origin)
 // In production, explicitly set to backend URL
-export const API_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.PROD ? 'https://todo-app-srbx.onrender.com' : '');
+export const API_URL = import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? 'https://todo-app-srbx.onrender.com' : 'http://localhost:5000');
 
 // Category type for todos
 export type TodoCategory = 'work' | 'personal' | 'shopping' | 'health' | 'other';

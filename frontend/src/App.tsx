@@ -140,23 +140,44 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
     }
   };
 
-  // Load todos from offline storage and password on mount
+// Load todos from offline storage and password on mount
   useEffect(() => {
     const loadOfflineTodos = async () => {
       try {
         const offlineTodos = await offlineStorage.getAllTodos();
-        if (offlineTodos.length > 0) {
-          setTodos(offlineTodos);
-        }
-        // Try to restore password from storage
+        
+        // Try to restore password from storage FIRST (before loading todos)
         const storedPassword = await offlineStorage.getPassword();
+        const storedSalt = await offlineStorage.getEncryptionSalt();
+        
         if (storedPassword) {
           setUserPassword(storedPassword);
         }
-        // Try to restore encryption salt from storage
-        const storedSalt = await offlineStorage.getEncryptionSalt();
         if (storedSalt) {
           setEncryptionSalt(storedSalt);
+        }
+        
+        // If we have todos AND password/salt, decrypt them
+        if (offlineTodos.length > 0 && storedPassword && storedSalt) {
+          try {
+            const decryptedTodos = await Promise.all(
+              offlineTodos.map(async (todo: Todo) => {
+                try {
+                  const decryptedText = await decrypt(todo.text, storedPassword, storedSalt);
+                  return { ...todo, text: decryptedText };
+                } catch {
+                  return todo;
+                }
+              })
+            );
+            setTodos(decryptedTodos);
+          } catch (err) {
+            console.warn('Decryption of offline todos failed:', err);
+            setTodos(offlineTodos);
+          }
+        } else if (offlineTodos.length > 0) {
+          // No password - show as-is (they might be plain text)
+          setTodos(offlineTodos);
         }
       } catch (error) {
         console.error('Error loading offline todos:', error);
@@ -235,7 +256,7 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
     handleGoogleOAuthParams();
   }, []);
 
-  // Separate effect to handle auth check - runs AFTER userPassword is restored
+// Separate effect to handle auth check - runs on mount
   useEffect(() => {
     // Skip if Google OAuth was already processed
     if (googleOAuthProcessed.current) {
@@ -252,8 +273,10 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
           setUser(res.data.user || null);
           setIsAdmin(res.data.isAdmin || false);
           
-          if (res.data.encryptionSalt) {
-            setEncryptionSalt(res.data.encryptionSalt);
+          // Get salt from server response
+          const serverSalt = res.data.encryptionSalt || '';
+          if (serverSalt) {
+            setEncryptionSalt(serverSalt);
           }
 
           // Fetch todos from server
@@ -264,26 +287,31 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
           // Ensure we have an array before mapping
           const todosData = Array.isArray(todosRes.data) ? todosRes.data : [];
           
-          // Use the current userPassword value (which may have been restored from storage)
-          if (userPassword) {
-            const decryptedTodos = await decryptAllTodos(todosData, userPassword, encryptionSalt);
+          // Get current password/salt from state (should be loaded from storage by now)
+          const currentPassword = userPassword;
+          const currentSalt = encryptionSalt || serverSalt;
+          
+          // Use password from storage OR from server response to decrypt
+          if (currentPassword && currentSalt) {
+            const decryptedTodos = await decryptAllTodos(todosData, currentPassword, currentSalt);
             setTodos(decryptedTodos);
             await offlineStorage.saveTodos(decryptedTodos);
           } else {
+            // No password yet - show as-is (might be plain text or need password prompt)
             setTodos(todosData);
             await offlineStorage.saveTodos(todosData);
           }
           
           // Only show welcome modal on first visit (no todos in offline storage AND no userPassword)
           const offlineTodos = await offlineStorage.getAllTodos();
-          if (offlineTodos.length === 0 && !userPassword) {
+          if (offlineTodos.length === 0 && !currentPassword) {
             setShowWelcomeBackModal(true);
             setMessage('');
             setMessageType('idle');
           } else {
             // User already has todos or password, show them normally
             setShowWelcomeBackModal(false);
-            if (userPassword) {
+            if (currentPassword) {
               setMessage('Welcome back!');
               setMessageType('success');
             }
