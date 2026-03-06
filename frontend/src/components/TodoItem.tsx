@@ -5,6 +5,16 @@ import { getIconColor, CATEGORY_COLORS, PRIORITY_COLORS, formatDueDate } from '.
 import type { LucideIcon } from 'lucide-react';
 import { Trash2, Tag, AlertCircle } from 'lucide-react';
 
+/**
+ * Sanitize text to prevent XSS attacks
+ * Escapes HTML special characters
+ */
+function sanitizeText(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 interface TodoItemProps {
   todo: Todo;
   onToggle: (todo: Todo) => void;
@@ -109,9 +119,8 @@ const TodoItemCore: React.FC<TodoItemProps> = memo(({
               wordBreak: 'break-word',
               whiteSpace: 'pre-wrap',
             }}
-          >
-            {todo.text}
-          </span>
+            dangerouslySetInnerHTML={{ __html: sanitizeText(todo.text) }}
+          />
         </div>
         
         {/* Badges row - show on all screen sizes */}
@@ -154,7 +163,7 @@ const TodoItemCore: React.FC<TodoItemProps> = memo(({
                 bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] text-[var(--text-secondary)]"
             >
               <Tag size={10} />
-              {tag}
+              {sanitizeText(tag)}
             </span>
           ))}
         </div>

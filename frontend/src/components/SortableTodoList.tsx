@@ -128,27 +128,38 @@ const SortableTodoList: React.FC<SortableTodoListProps> = memo(
         return;
       }
 
-      // Find the indices in the FULL sorted todos list (not filtered)
-      const oldIndex = todos.findIndex(todo => todo._id === active.id);
-      const newIndex = todos.findIndex(todo => todo._id === over.id);
+      // Use the same list that SortableContext uses for consistency
+      // This ensures drag indices match the displayed items
+      const activeList = hasActiveFilters ? filteredTodos : todos;
+
+      // Find the indices in the correct list (filtered or full)
+      const oldIndex = activeList.findIndex(todo => todo._id === active.id);
+      const newIndex = activeList.findIndex(todo => todo._id === over.id);
 
       if (oldIndex === -1 || newIndex === -1) {
         return;
       }
 
-      // Move within the full todos list using arrayMove
-      const reorderedTodos = arrayMove(todos, oldIndex, newIndex);
+      // Move within the active list using arrayMove
+      const reorderedActiveList = arrayMove(activeList, oldIndex, newIndex);
 
       // Assign new order values based on the new positions
       // Order values will be 0, 1, 2, 3... (sequential)
-      const updatedTodos = reorderedTodos.map((todo, index) => ({
-        ...todo,
-        order: index,
-      }));
+      // We need to update the full todos array with new order values
+      const updatedTodos = todos.map(todo => {
+        const newPosition = reorderedActiveList.findIndex(t => t._id === todo._id);
+        if (newPosition !== -1) {
+          return { ...todo, order: newPosition };
+        }
+        return todo;
+      });
+
+      // Sort by the new order values to maintain consistency
+      const reorderedTodos = [...updatedTodos].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
       // Call onReorder with the reordered todos
-      onReorder(updatedTodos);
-    }, [todos, onReorder]);
+      onReorder(reorderedTodos);
+    }, [todos, filteredTodos, hasActiveFilters, onReorder]);
 
     const handleDragCancel = () => {
       setActiveId(null);
@@ -334,8 +345,9 @@ const SortableTodoList: React.FC<SortableTodoListProps> = memo(
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
           >
+            {/* Use filtered list for SortableContext when filters are active to fix drag-drop mismatch */}
             <SortableContext
-              items={todos.map(t => t._id)}
+              items={hasActiveFilters ? filteredTodos.map(t => t._id) : todos.map(t => t._id)}
               strategy={verticalListSortingStrategy}
               disabled={!isDragEnabled}
             >

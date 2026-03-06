@@ -11,6 +11,7 @@ const KEY_LENGTH = 256; // bits
 // Key cache to avoid re-deriving keys on every operation
 // Implements TTL-based expiration for security
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache TTL
+const MAX_CACHE_SIZE = 50; // Maximum number of cached keys to prevent memory leak
 
 interface CacheEntry {
   key: CryptoKey;
@@ -36,6 +37,16 @@ export class CryptoError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'CryptoError';
+  }
+}
+
+/**
+ * Custom error class for decryption operations
+ */
+export class DecryptionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'DecryptionError';
   }
 }
 
@@ -79,12 +90,42 @@ function base64ToUint8Array(encoded: string): Uint8Array {
 }
 
 /**
+ * Clean up expired cache entries and enforce max cache size
+ * This prevents memory leaks from growing cache
+ */
+function cleanupKeyCache(): void {
+  const now = Date.now();
+  
+  // Remove expired entries
+  for (const [key, entry] of keyCache.entries()) {
+    if (now - entry.timestamp > CACHE_TTL) {
+      keyCache.delete(key);
+    }
+  }
+  
+  // If cache is still too large, remove oldest entries (LRU-style)
+  if (keyCache.size > MAX_CACHE_SIZE) {
+    const entries = Array.from(keyCache.entries());
+    // Sort by timestamp (oldest first)
+    entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+    // Remove oldest entries until we're under the limit
+    const toRemove = keyCache.size - MAX_CACHE_SIZE;
+    for (let i = 0; i < toRemove; i++) {
+      keyCache.delete(entries[i][0]);
+    }
+  }
+}
+
+/**
  * Derive an AES-GCM key from password and salt using PBKDF2
  * Uses caching with TTL expiration to improve performance for repeated operations
  */
 async function deriveKey(password: string, salt: string): Promise<CryptoKey> {
   const cacheKey = `${password}:${salt}`;
   const now = Date.now();
+  
+  // Clean up cache before adding new entries
+  cleanupKeyCache();
   
   // Check cache first and verify TTL hasn't expired
   const cachedEntry = keyCache.get(cacheKey);
@@ -225,6 +266,7 @@ function looksLikeEncryptedData(data: string): boolean {
 /**
  * Decrypt text using AES-GCM
  * Input: base64 encoded string: IV + ciphertext
+ * Throws DecryptionError on failure instead of returning garbled data
  */
 export async function decrypt(encryptedData: string, password: string, salt: string): Promise<string> {
   try {
@@ -232,7 +274,7 @@ export async function decrypt(encryptedData: string, password: string, salt: str
     validateEncryptionParams(password, salt);
     
     if (!encryptedData || typeof encryptedData !== 'string') {
-      throw new CryptoError(ENCRYPTION_ERRORS.INVALID_DATA);
+      throw new DecryptionError(ENCRYPTION_ERRORS.INVALID_DATA);
     }
     
     // Check if this looks like encrypted data - if not, return as plain text
@@ -249,8 +291,7 @@ export async function decrypt(encryptedData: string, password: string, salt: str
     // Check minimum length (IV + at least 1 byte of data)
     if (combined.length <= IV_LENGTH) {
       console.error('[Crypto] Invalid data length:', combined.length, 'IV_LENGTH:', IV_LENGTH);
-      // Return as plain text if length check fails
-      return encryptedData;
+      throw new DecryptionError(ENCRYPTION_ERRORS.INVALID_DATA);
     }
     
     // Extract IV and ciphertext
@@ -276,8 +317,11 @@ export async function decrypt(encryptedData: string, password: string, salt: str
     return result;
   } catch (error) {
     console.error('[Crypto] Decryption error:', error);
-    // Return original data on any error - this prevents showing encrypted text to users
-    return encryptedData;
+    // Throw proper error instead of returning encrypted data as plain text
+    if (error instanceof DecryptionError) {
+      throw error;
+    }
+    throw new DecryptionError(ENCRYPTION_ERRORS.DECRYPTION_FAILED);
   }
 }
 

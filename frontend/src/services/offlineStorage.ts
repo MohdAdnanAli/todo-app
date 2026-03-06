@@ -61,19 +61,39 @@ const db = new TodoAppDatabase();
 let isOnline = navigator.onLine;
 let syncInProgress = false;
 
+// Store event listener references for cleanup
+const eventListeners: { type: string; handler: (e: Event) => void }[] = [];
+
+// Cleanup function to remove all event listeners
+const cleanupEventListeners = () => {
+  if (typeof window !== 'undefined') {
+    eventListeners.forEach(({ type, handler }) => {
+      window.removeEventListener(type, handler);
+    });
+    eventListeners.length = 0;
+  }
+};
+
 // Listen for online/offline events
 if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => {
+  const onlineHandler = () => {
     logger.info('Network is online, triggering sync...');
     isOnline = true;
     // Trigger sync when coming back online
     offlineStorage.syncPendingChanges();
-  });
+  };
 
-  window.addEventListener('offline', () => {
+  const offlineHandler = () => {
     logger.warn('Network is offline, operating in offline mode');
     isOnline = false;
-  });
+  };
+
+  window.addEventListener('online', onlineHandler);
+  window.addEventListener('offline', offlineHandler);
+  
+  // Store references for cleanup
+  eventListeners.push({ type: 'online', handler: onlineHandler });
+  eventListeners.push({ type: 'offline', handler: offlineHandler });
 }
 
 // API service for syncing (will be imported lazily to avoid circular deps)
@@ -87,7 +107,11 @@ const getApi = async () => {
 };
 
 export const offlineStorage = {
+  // Cleanup function to remove event listeners (call this when unmounting)
+  cleanup: cleanupEventListeners,
+  
   // ===== IndexedDB Methods (via Dexie.js) =====
+
   
   // Get all todos from IndexedDB
   async getAllTodos(): Promise<Todo[]> {

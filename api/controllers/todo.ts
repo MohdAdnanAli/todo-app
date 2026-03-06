@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { Todo } from '../models/Todo';
+import { isValidObjectId } from 'mongoose';
 import { z } from 'zod';
 import { logger } from '../utils/logger';
 
@@ -53,7 +54,7 @@ const reorderTodosSchema = z.object({
   todos: z.array(z.object({
     id: z.string(),
     order: z.number().optional(),
-  })),
+  })).min(1).max(1000, 'Cannot reorder more than 1000 todos at once'),
 });
 
 export const getTodos = async (req: Request & { user?: { id: string } }, res: Response) => {
@@ -78,6 +79,7 @@ export const getTodos = async (req: Request & { user?: { id: string } }, res: Re
 };
 
 export const createTodo = async (req: Request & { user?: { id: string } }, res: Response) => {
+  const session = await Todo.startSession();
   try {
     const userId = (req as any).user?.id;
     if (!userId) {
@@ -91,26 +93,40 @@ export const createTodo = async (req: Request & { user?: { id: string } }, res: 
 
     const { text, category, priority, tags } = result.data;
 
-    // Use atomic operation to get next order value - prevents race conditions
-    // Find the current min order to put new todo at the TOP
-    const firstTodo = await Todo.findOne({ user: userId })
-      .sort({ order: 1 })
-      .select('order')
-      .lean();
+    // Use MongoDB transaction to prevent race conditions
+    // This ensures atomic order calculation
+    let newOrder: number;
     
-    // New todos go to the TOP (lowest order = displayed first)
-    // If no todos exist, order is 0; otherwise use minOrder - 1
-    const newOrder = firstTodo ? (firstTodo.order ?? 1) - 1 : 0;
+    session.startTransaction();
+    
+    try {
+      // Use aggregation to atomically get min order and calculate new order
+      // This prevents race conditions between concurrent creates
+      const minOrderDoc = await Todo.findOne({ user: userId })
+        .sort({ order: 1 })
+        .select('order')
+        .session(session);
+      
+      // New todos go to the TOP (lowest order = displayed first)
+      // If no todos exist, order is 0; otherwise use minOrder - 1
+      // Ensure order doesn't go negative
+      newOrder = minOrderDoc ? Math.max(0, (minOrderDoc.order ?? 1) - 1) : 0;
 
-    // Create new todo with calculated order
-    const todo = await Todo.create({
-      text,
-      user: userId,
-      category,
-      priority,
-      tags,
-      order: newOrder,
-    });
+      // Create new todo with calculated order
+      const todo = await Todo.create([{
+        text,
+        user: userId,
+        category,
+        priority,
+        tags,
+        order: newOrder,
+      }], { session });
+
+      await session.commitTransaction();
+    } catch (txError) {
+      await session.abortTransaction();
+      throw txError;
+    }
 
     // Return all todos sorted by order for immediate sync
     const allTodos = await Todo.find({ user: userId })
@@ -122,12 +138,19 @@ export const createTodo = async (req: Request & { user?: { id: string } }, res: 
   } catch (err) {
     logger.error('CreateTodo error:', err);
     return res.status(500).json({ error: 'Failed to create todo' });
+  } finally {
+    session.endSession();
   }
 };
 
 export const updateTodo = async (req: Request & { user?: { id: string } }, res: Response) => {
   try {
     const { id } = req.params;
+
+    // Validate ID format to prevent invalid ObjectId errors
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ error: 'Invalid todo ID' });
+    }
 
     const userId = (req as any).user?.id;
     if (!userId) {
@@ -158,36 +181,61 @@ export const updateTodo = async (req: Request & { user?: { id: string } }, res: 
 };
 
 export const deleteTodo = async (req: Request & { user?: { id: string } }, res: Response) => {
+  const session = await Todo.startSession();
   try {
     const { id } = req.params;
+
+    // Validate ID format to prevent invalid ObjectId errors
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ error: 'Invalid todo ID' });
+    }
 
     const userId = (req as any).user?.id;
     if (!userId) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const todo = await Todo.findOneAndDelete({ _id: id, user: userId });
+    session.startTransaction();
+    
+    let todo;
+    try {
+      todo = await Todo.findOneAndDelete({ _id: id, user: userId }).session(session);
 
-    if (!todo) {
-      return res.status(404).json({ error: 'Todo not found or not owned by user' });
-    }
+      if (!todo) {
+        await session.abortTransaction();
+        return res.status(404).json({ error: 'Todo not found or not owned by user' });
+      }
 
-    // Normalize orders after deletion to remove gaps
-    // This ensures sequential order: 0, 1, 2, 3, ...
-    const remainingTodos = await Todo.find({ user: userId })
-      .sort({ order: 1 })
-      .select('_id order')
-      .lean();
+      // Normalize orders after deletion to remove gaps
+      // This ensures sequential order: 0, 1, 2, 3, ...
+      const remainingTodos = await Todo.find({ user: userId })
+        .sort({ order: 1 })
+        .select('_id order')
+        .session(session);
 
-    if (remainingTodos.length > 0) {
-      // Rebuild all orders sequentially
-      const bulkOps = remainingTodos.map((t, index) => ({
-        updateOne: {
-          filter: { _id: t._id },
-          update: { $set: { order: index } },
-        },
-      }));
-      await Todo.bulkWrite(bulkOps);
+      if (remainingTodos.length > 0) {
+        // Rebuild all orders sequentially
+        const bulkOps = remainingTodos.map((t, index) => ({
+          updateOne: {
+            filter: { _id: t._id },
+            update: { $set: { order: index } },
+          },
+        }));
+        
+        // Add error handling for bulkWrite
+        try {
+          await Todo.bulkWrite(bulkOps, { session });
+        } catch (bulkError) {
+          logger.error('Bulk write failed during delete:', bulkError);
+          await session.abortTransaction();
+          return res.status(500).json({ error: 'Failed to reorder todos after deletion' });
+        }
+      }
+
+      await session.commitTransaction();
+    } catch (txError) {
+      await session.abortTransaction();
+      throw txError;
     }
 
     // Return all todos sorted by order for immediate sync
@@ -200,6 +248,8 @@ export const deleteTodo = async (req: Request & { user?: { id: string } }, res: 
   } catch (err) {
     logger.error('DeleteTodo error:', err);
     return res.status(500).json({ error: 'Failed to delete todo' });
+  } finally {
+    session.endSession();
   }
 };
 
@@ -228,7 +278,13 @@ export const reorderTodos = async (req: Request & { user?: { id: string } }, res
     }));
 
     if (bulkOps.length > 0) {
-      await Todo.bulkWrite(bulkOps);
+      // Add error handling for bulkWrite
+      try {
+        await Todo.bulkWrite(bulkOps);
+      } catch (bulkError) {
+        logger.error('Bulk write failed during reorder:', bulkError);
+        return res.status(500).json({ error: 'Failed to reorder todos' });
+      }
     }
 
     // Return all todos sorted by order for immediate sync across devices

@@ -20,6 +20,7 @@ import {
   ConfirmDialog,
   Footer,
   PremiumFeaturesModal,
+  ErrorBoundary,
 } from './components';
 import SmartTodoList from './components/SmartTodoList';
 import { onboardingService } from './services/onboarding';
@@ -746,6 +747,13 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
     checkOnboardingStatus();
   }, [user, quickStartChecked]);
 
+  // Cleanup offline storage event listeners on unmount
+  useEffect(() => {
+    return () => {
+      offlineStorage.cleanup();
+    };
+  }, []);
+
   // Auto-complete quick-start tasks when user performs actions
   const checkAndAutoCompleteTask = async (taskId: string) => {
     try {
@@ -776,14 +784,15 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
   }
 
   return (
-    <div
-      className={`rounded-2xl sm:p-[2.5rem] p-4 w-full mx-auto relative ${showAdminDashboard ? 'max-w-[90vw]' : 'max-w-[560px]'}`}
-      style={{
-        background: 'var(--bg-primary)',
-        boxShadow: 'var(--shadow)'
-      }}
-    >
-      <ThemeSelector ledMessage={message} ledMessageType={messageType} />
+    <ErrorBoundary>
+      <div
+        className={`rounded-2xl sm:p-[2.5rem] p-4 w-full mx-auto relative ${showAdminDashboard ? 'max-w-[90vw]' : 'max-w-[560px]'}`}
+        style={{
+          background: 'var(--bg-primary)',
+          boxShadow: 'var(--shadow)'
+        }}
+      >
+        <ThemeSelector ledMessage={message} ledMessageType={messageType} />
       
       <div className="flex items-center justify-center mb-[2rem] relative">
         <h1 className="text-center bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent text-[2rem] font-semibold m-0">
@@ -944,6 +953,7 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
 
       <Footer />
     </div>
+    </ErrorBoundary>
   );
 }
 
