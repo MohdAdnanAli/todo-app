@@ -3,7 +3,7 @@
  * Production-ready with comprehensive error handling, compression, sync, and quota management
  */
 
-import Dexie, { type Table, type EntityTable } from 'dexie';
+import Dexie, { type Table } from 'dexie';
 import type { Todo } from '../types';
 
 // ============================================
@@ -198,7 +198,7 @@ const getApi = async () => {
 // Compression Utilities (using basic encoding)
 // ============================================
 
-const compressData = async (data: string): Promise<string> => {
+const _compressData = async (data: string): Promise<string> => {
   try {
     // Use TextEncoder for basic compression
     const encoder = new TextEncoder();
@@ -239,7 +239,7 @@ const compressData = async (data: string): Promise<string> => {
   }
 };
 
-const decompressData = async (data: string): Promise<string> => {
+const _decompressData = async (data: string): Promise<string> => {
   try {
     // Use TextDecoder for basic decompression
     if (typeof DecompressionStream !== 'undefined') {

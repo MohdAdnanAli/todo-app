@@ -93,10 +93,16 @@ globalThis.cancelAnimationFrame = (id: number) => {
 };
 
 // Mock IntersectionObserver
-globalThis.IntersectionObserver = class IntersectionObserver {
+globalThis.IntersectionObserver = class IntersectionObserver implements IntersectionObserver {
+  readonly root: Element | null = null;
+  readonly rootMargin: string = '';
+  readonly thresholds: ReadonlyArray<number> = [];
+  
+  constructor() {}
+  
   observe() {}
   unobserve() {}
   disconnect() {}
   takeRecords() { return []; }
-};
+} as unknown as typeof IntersectionObserver;
 
