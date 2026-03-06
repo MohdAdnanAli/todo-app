@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { User } from '../models/User';
 import { Todo } from '../models/Todo';
 import { logger } from '../utils/logger';
+import { healthCheck } from '../utils/database';
 
 /**
  * Admin Controller - Full backend management
@@ -345,32 +346,22 @@ export const deleteMultipleTodos = async (req: AdminRequest, res: Response) => {
  */
 export const getSystemHealth = async (req: AdminRequest, res: Response) => {
   try {
-    const mongoose = require('mongoose');
+    // Use the new enhanced health check from database utility
+    const healthResult = await healthCheck();
     
-    const dbState = mongoose.connection.readyState;
-    const dbStates = {
-      0: 'disconnected',
-      1: 'connected',
-      2: 'connecting',
-      3: 'disconnecting',
-    };
-
-    // Get database stats
-    let dbStats = null;
-    if (dbState === 1) {
-      try {
-        dbStats = await User.estimatedDocumentCount();
-      } catch (e) {
-        dbStats = 'unavailable';
-      }
-    }
-
     res.json({
-      status: 'healthy',
+      status: healthResult.status,
       timestamp: new Date().toISOString(),
       database: {
-        state: dbStates[dbState as keyof typeof dbStates] || 'unknown',
-        users: dbStats,
+        state: healthResult.details.connectionState,
+        isConnected: healthResult.details.isConnected,
+        databaseName: healthResult.details.databaseName,
+        collections: healthResult.details.collections,
+        avgDocumentSize: healthResult.details.avgDocumentSize,
+        dataSize: healthResult.details.dataSize,
+        storageSize: healthResult.details.storageSize,
+        responseTime: healthResult.responseTime,
+        ...(healthResult.errors && { errors: healthResult.errors }),
       },
       uptime: process.uptime ? `${Math.floor(process.uptime())}s` : 'N/A',
       environment: process.env.NODE_ENV || 'development',

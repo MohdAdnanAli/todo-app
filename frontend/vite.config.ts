@@ -2,22 +2,41 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Environment detection
+const isProduction = process.env.NODE_ENV === 'production'
+const isDev = !isProduction
+
 export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // Register service worker automatically
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      
+      // Include assets to cache
+      includeAssets: [
+        'favicon.ico',
+        'apple-touch-icon.png',
+        'masked-icon.svg',
+        'robots.txt',
+      ],
+      
+      // Web App Manifest
       manifest: {
         name: 'Todo Advanced Pro',
         short_name: 'TodoPro',
-        description: 'Advanced Todo app with offline support, drag-and-drop, and more',
+        description: 'Advanced Todo app with offline support, drag-and-drop, encryption, and more',
         theme_color: '#6366f1',
         background_color: '#1e1b4b',
         display: 'standalone',
-        orientation: 'portrait',
+        orientation: 'portrait-primary',
         scope: '/',
         start_url: '/',
+        categories: ['productivity', 'utilities'],
+        lang: 'en',
+        dir: 'ltr',
+        
+        // Icons configuration
         icons: [
           {
             src: '/icon-192.png',
@@ -38,23 +57,70 @@ export default defineConfig({
             purpose: 'maskable',
           },
         ],
-        categories: ['productivity'],
+        
+        // Splash screens for iOS
         screenshots: [
           {
-            src: '/screenshot-1.png',
-            sizes: '540x720',
+            src: '/screenshot-mobile.png',
+            sizes: '390x844',
             type: 'image/png',
+            form_factor: 'narrow',
           },
           {
-            src: '/screenshot-2.png',
-            sizes: '540x720',
+            src: '/screenshot-desktop.png',
+            sizes: '1280x720',
             type: 'image/png',
+            form_factor: 'wide',
+          },
+        ],
+        
+        // Shortcuts for quick actions
+        shortcuts: [
+          {
+            name: 'Add New Task',
+            short_name: 'Add Task',
+            description: 'Quickly add a new task',
+            url: '/?action=add',
+            icons: [
+              {
+                src: '/icon-192.png',
+                sizes: '192x192',
+              },
+            ],
+          },
+          {
+            name: 'View All Tasks',
+            short_name: 'Tasks',
+            description: 'View all your tasks',
+            url: '/',
+            icons: [
+              {
+                src: '/icon-192.png',
+                sizes: '192x192',
+              },
+            ],
           },
         ],
       },
+      
+      // Workbox configuration for service worker
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,ttf,eot}'],
+        // Cache glob patterns
+        globPatterns: [
+          '**/*.{js,css,html,ico,png,svg,woff,woff2,ttf,eot,webp,avif,json}',
+        ],
+        
+        // Additional files to ignore
+        globIgnores: [
+          '**/dev-sw.js',
+          '**/dev-sw.js.map',
+          '**/sw.js.map',
+          '**/workbox-*.js.map',
+        ],
+        
+        // Runtime caching strategies
         runtimeCaching: [
+          // API caching with NetworkFirst strategy
           {
             urlPattern: /^https:\/\/api\./i,
             handler: 'NetworkFirst',
@@ -70,6 +136,8 @@ export default defineConfig({
               },
             },
           },
+          
+          // Google Fonts caching with CacheFirst strategy
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
@@ -79,24 +147,132 @@ export default defineConfig({
                 maxEntries: 20,
                 maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
               },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          
+          // Google Fonts CSS caching
+          {
+            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-static-cache',
+              expiration: {
+                maxEntries: 30,
+                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          
+          // Image caching with CacheFirst strategy
+          {
+            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|avif)$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'image-cache',
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          
+          // JavaScript and CSS caching with StaleWhileRevalidate
+          {
+            urlPattern: /\.(?:js|css)$/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'static-resources-cache',
+              expiration: {
+                maxEntries: 30,
+                maxAgeSeconds: 60 * 60 * 24 * 7, // 1 week
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          
+          // HTML pages caching
+          {
+            urlPattern: /\.(?:html|htm)$/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'html-cache',
+              expiration: {
+                maxEntries: 20,
+                maxAgeSeconds: 60 * 60 * 24, // 1 day
+              },
+              networkTimeoutSeconds: 3,
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
             },
           },
         ],
+        
+        // Skip waiting and claim clients immediately
+        skipWaiting: true,
+        clientsClaim: true,
+        
+        // Cleanup old caches
+        cleanupOutdatedCaches: true,
+        
+        // Define navigation preload
+        navigationPreload: true,
+        
+        // Cache ID for versioning
+        cacheId: 'todo-app-v1',
+        
+        // Maximum size for cache entries
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
       },
+      
+      // Dev Options for development
       devOptions: {
         enabled: true,
         type: 'module',
+        navigateFallback: '/',
       },
     }),
   ],
+  
+  // Base path
   base: '/',
+  
+  // Build configuration
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: true,
+    sourcemap: !isProduction,
+    minify: isProduction ? 'esbuild' : false,
   },
+  
+  // Development server configuration
   server: {
     port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+    host: true,
+    strictPort: false,
+  },
+  
+  // Preview server configuration
+  preview: {
+    port: 4173,
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
@@ -104,4 +280,33 @@ export default defineConfig({
       },
     },
   },
+  
+  // Resolve configuration
+  resolve: {
+    alias: {
+      '@': '/src',
+      '@components': '/src/components',
+      '@services': '/src/services',
+      '@hooks': '/src/hooks',
+      '@utils': '/src/utils',
+    },
+  },
+  
+  // CSS configuration
+  css: {
+    devSourcemap: !isProduction,
+  },
+  
+  // Optimize dependencies
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'axios',
+      'dexie',
+      '@dnd-kit/core',
+      '@dnd-kit/sortable',
+    ],
+  },
 })
+

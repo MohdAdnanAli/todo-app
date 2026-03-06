@@ -1,63 +1,204 @@
-import mongoose from 'mongoose';
+/**
+ * Enhanced MongoDB Database Utility
+ * Production-ready with connection validation, recovery, and health monitoring
+ */
+
+import mongoose, { type Mongoose } from 'mongoose';
 import { logger } from './logger';
+
+// ============================================
+// Configuration & Validation
+// ============================================
 
 // Use consistent MongoDB URI - prefer MONGODB_URI, fallback to MONGO_URI
 const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI;
 
+// Validate connection string format
+const validateConnectionString = (uri: string | undefined): boolean => {
+  if (!uri) return false;
+  
+  // Check for valid MongoDB URI formats
+  const validPrefixes = ['mongodb://', 'mongodb+srv://'];
+  const isValidPrefix = validPrefixes.some(prefix => uri.startsWith(prefix));
+  
+  if (!isValidPrefix) {
+    logger.error('Invalid MongoDB connection string prefix');
+    return false;
+  }
+  
+  // For mongodb+srv://, check for valid cluster format
+  if (uri.startsWith('mongodb+srv://')) {
+    const parts = uri.split('?');
+    const base = parts[0] || '';
+    return base.includes('.net') || base.includes('.mongodb.net') || base.includes('localhost');
+  }
+  
+  // For standard connection, check host:port format or local socket
+  const withoutProtocol = uri.replace('mongodb://', '');
+  const hasHost = withoutProtocol.includes(':') || withoutProtocol.includes('/') || withoutProtocol.includes('localhost');
+  
+  return hasHost;
+};
+
+// Sanitize connection string for logging (hide credentials)
+const sanitizeConnectionString = (uri: string): string => {
+  try {
+    const url = new URL(uri);
+    if (url.password) {
+      url.password = '****';
+    }
+    return url.toString().replace(/\/\//, '//****:****@');
+  } catch {
+    return 'mongodb://****:****@hidden';
+  }
+};
+
 if (!MONGODB_URI) {
   logger.error('MONGODB_URI environment variable is not set');
-  // Don't throw in development - allow app to start for testing
   if (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') {
     throw new Error('MONGODB_URI environment variable is required');
   }
+} else if (!validateConnectionString(MONGODB_URI)) {
+  logger.error('Invalid MongoDB connection string format');
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL === '1') {
+    throw new Error('Invalid MongoDB connection string');
+  }
 }
 
-// MongoDB connection options optimized for serverless and production
-const mongooseOptions = {
-  serverSelectionTimeoutMS: 15000, // 15 seconds to select server
-  socketTimeoutMS: 45000, // 45 seconds for socket timeout
-  maxPoolSize: 10, // Connection pool size
-  minPoolSize: 2, // Minimum connections
-  maxIdleTimeMS: 30000, // 30 seconds max idle time
-  family: 4, // Use IPv4
-  retryWrites: true, // Retry failed writes
-  retryReads: true, // Retry failed reads
-  // Serverless specific options
-  ...(process.env.VERCEL === '1' && {
+// ============================================
+// Connection Options - Optimized for all environments
+// ============================================
+
+const isProduction = process.env.NODE_ENV === 'production';
+const isServerless = process.env.VERCEL === '1';
+const isDevelopment = !isProduction && !isServerless;
+
+// Base connection options
+const baseOptions: mongoose.ConnectOptions = {
+  serverSelectionTimeoutMS: 15000,
+  socketTimeoutMS: 45000,
+  maxPoolSize: 10,
+  minPoolSize: 2,
+  maxIdleTimeMS: 30000,
+  family: 4,
+  retryWrites: true,
+  retryReads: true,
+  // Buffer commands on connection errors (helps with transient errors)
+  bufferCommands: true,
+  // Validate schema on connect
+  autoCreate: false,
+  autoIndex: false,
+};
+
+// Serverless-specific options (Vercel, AWS Lambda, etc.)
+const serverlessOptions: mongoose.ConnectOptions = {
+  maxPoolSize: 1,
+  minPoolSize: 1,
+  serverSelectionTimeoutMS: 10000,
+  socketTimeoutMS: 20000,
+  // Serverless friendly options
+  ...(isServerless && {
     maxPoolSize: 1,
     minPoolSize: 1,
   }),
 };
 
-// Connection state tracking
-let isConnected = false;
-let isConnecting = false;
-let connectionPromise: Promise<boolean> | null = null;
+// Production-specific options
+const productionOptions: mongoose.ConnectOptions = {
+  // Enable compression for better performance
+  // compression: { compressors: ['snappy', 'zstd'] }, // MongoDB 4.2+
+  // Enable retryable reads/writes by default
+  retryWrites: true,
+  retryReads: true,
+};
+
+// Development-specific options
+const developmentOptions: mongoose.ConnectOptions = {
+  // More lenient for development
+  serverSelectionTimeoutMS: 30000,
+};
+
+// Combine options based on environment
+const mongooseOptions: mongoose.ConnectOptions = {
+  ...baseOptions,
+  ...(isServerless && serverlessOptions),
+  ...(isProduction && productionOptions),
+  ...(isDevelopment && developmentOptions),
+};
+
+// ============================================
+// Connection State Management
+// ============================================
+
+interface ConnectionState {
+  isConnected: boolean;
+  isConnecting: boolean;
+  connectionPromise: Promise<boolean> | null;
+  reconnectAttempts: number;
+  lastConnected: Date | null;
+  lastError: string | null;
+  connectionId: number;
+}
+
+const state: ConnectionState = {
+  isConnected: false,
+  isConnecting: false,
+  connectionPromise: null,
+  reconnectAttempts: 0,
+  lastConnected: null,
+  lastError: null,
+  connectionId: 0,
+};
+
+const MAX_RECONNECT_ATTEMPTS = 5;
+const INITIAL_RETRY_DELAY = 1000;
+const MAX_RETRY_DELAY = 30000;
+
+// ============================================
+// Connection Functions
+// ============================================
 
 /**
  * Connect to MongoDB with retry logic
  */
-export const connectWithRetry = async (retries = 3, delay = 3000): Promise<boolean> => {
+export const connectWithRetry = async (retries = MAX_RECONNECT_ATTEMPTS, delay = INITIAL_RETRY_DELAY): Promise<boolean> => {
   if (!MONGODB_URI) {
     logger.error('Cannot connect: MONGODB_URI is not defined');
     return false;
   }
 
+  const sanitizedUri = sanitizeConnectionString(MONGODB_URI);
+  
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      logger.info(`MongoDB connection attempt ${attempt}/${retries}...`);
+      logger.info(`MongoDB connection attempt ${attempt}/${retries} to ${sanitizedUri}...`);
+      
+      // Increment connection ID for tracking
+      state.connectionId++;
+      const currentConnectionId = state.connectionId;
+      
       await mongoose.connect(MONGODB_URI, mongooseOptions);
-      logger.info('MongoDB connected successfully');
-      isConnected = true;
+      
+      logger.info(`MongoDB connected successfully (connection #${currentConnectionId})`);
+      state.isConnected = true;
+      state.reconnectAttempts = 0;
+      state.lastConnected = new Date();
+      state.lastError = null;
+      
       return true;
     } catch (err: any) {
-      logger.error(`MongoDB connection attempt ${attempt}/${retries} failed:`, err?.message || 'Unknown error');
+      const errorMessage = err?.message || 'Unknown error';
+      state.lastError = errorMessage;
+      state.reconnectAttempts = attempt;
+      
+      logger.error(`MongoDB connection attempt ${attempt}/${retries} failed: ${errorMessage}`);
+      
+      // Exponential backoff
+      const actualDelay = Math.min(delay * Math.pow(2, attempt - 1), MAX_RETRY_DELAY);
       
       if (attempt < retries) {
-        logger.info(`Retrying in ${delay / 1000} seconds...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        // Exponential backoff
-        delay *= 2;
+        logger.info(`Retrying in ${actualDelay / 1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, actualDelay));
       }
     }
   }
@@ -72,38 +213,66 @@ export const connectWithRetry = async (retries = 3, delay = 3000): Promise<boole
  */
 export const connectDB = async (): Promise<boolean> => {
   // Already connected
-  if (isConnected || mongoose.connection.readyState === 1) {
+  if (state.isConnected || mongoose.connection.readyState === 1) {
     return true;
   }
   
   // Already connecting, wait for it
-  if (isConnecting && connectionPromise) {
-    return connectionPromise;
+  if (state.isConnecting && state.connectionPromise) {
+    return state.connectionPromise;
   }
   
   // Start new connection
-  isConnecting = true;
-  connectionPromise = connectWithRetry(3, 3000);
+  state.isConnecting = true;
+  state.connectionPromise = connectWithRetry(MAX_RECONNECT_ATTEMPTS, INITIAL_RETRY_DELAY);
   
   try {
-    const result = await connectionPromise;
-    isConnected = result;
+    const result = await state.connectionPromise;
+    state.isConnected = result;
     return result;
   } finally {
-    isConnecting = false;
-    connectionPromise = null;
+    state.isConnecting = false;
+    state.connectionPromise = null;
   }
 };
+
+/**
+ * Force reconnection - useful for handling connection drops
+ */
+export const forceReconnect = async (): Promise<boolean> => {
+  logger.info('Force reconnecting to MongoDB...');
+  
+  // Disconnect first
+  if (mongoose.connection.readyState !== 0) {
+    try {
+      await mongoose.disconnect();
+    } catch (err) {
+      logger.warn('Error during disconnect:', err);
+    }
+  }
+  
+  state.isConnected = false;
+  state.isConnecting = false;
+  
+  // Reset retry counter for forced reconnect
+  state.reconnectAttempts = 0;
+  
+  return connectWithRetry();
+};
+
+// ============================================
+// Status & Health Check Functions
+// ============================================
 
 /**
  * Check if database is connected
  */
 export const isDBConnected = (): boolean => {
-  return isConnected || mongoose.connection.readyState === 1;
+  return state.isConnected || mongoose.connection.readyState === 1;
 };
 
 /**
- * Get database connection state
+ * Get database connection state as string
  */
 export const getDBState = (): string => {
   const states = {
@@ -116,46 +285,273 @@ export const getDBState = (): string => {
 };
 
 /**
+ * Get detailed connection status
+ */
+export const getConnectionStatus = (): {
+  isConnected: boolean;
+  isConnecting: boolean;
+  state: string;
+  reconnectAttempts: number;
+  lastConnected: string | null;
+  lastError: string | null;
+  connectionId: number;
+  mongoConnectionState: number;
+} => {
+  return {
+    isConnected: state.isConnected,
+    isConnecting: state.isConnecting,
+    state: getDBState(),
+    reconnectAttempts: state.reconnectAttempts,
+    lastConnected: state.lastConnected?.toISOString() || null,
+    lastError: state.lastError,
+    connectionId: state.connectionId,
+    mongoConnectionState: mongoose.connection.readyState,
+  };
+};
+
+/**
+ * Health check with detailed diagnostics
+ */
+export const healthCheck = async (): Promise<{
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  responseTime: number;
+  details: {
+    isConnected: boolean;
+    connectionState: string;
+    databaseName: string;
+    collections: number;
+    avgDocumentSize: number;
+    dataSize: number;
+    storageSize: number;
+    indexCount: number;
+  };
+  errors?: string[];
+}> => {
+  const startTime = Date.now();
+  const errors: string[] = [];
+  
+  const isConnected = isDBConnected();
+  
+  if (!isConnected) {
+    return {
+      status: 'unhealthy',
+      responseTime: Date.now() - startTime,
+      details: {
+        isConnected: false,
+        connectionState: getDBState(),
+        databaseName: 'unknown',
+        collections: 0,
+        avgDocumentSize: 0,
+        dataSize: 0,
+        storageSize: 0,
+        indexCount: 0,
+      },
+      errors: ['Database not connected'],
+    };
+  }
+  
+  try {
+    // Get database info - ensure connection.db exists
+    const db = mongoose.connection.db;
+    if (!db) {
+      errors.push('Database connection not established');
+      return {
+        status: 'unhealthy',
+        responseTime: Date.now() - startTime,
+        details: {
+          isConnected: false,
+          connectionState: getDBState(),
+          databaseName: 'unknown',
+          collections: 0,
+          avgDocumentSize: 0,
+          dataSize: 0,
+          storageSize: 0,
+          indexCount: 0,
+        },
+        errors,
+      };
+    }
+    
+    const adminDb = db.admin();
+    const serverStatus = await adminDb.serverStatus();
+    const dbStats = await db.stats();
+    
+    const responseTime = Date.now() - startTime;
+    const status = responseTime < 1000 ? 'healthy' : responseTime < 3000 ? 'degraded' : 'unhealthy';
+    
+    const errorList: string[] = errors.length > 0 ? errors : [];
+    
+    return {
+      status,
+      responseTime,
+      details: {
+        isConnected: true,
+        connectionState: getDBState(),
+        databaseName: db.databaseName,
+        collections: dbStats.collections || 0,
+        avgDocumentSize: dbStats.avgObjSize || 0,
+        dataSize: dbStats.dataSize || 0,
+        storageSize: dbStats.storageSize || 0,
+        indexCount: serverStatus.indexCounters?. accesses || 0,
+      },
+      errors: errorList,
+    };
+  } catch (err: any) {
+    const errorMessage = err?.message || 'Health check failed';
+    return {
+      status: 'unhealthy',
+      responseTime: Date.now() - startTime,
+      details: {
+        isConnected: false,
+        connectionState: getDBState(),
+        databaseName: 'unknown',
+        collections: 0,
+        avgDocumentSize: 0,
+        dataSize: 0,
+        storageSize: 0,
+        indexCount: 0,
+      },
+      errors: [errorMessage],
+    };
+  }
+};
+
+/**
+ * Ping the database
+ */
+export const pingDB = async (): Promise<boolean> => {
+  try {
+    if (!mongoose.connection.db) {
+      return false;
+    }
+    await mongoose.connection.db.command({ ping: 1 });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// ============================================
+// Graceful Shutdown
+// ============================================
+
+/**
  * Graceful shutdown handler
  */
 export const gracefulShutdown = async (signal: string): Promise<void> => {
   logger.info(`${signal} received, shutting down gracefully...`);
+  
   try {
-    await mongoose.connection.close();
-    logger.info('MongoDB connection closed');
+    if (mongoose.connection.readyState !== 0) {
+      // Wait for pending operations to complete (with timeout)
+      await Promise.race([
+        mongoose.connection.close(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Close timeout')), 5000)
+        ),
+      ]);
+      logger.info('MongoDB connection closed gracefully');
+    } else {
+      logger.info('MongoDB already disconnected');
+    }
   } catch (err) {
     logger.error('Error during shutdown:', err);
+    // Force close if graceful close fails
+    try {
+      await mongoose.disconnect();
+    } catch (forceErr) {
+      logger.error('Force disconnect failed:', forceErr);
+    }
   }
+  
+  state.isConnected = false;
 };
 
-// Initialize connection on module load (non-blocking for non-serverless)
-// For serverless, the lazy connectDB() will be called before each request
-if (process.env.VERCEL !== '1' && MONGODB_URI) {
+// ============================================
+// Event Handlers Setup
+// ============================================
+
+const setupEventHandlers = () => {
+  mongoose.connection.on('connected', () => {
+    logger.info('MongoDB connection established');
+    state.isConnected = true;
+    state.isConnecting = false;
+    state.lastConnected = new Date();
+    state.lastError = null;
+  });
+
+  mongoose.connection.on('disconnected', () => {
+    logger.warn('MongoDB connection lost');
+    state.isConnected = false;
+    
+    // Auto-reconnect in non-serverless environments
+    if (!isServerless) {
+      logger.info('Attempting to reconnect...');
+      setTimeout(() => {
+        if (!state.isConnected) {
+          forceReconnect();
+        }
+      }, 1000);
+    }
+  });
+
+  mongoose.connection.on('error', (err) => {
+    logger.error('MongoDB connection error:', err?.message || err);
+    state.isConnected = false;
+    state.lastError = err?.message || 'Unknown error';
+  });
+
+  mongoose.connection.on('reconnectFailed', () => {
+    logger.error('MongoDB reconnection failed after all retries');
+    state.reconnectAttempts = MAX_RECONNECT_ATTEMPTS;
+  });
+
+  mongoose.connection.on('reconnect', (attempt) => {
+    logger.info(`MongoDB reconnected after ${attempt} attempts`);
+    state.isConnected = true;
+    state.reconnectAttempts = 0;
+    state.lastConnected = new Date();
+  });
+
+  mongoose.connection.on('close', () => {
+    logger.info('MongoDB connection closed');
+    state.isConnected = false;
+  });
+};
+
+// ============================================
+// Initialize Connection
+// ============================================
+
+setupEventHandlers();
+
+// Initialize connection on module load for non-serverless environments
+if (!isServerless && MONGODB_URI && validateConnectionString(MONGODB_URI)) {
+  logger.info('Initializing MongoDB connection...');
   connectWithRetry().then(connected => {
-    isConnected = connected;
+    state.isConnected = connected;
+    logger.info(`Initial connection ${connected ? 'succeeded' : 'failed'}`);
+  }).catch(err => {
+    logger.error('Initial connection error:', err);
   });
 }
 
-// Setup connection event handlers
-mongoose.connection.on('connected', () => {
-  logger.info('MongoDB connection established');
-  isConnected = true;
-  isConnecting = false;
-});
+// For serverless, the lazy connectDB() will be called before each request
+// via the middleware in index.ts
 
-mongoose.connection.on('disconnected', () => {
-  logger.warn('MongoDB connection lost');
-  isConnected = false;
-});
+// ============================================
+// Export
+// ============================================
 
-mongoose.connection.on('error', (err) => {
-  logger.error('MongoDB connection error:', err);
-  isConnected = false;
-});
-
-mongoose.connection.on('reconnectFailed', () => {
-  logger.error('MongoDB reconnection failed after all retries');
-});
-
-// Export mongoose for direct access if needed
 export { mongoose };
+export default {
+  connectDB,
+  isDBConnected,
+  getDBState,
+  getConnectionStatus,
+  healthCheck,
+  pingDB,
+  forceReconnect,
+  gracefulShutdown,
+};
+

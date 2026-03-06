@@ -1,13 +1,25 @@
-import Dexie, { type Table } from 'dexie';
+/**
+ * Enhanced IndexedDB Storage Service
+ * Production-ready with comprehensive error handling, compression, sync, and quota management
+ */
+
+import Dexie, { type Table, type EntityTable } from 'dexie';
 import type { Todo } from '../types';
 
+// ============================================
 // Console wrapper for consistent logging
+// ============================================
+
 const logger = {
   error: (msg: string, ...args: unknown[]) => console.error(`[OfflineStorage] ERROR: ${msg}`, ...args),
   warn: (msg: string, ...args: unknown[]) => console.warn(`[OfflineStorage] WARN: ${msg}`, ...args),
   info: (msg: string, ...args: unknown[]) => console.info(`[OfflineStorage] INFO: ${msg}`, ...args),
   debug: (msg: string, ...args: unknown[]) => console.debug(`[OfflineStorage] DEBUG: ${msg}`, ...args),
 };
+
+// ============================================
+// Type Definitions
+// ============================================
 
 // Sync queue item type
 export interface SyncQueueItem {
@@ -16,6 +28,8 @@ export interface SyncQueueItem {
   action: 'create' | 'update' | 'delete';
   data: Partial<Todo>;
   timestamp: number;
+  retries: number;
+  lastError?: string;
 }
 
 // Metadata type
@@ -37,19 +51,64 @@ export interface StorageMetadata {
   };
 }
 
-// Dexie Database class
+// Storage quota info
+export interface StorageQuota {
+  used: number;
+  available: number;
+  total: number;
+  percentage: number;
+}
+
+// Sync status
+export interface SyncStatus {
+  pendingCount: number;
+  isOnline: boolean;
+  syncInProgress: boolean;
+  lastSyncAt: number | null;
+  lastError: string | null;
+}
+
+// Database version info
+interface DatabaseVersion {
+  version: number;
+  createdAt: number;
+  lastMigratedAt: number;
+}
+
+// ============================================
+// Dexie Database Class with Schema Migrations
+// ============================================
+
 class TodoAppDatabase extends Dexie {
   todos!: Table<Todo, string>;
   syncQueue!: Table<SyncQueueItem, number>;
   metadata!: Table<StorageMetadata, string>;
+  versions!: Table<DatabaseVersion, number>;
 
   constructor() {
     super('TodoAppDB');
     
+    // Define schema with versioning
+    // Version 1: Initial schema
+    // Version 2: Added versions table for migration tracking
     this.version(1).stores({
-      todos: '_id, order, category, priority, completed, createdAt',
+      todos: '_id, order, category, priority, completed, createdAt, [user+order]',
       syncQueue: '++id, todoId, action, timestamp',
       metadata: 'key',
+    });
+    
+    this.version(2).stores({
+      todos: '_id, order, category, priority, completed, createdAt, [user+order]',
+      syncQueue: '++id, todoId, action, timestamp',
+      metadata: 'key',
+      versions: 'version',
+    }).upgrade(tx => {
+      // Migration from v1 to v2
+      return tx.table('versions').put({
+        version: 2,
+        createdAt: Date.now(),
+        lastMigratedAt: Date.now(),
+      });
     });
   }
 }
@@ -57,12 +116,22 @@ class TodoAppDatabase extends Dexie {
 // Initialize database
 const db = new TodoAppDatabase();
 
-// Track online status
-let isOnline = navigator.onLine;
+// ============================================
+// Network & Sync State
+// ============================================
+
+let isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 let syncInProgress = false;
+let syncStatus: SyncStatus = {
+  pendingCount: 0,
+  isOnline,
+  syncInProgress: false,
+  lastSyncAt: null,
+  lastError: null,
+};
 
 // Store event listener references for cleanup
-const eventListeners: { type: string; handler: (e: Event) => void }[] = [];
+const eventListeners: Array<{ type: string; handler: (e: Event) => void }> = [];
 
 // Cleanup function to remove all event listeners
 const cleanupEventListeners = () => {
@@ -74,18 +143,27 @@ const cleanupEventListeners = () => {
   }
 };
 
-// Listen for online/offline events
-if (typeof window !== 'undefined') {
+// ============================================
+// Network Event Handlers
+// ============================================
+
+const setupNetworkListeners = () => {
+  if (typeof window === 'undefined') return;
+  
   const onlineHandler = () => {
     logger.info('Network is online, triggering sync...');
     isOnline = true;
+    syncStatus.isOnline = true;
     // Trigger sync when coming back online
-    offlineStorage.syncPendingChanges();
+    offlineStorage.syncPendingChanges().catch(err => {
+      logger.error('Auto-sync failed:', err);
+    });
   };
 
   const offlineHandler = () => {
     logger.warn('Network is offline, operating in offline mode');
     isOnline = false;
+    syncStatus.isOnline = false;
   };
 
   window.addEventListener('online', onlineHandler);
@@ -94,9 +172,19 @@ if (typeof window !== 'undefined') {
   // Store references for cleanup
   eventListeners.push({ type: 'online', handler: onlineHandler });
   eventListeners.push({ type: 'offline', handler: offlineHandler });
-}
+  
+  // Initialize network status
+  isOnline = navigator.onLine;
+  syncStatus.isOnline = isOnline;
+};
 
-// API service for syncing (will be imported lazily to avoid circular deps)
+// Initialize network listeners
+setupNetworkListeners();
+
+// ============================================
+// API Service (Lazy Import)
+// ============================================
+
 let api: typeof import('axios').default | null = null;
 const getApi = async () => {
   if (!api) {
@@ -106,18 +194,120 @@ const getApi = async () => {
   return api;
 };
 
+// ============================================
+// Compression Utilities (using basic encoding)
+// ============================================
+
+const compressData = async (data: string): Promise<string> => {
+  try {
+    // Use TextEncoder for basic compression
+    const encoder = new TextEncoder();
+    const uint8Array = encoder.encode(data);
+    
+    // Use CompressionStream if available
+    if (typeof CompressionStream !== 'undefined') {
+      const cs = new CompressionStream('gzip');
+      const writer = cs.writable.getWriter();
+      writer.write(uint8Array);
+      writer.close();
+      
+      const reader = cs.readable.getReader();
+      const chunks: Uint8Array[] = [];
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+      
+      // Convert to base64
+      const combined = new Uint8Array(chunks.reduce((acc, val) => acc + val.length, 0));
+      let offset = 0;
+      chunks.forEach(chunk => {
+        combined.set(chunk, offset);
+        offset += chunk.length;
+      });
+      
+      return btoa(String.fromCharCode(...combined));
+    }
+    
+    // Fallback: just return base64 encoded
+    return btoa(data);
+  } catch (error) {
+    logger.warn('Compression failed, using plain data:', error);
+    return data;
+  }
+};
+
+const decompressData = async (data: string): Promise<string> => {
+  try {
+    // Use TextDecoder for basic decompression
+    if (typeof DecompressionStream !== 'undefined') {
+      const binaryString = atob(data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      const ds = new DecompressionStream('gzip');
+      const writer = ds.writable.getWriter();
+      writer.write(bytes);
+      writer.close();
+      
+      const reader = ds.readable.getReader();
+      const chunks: Uint8Array[] = [];
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+      
+      const combined = new Uint8Array(chunks.reduce((acc, val) => acc + val.length, 0));
+      let offset = 0;
+      chunks.forEach(chunk => {
+        combined.set(chunk, offset);
+        offset += chunk.length;
+      });
+      
+      return new TextDecoder().decode(combined);
+    }
+    
+    // Fallback
+    return atob(data);
+  } catch (error) {
+    logger.warn('Decompression failed, using plain data:', error);
+    return data;
+  }
+};
+
+// ============================================
+// Exponential Backoff for Sync
+// ============================================
+
+const calculateBackoff = (retries: number): number => {
+  const baseDelay = 1000; // 1 second
+  const maxDelay = 60000; // 60 seconds
+  const delay = Math.min(baseDelay * Math.pow(2, retries), maxDelay);
+  // Add some jitter
+  return delay + Math.random() * 1000;
+};
+
+// ============================================
+// Main OfflineStorage Object
+// ============================================
+
 export const offlineStorage = {
   // Cleanup function to remove event listeners (call this when unmounting)
   cleanup: cleanupEventListeners,
   
   // ===== IndexedDB Methods (via Dexie.js) =====
-
   
   // Get all todos from IndexedDB
   async getAllTodos(): Promise<Todo[]> {
     try {
       const todos = await db.todos.toArray();
-      return todos.sort((a, b) => (a.order || 0) - (b.order || 0));
+      return todos.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     } catch (error) {
       logger.error('Failed to get todos from IndexedDB, falling back to localStorage', error);
       return this.getTodosFromLocalStorage();
@@ -147,7 +337,7 @@ export const offlineStorage = {
     }
   },
 
-  // Save multiple todos
+  // Save multiple todos (bulk operation)
   async saveTodos(todos: Todo[]): Promise<void> {
     try {
       await db.todos.bulkPut(todos);
@@ -182,23 +372,46 @@ export const offlineStorage = {
 
   // ===== Sync Queue Methods =====
   
-  // Add to sync queue
+  // Add to sync queue with retry support
   async addToSyncQueue(
     action: 'create' | 'update' | 'delete',
     todoId: string,
     data: Partial<Todo>
   ): Promise<void> {
     try {
+      // Check if item already exists in queue for update/delete
+      if (action === 'update' || action === 'delete') {
+        const existing = await db.syncQueue
+          .where('todoId')
+          .equals(todoId)
+          .first();
+        
+        if (existing) {
+          // Update existing entry instead of adding new
+          await db.syncQueue.update(existing.id!, {
+            action,
+            data,
+            timestamp: Date.now(),
+            retries: 0,
+            lastError: undefined,
+          });
+          return;
+        }
+      }
+      
       await db.syncQueue.add({
         todoId,
         action,
         data,
         timestamp: Date.now(),
+        retries: 0,
       });
       
       // Try to sync immediately if online
       if (isOnline) {
-        this.syncPendingChanges();
+        this.syncPendingChanges().catch(err => {
+          logger.error('Immediate sync failed:', err);
+        });
       }
     } catch (error) {
       logger.error('Failed to add to sync queue', error);
@@ -233,7 +446,7 @@ export const offlineStorage = {
     }
   },
 
-  // Sync pending changes to server
+  // Sync pending changes to server with exponential backoff
   async syncPendingChanges(): Promise<{ success: boolean; synced: number; failed: number }> {
     if (syncInProgress) {
       logger.info('Sync already in progress, skipping...');
@@ -246,6 +459,7 @@ export const offlineStorage = {
     }
 
     syncInProgress = true;
+    syncStatus.syncInProgress = true;
     let synced = 0;
     let failed = 0;
 
@@ -255,6 +469,7 @@ export const offlineStorage = {
       if (queue.length === 0) {
         logger.info('No pending changes to sync');
         syncInProgress = false;
+        syncStatus.syncInProgress = false;
         return { success: true, synced: 0, failed: 0 };
       }
 
@@ -281,17 +496,46 @@ export const offlineStorage = {
             await this.removeFromSyncQueue(item.id);
           }
           synced++;
-        } catch (error) {
-          logger.error(`Failed to sync item ${item.id}:`, error);
+        } catch (error: any) {
+          logger.error(`Failed to sync item ${item.id}:`, error?.message || error);
           failed++;
+          
+          // Increment retry count
+          const newRetries = (item.retries || 0) + 1;
+          const errorMessage = error?.message || 'Unknown error';
+          
+          // If max retries exceeded, remove from queue
+          if (newRetries >= 5) {
+            logger.warn(`Max retries exceeded for item ${item.id}, removing from queue`);
+            if (item.id) {
+              await this.removeFromSyncQueue(item.id);
+            }
+          } else {
+            // Update retry count and error message
+            await db.syncQueue.update(item.id!, {
+              retries: newRetries,
+              lastError: errorMessage,
+            });
+            
+            // Wait with exponential backoff before next retry
+            if (failed < queue.length) {
+              const backoff = calculateBackoff(newRetries);
+              logger.info(`Waiting ${backoff}ms before next retry...`);
+              await new Promise(resolve => setTimeout(resolve, backoff));
+            }
+          }
         }
       }
 
       logger.info(`Sync complete: ${synced} synced, ${failed} failed`);
-    } catch (error) {
+      syncStatus.lastSyncAt = Date.now();
+      syncStatus.lastError = failed > 0 ? `${failed} items failed to sync` : null;
+    } catch (error: any) {
       logger.error('Sync failed:', error);
+      syncStatus.lastError = error?.message || 'Sync failed';
     } finally {
       syncInProgress = false;
+      syncStatus.syncInProgress = false;
     }
 
     return { success: failed === 0, synced, failed };
@@ -302,7 +546,10 @@ export const offlineStorage = {
   // Update metadata
   async updateMetadata(key: string, value: Record<string, unknown>): Promise<void> {
     try {
-      await db.metadata.put({ key, value: { ...value, savedAt: Date.now() } }, key);
+      await db.metadata.put({ 
+        key, 
+        value: { ...value, savedAt: Date.now() } 
+      }, key);
     } catch (error) {
       logger.error('Failed to update metadata', error);
     }
@@ -319,6 +566,8 @@ export const offlineStorage = {
     }
   },
 
+  // ===== Password & Encryption Methods =====
+  
   // Store user password (for decryption on reload)
   async savePassword(password: string): Promise<void> {
     try {
@@ -385,13 +634,202 @@ export const offlineStorage = {
   },
 
   // Get sync status
-  async getSyncStatus(): Promise<{ pendingCount: number; isOnline: boolean; syncInProgress: boolean }> {
+  async getSyncStatus(): Promise<SyncStatus> {
     const pendingCount = await db.syncQueue.count();
     return {
+      ...syncStatus,
       pendingCount,
-      isOnline,
-      syncInProgress,
     };
+  },
+
+  // ===== Storage Quota Management =====
+  
+  // Get storage quota information
+  async getStorageQuota(): Promise<StorageQuota> {
+    if (typeof navigator !== 'undefined' && 'storage' in navigator && 'estimate' in navigator.storage) {
+      try {
+        const estimate = await navigator.storage.estimate();
+        const used = estimate.usage || 0;
+        const quota = estimate.quota || 0;
+        const available = quota - used;
+        const percentage = quota > 0 ? (used / quota) * 100 : 0;
+        
+        return {
+          used,
+          available,
+          total: quota,
+          percentage,
+        };
+      } catch (error) {
+        logger.error('Failed to get storage quota:', error);
+      }
+    }
+    
+    // Fallback: estimate from localStorage
+    try {
+      let total = 0;
+      for (const key in localStorage) {
+        if (localStorage.hasOwnProperty(key)) {
+          total += localStorage[key].length * 2; // UTF-16 = 2 bytes per char
+        }
+      }
+      
+      return {
+        used: total,
+        available: 5 * 1024 * 1024 - total, // Assume 5MB limit
+        total: 5 * 1024 * 1024,
+        percentage: (total / (5 * 1024 * 1024)) * 100,
+      };
+    } catch {
+      return {
+        used: 0,
+        available: 0,
+        total: 0,
+        percentage: 0,
+      };
+    }
+  },
+
+  // Request persistent storage
+  async requestPersistentStorage(): Promise<boolean> {
+    if (typeof navigator !== 'undefined' && 'storage' in navigator && 'persist' in navigator.storage) {
+      try {
+        const isPersisted = await navigator.storage.persist();
+        logger.info(`Persistent storage ${isPersisted ? 'granted' : 'denied'}`);
+        return isPersisted;
+      } catch (error) {
+        logger.error('Failed to request persistent storage:', error);
+      }
+    }
+    return false;
+  },
+
+  // Check if storage is persistent
+  async isStoragePersistent(): Promise<boolean> {
+    if (typeof navigator !== 'undefined' && 'storage' in navigator && 'persisted' in navigator.storage) {
+      try {
+        return await navigator.storage.persisted();
+      } catch (error) {
+        logger.error('Failed to check persistent storage:', error);
+      }
+    }
+    return false;
+  },
+
+  // ===== Data Snapshot & Backup =====
+  
+  // Create a snapshot of all data
+  async createSnapshot(): Promise<{
+    todos: Todo[];
+    metadata: StorageMetadata[];
+    syncQueue: SyncQueueItem[];
+    createdAt: number;
+  }> {
+    try {
+      const [todos, metadata, syncQueue] = await Promise.all([
+        db.todos.toArray(),
+        db.metadata.toArray(),
+        db.syncQueue.toArray(),
+      ]);
+      
+      return {
+        todos,
+        metadata,
+        syncQueue,
+        createdAt: Date.now(),
+      };
+    } catch (error) {
+      logger.error('Failed to create snapshot:', error);
+      throw error;
+    }
+  },
+
+  // Restore from a snapshot
+  async restoreFromSnapshot(snapshot: {
+    todos?: Todo[];
+    metadata?: StorageMetadata[];
+    syncQueue?: SyncQueueItem[];
+  }): Promise<void> {
+    try {
+      if (snapshot.todos && snapshot.todos.length > 0) {
+        await db.todos.bulkPut(snapshot.todos);
+      }
+      
+      if (snapshot.metadata && snapshot.metadata.length > 0) {
+        await db.metadata.bulkPut(snapshot.metadata);
+      }
+      
+      if (snapshot.syncQueue && snapshot.syncQueue.length > 0) {
+        await db.syncQueue.bulkPut(snapshot.syncQueue);
+      }
+      
+      logger.info('Snapshot restored successfully');
+    } catch (error) {
+      logger.error('Failed to restore snapshot:', error);
+      throw error;
+    }
+  },
+
+  // Export data as JSON string
+  async exportData(): Promise<string> {
+    const snapshot = await this.createSnapshot();
+    return JSON.stringify(snapshot);
+  },
+
+  // Import data from JSON string
+  async importData(jsonString: string): Promise<void> {
+    try {
+      const data = JSON.parse(jsonString);
+      await this.restoreFromSnapshot(data);
+    } catch (error) {
+      logger.error('Failed to import data:', error);
+      throw error;
+    }
+  },
+
+  // ===== Database Maintenance =====
+  
+  // Vacuum/delete unused data
+  async vacuum(): Promise<{ deletedItems: number }> {
+    let deletedItems = 0;
+    
+    try {
+      // Clear sync queue (items should be synced or failed)
+      const queueSize = await db.syncQueue.count();
+      if (queueSize > 100) {
+        // Only keep recent items if queue is huge
+        const oldItems = await db.syncQueue
+          .orderBy('timestamp')
+          .limit(Math.max(0, queueSize - 100))
+          .toArray();
+        
+        for (const item of oldItems) {
+          if (item.id) {
+            await db.syncQueue.delete(item.id);
+            deletedItems++;
+          }
+        }
+      }
+      
+      // Clear old metadata (keep only recent)
+      const oldMetadata = await db.metadata
+        .filter(m => {
+          const savedAt = m.value?.savedAt || 0;
+          return Date.now() - savedAt > 30 * 24 * 60 * 60 * 1000; // 30 days
+        })
+        .toArray();
+      
+      for (const m of oldMetadata) {
+        await db.metadata.delete(m.key);
+        deletedItems++;
+      }
+      
+      logger.info(`Vacuum complete: ${deletedItems} items deleted`);
+    } catch (error) {
+      logger.error('Vacuum failed:', error);
+    }
+    
+    return { deletedItems };
   },
 
   // ===== Fallback: LocalStorage Methods =====
@@ -452,6 +890,31 @@ export const offlineStorage = {
       logger.warn('LocalStorage is not available');
       return false;
     }
+  },
+
+  // ===== Database Version Info =====
+  
+  // Get database info
+  async getDatabaseInfo(): Promise<{
+    name: string;
+    version: number;
+    todoCount: number;
+    syncQueueCount: number;
+    metadataCount: number;
+  }> {
+    const [todoCount, syncQueueCount, metadataCount] = await Promise.all([
+      db.todos.count(),
+      db.syncQueue.count(),
+      db.metadata.count(),
+    ]);
+    
+    return {
+      name: db.name,
+      version: db.verno,
+      todoCount,
+      syncQueueCount,
+      metadataCount,
+    };
   },
 };
 

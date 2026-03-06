@@ -1,25 +1,38 @@
-import { afterEach, vi } from 'vitest';
+import { afterEach, vi, beforeEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 // Cleanup after each test
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
 });
 
-// Mock IndexedDB
-const mockIndexedDB = {
-  open: vi.fn(),
-  deleteDatabase: vi.fn(),
+// Simple IndexedDB mock
+const indexedDBMock = {
+  open: vi.fn(() => {
+    const request: any = {
+      result: {},
+      error: null,
+      onsuccess: null,
+      onerror: null,
+      onupgradeneeded: null,
+    };
+    return request;
+  }),
+  deleteDatabase: vi.fn(() => ({ result: {} })),
+  cmp: vi.fn(),
 };
 
-Object.defineProperty(window, 'indexedDB', {
-  value: mockIndexedDB,
-  writable: true,
+beforeEach(() => {
+  Object.defineProperty(window, 'indexedDB', {
+    value: indexedDBMock,
+    writable: true,
+  });
 });
 
-// Mock localStorage
-const localStorageMock = (() => {
+// Mock localStorage with proper implementation
+const createLocalStorageMock = () => {
   let store: Record<string, string> = {};
 
   return {
@@ -33,11 +46,16 @@ const localStorageMock = (() => {
     clear: () => {
       store = {};
     },
+    get length() {
+      return Object.keys(store).length;
+    },
+    key: (index: number) => Object.keys(store)[index] || null,
   };
-})();
+};
 
 Object.defineProperty(window, 'localStorage', {
-  value: localStorageMock,
+  value: createLocalStorageMock(),
+  writable: true,
 });
 
 // Mock matchMedia
@@ -54,3 +72,31 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: vi.fn(),
   })),
 });
+
+// Mock scrollIntoView
+Element.prototype.scrollIntoView = vi.fn();
+
+// Mock ResizeObserver
+globalThis.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
+// Mock requestAnimationFrame
+globalThis.requestAnimationFrame = (callback: FrameRequestCallback) => {
+  return setTimeout(callback as any, 16);
+};
+
+globalThis.cancelAnimationFrame = (id: number) => {
+  clearTimeout(id);
+};
+
+// Mock IntersectionObserver
+globalThis.IntersectionObserver = class IntersectionObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() { return []; }
+};
+

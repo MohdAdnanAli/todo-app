@@ -1,5 +1,9 @@
 import { Schema, model, Types } from 'mongoose';
 
+// ============================================
+// Todo Schema Definition
+// ============================================
+
 const todoSchema = new Schema({
   text: {
     type: String,
@@ -55,14 +59,64 @@ const todoSchema = new Schema({
   timestamps: true,
 });
 
-// Compound indexes for efficient querying
+// ============================================
+// Optimized Compound Indexes
+// ============================================
+
+// Primary compound index for most common queries
 todoSchema.index({ user: 1, order: 1 });
 todoSchema.index({ user: 1, completed: 1 });
 todoSchema.index({ user: 1, category: 1 });
 todoSchema.index({ user: 1, dueDate: 1 });
+todoSchema.index({ user: 1, priority: 1 });
 todoSchema.index({ completed: 1, createdAt: -1 });
 todoSchema.index({ category: 1, priority: 1 });
+todoSchema.index({ user: 1, category: 1, completed: 1 });
 todoSchema.index({ createdAt: -1 });
 todoSchema.index({ updatedAt: -1 });
+todoSchema.index({ text: 'text' });
+
+// ============================================
+// Virtuals
+// ============================================
+
+todoSchema.virtual('isOverdue').get(function() {
+  if (!this.dueDate) return false;
+  return new Date(this.dueDate) < new Date() && !this.completed;
+});
+
+todoSchema.virtual('daysUntilDue').get(function() {
+  if (!this.dueDate) return null;
+  const now = new Date();
+  const due = new Date(this.dueDate);
+  const diffTime = due.getTime() - now.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+});
+
+todoSchema.set('toJSON', { virtuals: true });
+todoSchema.set('toObject', { virtuals: true });
+
+// ============================================
+// Pre-save Middleware
+// ============================================
+
+todoSchema.pre('save', function(next) {
+  if (this.text) {
+    this.text = this.text.trim();
+  }
+  
+  if (this.tags && Array.isArray(this.tags)) {
+    this.tags = this.tags.map((tag: string) => tag.trim().toLowerCase()).filter((tag: string) => tag.length > 0);
+  }
+  
+  next();
+});
+
+// ============================================
+// Export Model
+// ============================================
 
 export const Todo = model('Todo', todoSchema);
+
+export default Todo;
+
