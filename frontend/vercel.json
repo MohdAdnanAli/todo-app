@@ -1,11 +1,13 @@
 {
   "version": 2,
+  "bunVersion": "latest",
   "builds": [
     {
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "dist"
+        "distDir": "dist",
+        "buildCommand": "bun run build"
       }
     }
   ],
