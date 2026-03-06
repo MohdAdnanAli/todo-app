@@ -1,16 +1,14 @@
 {
   "version": 2,
-  "bunVersion": "latest",
   "builds": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist",
-        "buildCommand": "bun run build"
-      }
+      "src": "dist/**",
+      "use": "@vercel/static"
     }
   ],
+  "installCommand": "bun install",
+  "buildCommand": "bun run build",
+  "outputDirectory": "dist",
   "routes": [
     {
       "src": "/verify-email",
@@ -33,4 +31,3 @@
     "VITE_API_URL": "https://todo-app-srbx.onrender.com"
   }
 }
-
