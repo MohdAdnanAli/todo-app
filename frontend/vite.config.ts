@@ -4,7 +4,6 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // Environment detection
 const isProduction = process.env.NODE_ENV === 'production'
-const isDev = !isProduction
 
 export default defineConfig({
   plugins: [

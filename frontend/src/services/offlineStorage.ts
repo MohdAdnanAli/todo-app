@@ -198,7 +198,7 @@ const getApi = async () => {
 // Compression Utilities (using basic encoding)
 // ============================================
 
-const _compressData = async (data: string): Promise<string> => {
+export const compressData = async (data: string): Promise<string> => {
   try {
     // Use TextEncoder for basic compression
     const encoder = new TextEncoder();
@@ -239,7 +239,7 @@ const _compressData = async (data: string): Promise<string> => {
   }
 };
 
-const _decompressData = async (data: string): Promise<string> => {
+export const decompressData = async (data: string): Promise<string> => {
   try {
     // Use TextDecoder for basic decompression
     if (typeof DecompressionStream !== 'undefined') {
