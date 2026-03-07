@@ -1,24 +1,22 @@
 import nodemailer from 'nodemailer';
 import { logger } from './logger';
-
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'localhost',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: process.env.SMTP_SECURE === 'true',
-  auth: process.env.SMTP_USER ? {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  } : undefined,
-});
+import { getTransporter, getSMTPConfig } from './smtp';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 export const sendVerificationEmail = async (email: string, token: string): Promise<boolean> => {
   try {
+    const transporter = getTransporter();
+    if (!transporter) {
+      logger.warn('SMTP not configured, cannot send verification email');
+      return false;
+    }
+
     const verificationUrl = `${FRONTEND_URL}/verify-email?token=${token}`;
+    const config = getSMTPConfig();
     
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || 'noreply@todoapp.com',
+      from: config.from || 'noreply@todoapp.com',
       to: email,
       subject: 'Verify your email address - Todo App',
       html: `
@@ -44,10 +42,17 @@ export const sendVerificationEmail = async (email: string, token: string): Promi
 
 export const sendPasswordResetEmail = async (email: string, token: string): Promise<boolean> => {
   try {
+    const transporter = getTransporter();
+    if (!transporter) {
+      logger.warn('SMTP not configured, cannot send password reset email');
+      return false;
+    }
+
     const resetUrl = `${FRONTEND_URL}/reset-password?token=${token}`;
+    const config = getSMTPConfig();
     
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || 'noreply@todoapp.com',
+      from: config.from || 'noreply@todoapp.com',
       to: email,
       subject: 'Reset your password - Todo App',
       html: `

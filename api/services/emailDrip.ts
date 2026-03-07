@@ -1,23 +1,12 @@
 import nodemailer from 'nodemailer';
 import { User } from '../models/User';
 import { logger } from '../utils/logger';
+import { getTransporter, getSMTPConfig } from '../utils/smtp';
 
 interface EmailTemplate {
   subject: string;
   html: string;
 }
-
-const getEmailTransporter = () => {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.mailtrap.io',
-    port: parseInt(process.env.SMTP_PORT || '465'),
-    secure: true,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-};
 
 const emailTemplates = {
   welcomeDay1: (displayName: string): EmailTemplate => ({
@@ -234,11 +223,17 @@ export const emailDripService = {
 
   async sendWelcomeEmail(userId: string, email: string, displayName: string): Promise<void> {
     try {
-      const transporter = getEmailTransporter();
+      const transporter = getTransporter();
+      if (!transporter) {
+        logger.warn('SMTP not configured, cannot send welcome email');
+        return;
+      }
+
+      const config = getSMTPConfig();
       const template = emailTemplates.welcomeDay1(displayName);
 
       await transporter.sendMail({
-        from: process.env.SMTP_FROM || 'noreply@todopro.app',
+        from: config.from || 'noreply@todopro.app',
         to: email,
         subject: template.subject,
         html: template.html,
@@ -257,11 +252,17 @@ export const emailDripService = {
 
   async sendTipsEmail(userId: string, email: string, displayName: string): Promise<void> {
     try {
-      const transporter = getEmailTransporter();
+      const transporter = getTransporter();
+      if (!transporter) {
+        logger.warn('SMTP not configured, cannot send tips email');
+        return;
+      }
+
+      const config = getSMTPConfig();
       const template = emailTemplates.tipsDay3(displayName);
 
       await transporter.sendMail({
-        from: process.env.SMTP_FROM || 'noreply@todopro.app',
+        from: config.from || 'noreply@todopro.app',
         to: email,
         subject: template.subject,
         html: template.html,
@@ -297,11 +298,17 @@ export const emailDripService = {
 
       const userStats = stats[0] || { totalTodos: 0, completedTodos: 0 };
 
-      const transporter = getEmailTransporter();
+      const transporter = getTransporter();
+      if (!transporter) {
+        logger.warn('SMTP not configured, cannot send check-in email');
+        return;
+      }
+
+      const config = getSMTPConfig();
       const template = emailTemplates.checkInDay7(displayName, userStats);
 
       await transporter.sendMail({
-        from: process.env.SMTP_FROM || 'noreply@todopro.app',
+        from: config.from || 'noreply@todopro.app',
         to: email,
         subject: template.subject,
         html: template.html,
