@@ -259,7 +259,7 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
     handleGoogleOAuthParams();
   }, []);
 
-// Separate effect to handle auth check - runs on mount
+  // Separate effect to handle auth check - runs on mount
   useEffect(() => {
     // Skip if Google OAuth was already processed
     if (googleOAuthProcessed.current) {
@@ -338,8 +338,8 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
           
           console.warn(`Attempt ${attempt} failed:`, err.message);
           if (attempt === retries) {
-            setMessage('Unable to connect to server. Please try again later.');
-            setMessageType('system');
+            // API unavailable - stop loading and show login form
+            // Don't show error message, just let user log in
             setIsLoading(false);
           } else {
             await new Promise(r => setTimeout(r, 1000 * attempt));
@@ -347,6 +347,9 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
         }
       }
     };
+    // Start with loading false to show login form immediately
+    // Then try to fetch user data in background
+    setIsLoading(false);
     checkAuthAndFetch();
   }, [userPassword, encryptionSalt]);
 
