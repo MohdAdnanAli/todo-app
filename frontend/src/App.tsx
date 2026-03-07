@@ -96,6 +96,9 @@ function App() {
 
   // Track if we've processed Google OAuth redirect
   const googleOAuthProcessed = useRef(false);
+  
+  // Track if initial auth check is done
+  const initialAuthCheckDone = useRef(false);
 
 const decryptTodo = useCallback(async (todo: Todo, password: string, salt: string): Promise<Todo> => {
     if (!password || !salt) return todo;
@@ -261,10 +264,13 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
 
   // Separate effect to handle auth check - runs on mount
   useEffect(() => {
-    // Skip if Google OAuth was already processed
-    if (googleOAuthProcessed.current) {
+    // Skip if Google OAuth was already processed or if we've already done initial check
+    if (googleOAuthProcessed.current || initialAuthCheckDone.current) {
       return;
     }
+    
+    // Mark as done immediately to prevent re-runs
+    initialAuthCheckDone.current = true;
     
     const checkAuthAndFetch = async (retries = 3) => {
       for (let attempt = 1; attempt <= retries; attempt++) {
@@ -347,11 +353,11 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
         }
       }
     };
-    // Start with loading false to show login form immediately
-    // Then try to fetch user data in background
-    setIsLoading(false);
+    
+    // Don't set loading false here - let it stay true until API responds or fails
+    // But we already marked initialAuthCheckDone as true so this won't run again
     checkAuthAndFetch();
-  }, [userPassword, encryptionSalt]);
+  }, []);
 
   const handleLogin = async (loginEmail: string, loginPassword: string) => {
     setMessage('Logging in...');
