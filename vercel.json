@@ -1,46 +1,20 @@
 {
-    "env": {
-      "VITE_API_URL": "https://todo-app-srbx.onrender.com"
-    },
-  
+  "env": {
+    "VITE_API_URL": "https://todo-app-srbx.onrender.com"
+  },
   "version": 2,
   "builds": [
     {
       "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "outputDirectory": "frontend/dist"
-      }
+      "use": "@vercel/vite"
     }
   ],
   "installCommand": "cd frontend && bun install",
   "buildCommand": "cd frontend && bun run build",
   "outputDirectory": "frontend/dist",
   "framework": "vite",
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/frontend/dist/$1"
-    },
-    {
-      "src": "/(.*).js",
-      "dest": "/frontend/dist/$1.js"
-    },
-    {
-      "src": "/(.*).css",
-      "dest": "/frontend/dist/$1.css"
-    },
-    {
-      "src": "/(.*)/",
-      "dest": "/frontend/dist/$1/index.html"
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/frontend/dist/index.html"
-    }
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "regions": ["iad1"]
 }
