@@ -9,5 +9,8 @@
   "devDependencies": {
     "bun-types": "^1.0.0",
     "vercel": "^50.28.0"
+  },
+  "overrides": {
+    "esbuild": "^0.27.0"
   }
 }
