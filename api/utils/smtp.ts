@@ -12,13 +12,29 @@ export interface SMTPConfig {
 }
 
 /**
+ * Get SMTP configuration from environment variables
+ */
+export const getSMTPConfig = (): SMTPConfig => {
+  return {
+    host: process.env.SMTP_HOST || '',
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.SMTP_FROM || 'noreply@example.com',
+  };
+};
+
+/**
  * Check if SMTP credentials are configured
  */
 export const isSMTPConfigured = (): boolean => {
   const config = getSMTPConfig();
 
   // Supports both port 587 (STARTTLS) and port 465 (implicit TLS)
- 
+  return !!(config.host && config.user && config.pass);
+};
+
 export const createTransporter = (): nodemailer.Transporter | null => {
   const config = getSMTPConfig();
 

@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "frontend",
+      "use": "@vercel/static-build"
+    }
+  ],
+  "installCommand": "cd frontend && bun install",
+  "buildCommand": "cd frontend && bun run build",
+  "outputDirectory": "frontend/dist",
+  "framework": "vite"
+}
