@@ -42,5 +42,6 @@
   ],
   "env": {
     "VITE_API_URL": "https://todo-app-srbx.onrender.com"
-  }
+  },
+  "regions": ["iad1"]
 }
