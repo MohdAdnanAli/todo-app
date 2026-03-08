@@ -513,3 +513,42 @@ export const updateQuickStartProgress = async (req: Request & { user?: { id: str
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+// Reset onboarding status (for testing/admin purposes)
+export const resetOnboarding = async (req: Request & { user?: { id: string } }, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          hasCompletedOnboarding: false,
+          onboardingCompletedAt: null,
+          quickStartProgress: {
+            firstTask: false,
+            categorize: false,
+            setPriority: false,
+          },
+        },
+      },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json({
+      message: 'Onboarding status reset',
+      hasCompletedOnboarding: false,
+      quickStartProgress: user.quickStartProgress,
+    });
+  } catch (err) {
+    logger.error('ResetOnboarding error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};

@@ -7,7 +7,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import path from 'path';
 
-import { register, login, verifyEmail, requestPasswordReset, resetPassword, updateProfile, getProfile, deleteUser, getOnboardingStatus, completeOnboarding, updateQuickStartProgress } from './controllers/auth';
+import { register, login, verifyEmail, requestPasswordReset, resetPassword, updateProfile, getProfile, deleteUser, getOnboardingStatus, completeOnboarding, updateQuickStartProgress, resetOnboarding } from './controllers/auth';
 import { getDashboardStats, getAllUsers, getUserDetails, updateUser, deleteUser as adminDeleteUser, getAllTodos, deleteTodo as adminDeleteTodo, deleteMultipleTodos, getSystemHealth } from './controllers/admin';
 import { getGoogleAuthUrlHandler, googleCallback, googleError, linkGoogleAccount, unlinkGoogleAccount, getGoogleAuthStatus } from './controllers/googleAuth';
 import { checkEmailAvailability } from './controllers/emailCheck';
@@ -209,6 +209,7 @@ app.post('/api/auth/logout', (req, res) => {
 app.get('/api/onboarding/status', protect, getOnboardingStatus);
 app.post('/api/onboarding/complete', protect, completeOnboarding);
 app.put('/api/onboarding/quickstart', protect, updateQuickStartProgress);
+app.post('/api/onboarding/reset', protect, resetOnboarding);
 
 // Admin routes - Full admin dashboard with adminProtect middleware
 // ───────────────────────────────────────────────

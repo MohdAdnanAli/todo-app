@@ -124,7 +124,8 @@ export const EXAMPLE_TODOS: Omit<Todo, '_id' | 'createdAt' | 'updatedAt'>[] = [
 ];
 
 export const onboardingService = {
-  // Check if user has completed onboarding (uses database first, falls back to localStorage)
+  // Check if user has completed onboarding
+  // Uses database first, falls back to localStorage for offline support
   async hasCompletedOnboarding(): Promise<boolean> {
     try {
       // Try to get from database first
@@ -132,11 +133,13 @@ export const onboardingService = {
       if (dbStatus.hasCompletedOnboarding) {
         return true;
       }
+      // Database says not completed, return false
+      return false;
     } catch (error) {
       console.warn('Failed to get onboarding status from API, falling back to localStorage:', error);
     }
     
-    // Fallback to localStorage
+    // Fallback to localStorage (for offline support)
     const metadata = await offlineStorage.getMetadata('onboarding-completed');
     return metadata?.completed === true;
   },
@@ -235,22 +238,6 @@ export const onboardingService = {
     return tasks.every(t => t.completed);
   },
 
-  // Create example todos for new user
-  async createExampleTodos(): Promise<void> {
-    const todos = await offlineStorage.getAllTodos();
-    
-    // Only create examples if user has no todos
-    if (todos.length === 0) {
-      const exampleTodosWithIds = EXAMPLE_TODOS.map((todo, index) => ({
-        ...todo,
-        _id: `example-${index}-${Date.now()}`,
-        createdAt: new Date().toISOString(),
-      }));
-
-      await offlineStorage.saveTodos(exampleTodosWithIds);
-    }
-  },
-
   // Skip onboarding
   async skipOnboarding(): Promise<void> {
     await this.markOnboardingAsCompleted();
@@ -278,8 +265,15 @@ export const onboardingService = {
     };
   },
 
-  // Reset onboarding (for testing/demo)
+  // Reset onboarding (for testing/demo) - calls API and clears localStorage
   async resetOnboarding(): Promise<void> {
+    try {
+      await onboardingApi.reset();
+    } catch (error) {
+      console.warn('Failed to reset onboarding via API, clearing localStorage only:', error);
+    }
+    
+    // Clear localStorage
     await offlineStorage.updateMetadata('onboarding-completed', { completed: false });
     await offlineStorage.updateMetadata('tour-step', { step: 'welcome' });
     await offlineStorage.updateMetadata('quick-start-progress', { 

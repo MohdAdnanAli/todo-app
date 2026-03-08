@@ -166,6 +166,11 @@ export const onboardingApi = {
     const res = await api.put<{ message: string; quickStartProgress: OnboardingStatus['quickStartProgress'] }>('/api/onboarding/quickstart', progress);
     return res.data;
   },
+
+  reset: async (): Promise<{ message: string; hasCompletedOnboarding: boolean; quickStartProgress: OnboardingStatus['quickStartProgress'] }> => {
+    const res = await api.post<{ message: string; hasCompletedOnboarding: boolean; quickStartProgress: OnboardingStatus['quickStartProgress'] }>('/api/onboarding/reset');
+    return res.data;
+  },
 };
 
 // ==================== TODOS ====================

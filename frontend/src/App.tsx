@@ -716,9 +716,11 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
   };
 
   // Check quick-start progress and show checklist for new users
+  // This runs once when user is authenticated and todos are loaded
   useEffect(() => {
     const checkOnboardingStatus = async () => {
-      if (!user || quickStartChecked) return;
+      // Only run when: user exists, todos are loaded (not loading), and we haven't checked yet
+      if (!user || isLoadingTodos || quickStartChecked) return;
       
       try {
         // Check if onboarding has been completed
@@ -727,24 +729,15 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
         // Show welcome tour for first-time users (onboarding not completed)
         if (!onboardingCompleted) {
           setShowWelcomeTour(true);
-          // Pre-populate example todos for new users
-          await onboardingService.createExampleTodos();
-          
-          // Load the example todos from offline storage into UI state
-          const exampleTodos = await offlineStorage.getAllTodos();
-          if (exampleTodos.length > 0) {
-            setTodos(exampleTodos);
-            await offlineStorage.saveTodos(exampleTodos);
-          }
         }
         
         // Check quick-start progress and show checklist
+        // Only show if user hasn't completed all tasks
         const isComplete = await onboardingService.isQuickStartComplete();
-        
-        // Show checklist if user hasn't completed all tasks yet
         if (!isComplete) {
           setShowQuickStart(true);
         }
+        
         setQuickStartChecked(true);
       } catch (error) {
         console.error('Error checking onboarding status:', error);
@@ -753,7 +746,7 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
     };
     
     checkOnboardingStatus();
-  }, [user, quickStartChecked]);
+  }, [user, isLoadingTodos, quickStartChecked]);
 
   // Cleanup offline storage event listeners on unmount
   useEffect(() => {
@@ -916,7 +909,7 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
         />
       )}
 
-      {showWelcomeBackModal && user && (
+      {showWelcomeBackModal && user && !showWelcomeTour && (
         <WelcomeBackModal
           isOpen={showWelcomeBackModal}
           userName={user.displayName || user.email.split('@')[0]}
