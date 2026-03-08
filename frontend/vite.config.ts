@@ -15,9 +15,7 @@ export default defineConfig({
       // Include assets to cache
       includeAssets: [
         'favicon.ico',
-        'apple-touch-icon.png',
-        'masked-icon.svg',
-        'robots.txt',
+        'vite.svg',
       ],
       
       // Web App Manifest
@@ -35,71 +33,18 @@ export default defineConfig({
         lang: 'en',
         dir: 'ltr',
         
-        // Icons configuration
+        // Icons configuration - only use existing icon
         icons: [
           {
             src: '/icon-192.png',
             sizes: '192x192',
             type: 'image/png',
-            purpose: 'any',
-          },
-          {
-            src: '/icon-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any',
-          },
-          {
-            src: '/icon-maskable.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable',
+            purpose: 'any maskable',
           },
         ],
         
-        // Splash screens for iOS
-        screenshots: [
-          {
-            src: '/screenshot-mobile.png',
-            sizes: '390x844',
-            type: 'image/png',
-            form_factor: 'narrow',
-          },
-          {
-            src: '/screenshot-desktop.png',
-            sizes: '1280x720',
-            type: 'image/png',
-            form_factor: 'wide',
-          },
-        ],
-        
-        // Shortcuts for quick actions
-        shortcuts: [
-          {
-            name: 'Add New Task',
-            short_name: 'Add Task',
-            description: 'Quickly add a new task',
-            url: '/?action=add',
-            icons: [
-              {
-                src: '/icon-192.png',
-                sizes: '192x192',
-              },
-            ],
-          },
-          {
-            name: 'View All Tasks',
-            short_name: 'Tasks',
-            description: 'View all your tasks',
-            url: '/',
-            icons: [
-              {
-                src: '/icon-192.png',
-                sizes: '192x192',
-              },
-            ],
-          },
-        ],
+        // Shortcuts for quick actions - simplified
+        shortcuts: [],
       },
       
       // Workbox configuration for service worker
