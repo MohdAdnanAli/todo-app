@@ -1,21 +1,13 @@
 {
-  "env": {
-    "VITE_API_URL": "https://todo-app-srbx.onrender.com"
-  },
-  "version": 2,
   "builds": [
     {
       "src": "frontend/package.json",
       "use": "@vercel/vite"
     }
   ],
-  "installCommand": "cd frontend && bun install",
-  "buildCommand": "cd frontend && bun run build",
   "outputDirectory": "dist",
-  "framework": "vite",
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ],
-  "regions": ["iad1"]
+  ]
 }
 
