@@ -135,6 +135,39 @@ export const profileApi = {
   },
 };
 
+// ==================== ONBOARDING ====================
+
+export interface OnboardingStatus {
+  hasCompletedOnboarding: boolean;
+  onboardingCompletedAt: string | null;
+  quickStartProgress: {
+    firstTask: boolean;
+    categorize: boolean;
+    setPriority: boolean;
+  };
+}
+
+export const onboardingApi = {
+  getStatus: async (): Promise<OnboardingStatus> => {
+    const res = await api.get<OnboardingStatus>('/api/onboarding/status');
+    return res.data;
+  },
+
+  complete: async (): Promise<{ message: string; hasCompletedOnboarding: boolean; onboardingCompletedAt: string }> => {
+    const res = await api.post<{ message: string; hasCompletedOnboarding: boolean; onboardingCompletedAt: string }>('/api/onboarding/complete');
+    return res.data;
+  },
+
+  updateQuickStart: async (progress: {
+    firstTask?: boolean;
+    categorize?: boolean;
+    setPriority?: boolean;
+  }): Promise<{ message: string; quickStartProgress: OnboardingStatus['quickStartProgress'] }> => {
+    const res = await api.put<{ message: string; quickStartProgress: OnboardingStatus['quickStartProgress'] }>('/api/onboarding/quickstart', progress);
+    return res.data;
+  },
+};
+
 // ==================== TODOS ====================
 
 export const todoApi = {

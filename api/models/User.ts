@@ -52,6 +52,17 @@ const userSchema = new Schema({
     createdAt: { type: Date, default: null },
   },
   
+  // Onboarding status - tracks if user has completed welcome tour
+  hasCompletedOnboarding: { type: Boolean, default: false, index: true },
+  onboardingCompletedAt: { type: Date, default: null },
+  
+  // Quick start checklist progress
+  quickStartProgress: {
+    firstTask: { type: Boolean, default: false },
+    categorize: { type: Boolean, default: false },
+    setPriority: { type: Boolean, default: false },
+  },
+  
 }, { timestamps: true });
 
 // Compound indexes for common queries

@@ -1,4 +1,5 @@
 import { offlineStorage } from './offlineStorage';
+import { onboardingApi } from './api';
 import type { Todo } from '../types';
 
 export interface OnboardingStep {
@@ -123,28 +124,47 @@ export const EXAMPLE_TODOS: Omit<Todo, '_id' | 'createdAt' | 'updatedAt'>[] = [
 ];
 
 export const onboardingService = {
-  // Check if user has completed onboarding
+  // Check if user has completed onboarding (uses database first, falls back to localStorage)
   async hasCompletedOnboarding(): Promise<boolean> {
+    try {
+      // Try to get from database first
+      const dbStatus = await onboardingApi.getStatus();
+      if (dbStatus.hasCompletedOnboarding) {
+        return true;
+      }
+    } catch (error) {
+      console.warn('Failed to get onboarding status from API, falling back to localStorage:', error);
+    }
+    
+    // Fallback to localStorage
     const metadata = await offlineStorage.getMetadata('onboarding-completed');
     return metadata?.completed === true;
   },
 
-  // Mark onboarding as completed
+  // Mark onboarding as completed (saves to both database and localStorage)
   async markOnboardingAsCompleted(): Promise<void> {
+    try {
+      // Save to database
+      await onboardingApi.complete();
+    } catch (error) {
+      console.warn('Failed to save onboarding completion to API, saving to localStorage:', error);
+    }
+    
+    // Always save to localStorage as backup
     await offlineStorage.updateMetadata('onboarding-completed', {
       completed: true,
       completedAt: Date.now(),
     });
   },
 
-  // Get current tour step
+  // Get current tour step (localStorage only - this is session state)
   async getCurrentTourStep(): Promise<string> {
     const metadata = await offlineStorage.getMetadata('tour-step');
     const step = metadata?.step;
     return typeof step === 'string' ? step : 'welcome';
   },
 
-  // Update tour step
+  // Update tour step (localStorage only - this is session state)
   async setCurrentTourStep(stepId: string): Promise<void> {
     await offlineStorage.updateMetadata('tour-step', {
       step: stepId,
@@ -152,8 +172,24 @@ export const onboardingService = {
     });
   },
 
-  // Get quick-start progress
+  // Get quick-start progress (uses database first, falls back to localStorage)
   async getQuickStartProgress(): Promise<QuickStartTask[]> {
+    try {
+      // Try to get from database first
+      const dbStatus = await onboardingApi.getStatus();
+      const dbProgress = dbStatus.quickStartProgress;
+      
+      // Convert database format to QuickStartTask format
+      return [
+        { id: 'first-task', text: 'Add your first task', completed: dbProgress.firstTask, hint: 'Click the input field and type a task name' },
+        { id: 'categorize', text: 'Organize with categories', completed: dbProgress.categorize, hint: 'Add a task and assign it to a category (Work, Personal, etc.)' },
+        { id: 'set-priority', text: 'Set task priorities', completed: dbProgress.setPriority, hint: 'Create a High priority task to see it highlighted' },
+      ];
+    } catch (error) {
+      console.warn('Failed to get quick start progress from API, falling back to localStorage:', error);
+    }
+    
+    // Fallback to localStorage
     const metadata = await offlineStorage.getMetadata('quick-start-progress');
     const tasks = metadata?.tasks;
     if (Array.isArray(tasks)) {
@@ -162,8 +198,27 @@ export const onboardingService = {
     return QUICK_START_TASKS;
   },
 
-  // Update quick-start task
+  // Update quick-start task (saves to both database and localStorage)
   async updateQuickStartTask(taskId: string, completed: boolean): Promise<void> {
+    // Map taskId to database field
+    const dbFieldMap: Record<string, 'firstTask' | 'categorize' | 'setPriority'> = {
+      'first-task': 'firstTask',
+      'categorize': 'categorize',
+      'set-priority': 'setPriority',
+    };
+    
+    const dbField = dbFieldMap[taskId];
+    
+    // Try to save to database
+    if (dbField) {
+      try {
+        await onboardingApi.updateQuickStart({ [dbField]: completed });
+      } catch (error) {
+        console.warn('Failed to save quick start progress to API, saving to localStorage:', error);
+      }
+    }
+    
+    // Also save to localStorage as backup
     const progress = await this.getQuickStartProgress();
     const updated = progress.map(t =>
       t.id === taskId ? { ...t, completed } : t
@@ -205,7 +260,7 @@ export const onboardingService = {
     });
   },
 
-  // Get onboarding status
+  // Get onboarding status (combines database and local storage data)
   async getOnboardingStatus() {
     const completed = await this.hasCompletedOnboarding();
     const currentStep = await this.getCurrentTourStep();

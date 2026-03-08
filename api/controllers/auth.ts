@@ -414,3 +414,102 @@ export const deleteUser = async (req: Request & { user?: { id: string } }, res: 
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+// Get onboarding status
+export const getOnboardingStatus = async (req: Request & { user?: { id: string } }, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const user = await User.findById(userId).select('hasCompletedOnboarding onboardingCompletedAt quickStartProgress');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json({
+      hasCompletedOnboarding: user.hasCompletedOnboarding || false,
+      onboardingCompletedAt: user.onboardingCompletedAt,
+      quickStartProgress: user.quickStartProgress || {
+        firstTask: false,
+        categorize: false,
+        setPriority: false,
+      },
+    });
+  } catch (err) {
+    logger.error('GetOnboardingStatus error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Mark onboarding as completed
+export const completeOnboarding = async (req: Request & { user?: { id: string } }, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          hasCompletedOnboarding: true,
+          onboardingCompletedAt: new Date(),
+        },
+      },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json({
+      message: 'Onboarding completed',
+      hasCompletedOnboarding: true,
+      onboardingCompletedAt: user.onboardingCompletedAt,
+    });
+  } catch (err) {
+    logger.error('CompleteOnboarding error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Update quick start progress
+export const updateQuickStartProgress = async (req: Request & { user?: { id: string } }, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { firstTask, categorize, setPriority } = req.body;
+
+    // Build update object
+    const updateObj: any = {};
+    if (typeof firstTask === 'boolean') updateObj['quickStartProgress.firstTask'] = firstTask;
+    if (typeof categorize === 'boolean') updateObj['quickStartProgress.categorize'] = categorize;
+    if (typeof setPriority === 'boolean') updateObj['quickStartProgress.setPriority'] = setPriority;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateObj },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    return res.json({
+      message: 'Quick start progress updated',
+      quickStartProgress: user.quickStartProgress,
+    });
+  } catch (err) {
+    logger.error('UpdateQuickStartProgress error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
