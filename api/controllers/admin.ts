@@ -1,5 +1,6 @@
 
 import type { Request, Response } from 'express';
+import { Types } from 'mongoose';
 import { User } from '../models/User';
 import { Todo } from '../models/Todo';
 import { logger } from '../utils/logger';
@@ -169,43 +170,60 @@ export const getAllUsers = async (req: AdminRequest, res: Response) => {
 export const getUserDetails = async (req: AdminRequest, res: Response) => {
   try {
     const { userId } = req.params;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
 
-    const user = await User.findById(userId)
-      .select('-password -emailVerificationToken -passwordResetToken -__v')
-      .lean();
-    
-    if (!user) {
+    // OPTIMIZED: Use aggregation for user stats instead of separate queries
+    const [userResult, todoStatsResult] = await Promise.all([
+      User.findById(userId)
+        .select('-password -emailVerificationToken -passwordResetToken -__v')
+        .lean(),
+      // Single aggregation for todo stats - much faster than fetching all todos
+      Todo.aggregate([
+        { $match: { user: new Types.ObjectId(userId) } },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            completed: { $sum: { $cond: ['$completed', 1, 0] } },
+            pending: { $sum: { $cond: ['$completed', 0, 1] } },
+          }
+        }
+      ]),
+    ]);
+
+    if (!userResult) {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Paginated todos query
     const todos = await Todo.find({ user: userId })
       .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
       .select('-__v')
       .lean();
 
-    // Use single reduce pass instead of two filter passes for efficiency
-    const todoStats = todos.reduce((acc: { completed: number; pending: number }, t: any) => {
-      if (t.completed) acc.completed++;
-      else acc.pending++;
-      return acc;
-    }, { completed: 0, pending: 0 });
+    const stats = todoStatsResult[0] || { total: 0, completed: 0, pending: 0 };
 
     res.json({
       user: {
-        id: user._id,
-        email: user.email,
-        displayName: user.displayName,
-        bio: user.bio,
-        avatar: user.avatar,
-        emailVerified: user.emailVerified,
-        lastLoginAt: user.lastLoginAt,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
+        id: userResult._id,
+        email: userResult.email,
+        displayName: userResult.displayName,
+        bio: userResult.bio,
+        avatar: userResult.avatar,
+        emailVerified: userResult.emailVerified,
+        lastLoginAt: userResult.lastLoginAt,
+        createdAt: userResult.createdAt,
+        updatedAt: userResult.updatedAt,
       },
       todos: {
-        total: todos.length,
-        completed: todoStats.completed,
-        pending: todoStats.pending,
+        total: stats.total,
+        completed: stats.completed,
+        pending: stats.pending,
+        page,
+        limit,
         items: todos,
       },
     });

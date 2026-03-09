@@ -67,8 +67,10 @@ const isTemporaryEmail = (email: string): boolean => {
 };
 
 function App() {
+  // MUST call useTheme first - always! (hook must be at top level)
   useTheme();
   
+  // State hooks - always call in same order
   const [isLoading, setIsLoading] = useState(true);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [message, setMessage] = useState('');
@@ -99,13 +101,13 @@ function App() {
   // Track if initial auth check is done
   const initialAuthCheckDone = useRef(false);
 
-const decryptTodo = useCallback(async (todo: Todo, password: string, salt: string): Promise<Todo> => {
+  // Memoized/decrypt functions - always call in same order
+  const decryptTodo = useCallback(async (todo: Todo, password: string, salt: string): Promise<Todo> => {
     if (!password || !salt) return todo;
     try {
       const decryptedText = await decrypt(todo.text, password, salt);
       return { ...todo, text: decryptedText };
     } catch (err) {
-      // Crypto module now handles errors gracefully - return original todo
       console.warn('Decryption issue for todo:', todo._id, err);
       return todo;
     }
@@ -593,9 +595,23 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
         { withCredentials: true }
       );
       
-      // Backend returns all todos sorted - decrypt and set directly
-      // Ensure we have an array before mapping
-      const todosData = Array.isArray(res.data) ? res.data : [];
+      // Backend returns { todo: serializedTodo, fullSync: false } or an array of all todos
+      // Handle both formats for backward compatibility
+      let todosData: Todo[] = [];
+      if (Array.isArray(res.data)) {
+        // Old format: returns all todos as array
+        todosData = res.data;
+      } else if (res.data?.todo) {
+        // New format: returns { todo, fullSync } - add the new todo to existing list
+        const newTodo = res.data.todo;
+        // Add the new todo to our existing list
+        todosData = [newTodo, ...todos];
+      } else {
+        // Fallback: fetch all todos from server
+        const fetchRes = await axios.get(`${API_URL}/api/todos`, { withCredentials: true });
+        todosData = Array.isArray(fetchRes.data) ? fetchRes.data : [];
+      }
+      
       const decryptedTodos = await decryptAllTodos(todosData, userPassword, encryptionSalt);
       setTodos(decryptedTodos);
       await offlineStorage.saveTodos(decryptedTodos);
@@ -655,9 +671,21 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
         withCredentials: true,
       });
 
-      // Backend returns all todos sorted - decrypt and set directly
-      // Ensure we have an array before mapping
-      const todosData = Array.isArray(res.data) ? res.data : [];
+      // Backend returns { deletedId, fullSync } or an array of all todos
+      // Handle both formats for backward compatibility
+      let todosData: Todo[] = [];
+      if (Array.isArray(res.data)) {
+        // Old format: returns all todos as array
+        todosData = res.data;
+      } else if (res.data?.deletedId) {
+        // New format: returns { deletedId, fullSync } - remove from existing list
+        todosData = todos.filter(t => t._id !== res.data.deletedId);
+      } else {
+        // Fallback: fetch all todos from server
+        const fetchRes = await axios.get(`${API_URL}/api/todos`, { withCredentials: true });
+        todosData = Array.isArray(fetchRes.data) ? fetchRes.data : [];
+      }
+      
       const decryptedTodos = await decryptAllTodos(todosData, userPassword, encryptionSalt);
       setTodos(decryptedTodos);
       await offlineStorage.saveTodos(decryptedTodos);
@@ -715,6 +743,20 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
     setShowQuickStart(false);
   };
 
+  // Auto-complete quick-start tasks when user performs actions
+  // Must be defined BEFORE useEffect that might call it
+  const checkAndAutoCompleteTask = async (taskId: string) => {
+    try {
+      const progress = await onboardingService.getQuickStartProgress();
+      const task = progress.find(t => t.id === taskId);
+      if (task && !task.completed) {
+        await onboardingService.updateQuickStartTask(taskId, true);
+      }
+    } catch (error) {
+      console.error('Error auto-completing task:', error);
+    }
+  };
+
   // Check quick-start progress and show checklist for new users
   // This runs once when user is authenticated and todos are loaded
   useEffect(() => {
@@ -755,32 +797,22 @@ const decryptTodo = useCallback(async (todo: Todo, password: string, salt: strin
     };
   }, []);
 
-  // Auto-complete quick-start tasks when user performs actions
-  const checkAndAutoCompleteTask = async (taskId: string) => {
-    try {
-      const progress = await onboardingService.getQuickStartProgress();
-      const task = progress.find(t => t.id === taskId);
-      if (task && !task.completed) {
-        await onboardingService.updateQuickStartTask(taskId, true);
-      }
-    } catch (error) {
-      console.error('Error auto-completing task:', error);
-    }
-  };
-
+  // Render loading state - ensures hooks are always called in same order
   if (isLoading) {
     return (
-      <div 
-        className="rounded-2xl sm:p-12 p-6 max-w-[560px] w-full mx-auto text-center"
-        style={{ 
-          background: 'var(--bg-primary)', 
-          boxShadow: 'var(--shadow)' 
-        }}
-      >
-        <div className="max-w-[120px] mx-auto mb-4 sm:mb-6">
-          <GeometryLoader initialMessage="Preparing your workspace..." />
+      <ErrorBoundary>
+        <div 
+          className="rounded-2xl sm:p-12 p-6 max-w-[560px] w-full mx-auto text-center"
+          style={{ 
+            background: 'var(--bg-primary)', 
+            boxShadow: 'var(--shadow)' 
+          }}
+        >
+          <div className="max-w-[120px] mx-auto mb-4 sm:mb-6">
+            <GeometryLoader initialMessage="Preparing your workspace..." />
+          </div>
         </div>
-      </div>
+      </ErrorBoundary>
     );
   }
 

@@ -38,7 +38,7 @@ interface PremiumFeature {
 const premiumFeatures: PremiumFeature[] = [
   {
     id: 1,
-    icon: <FolderOpen size={48} />,
+    icon: <FolderOpen size={28} />,
     title: 'Folder Customization',
     description: 'Organize your tasks into custom folders with personalized icons and colors. Create folders like Work, Personal, Projects, or any category that fits your workflow.',
     color: 'from-blue-500 to-cyan-500',
@@ -46,7 +46,7 @@ const premiumFeatures: PremiumFeature[] = [
   },
   {
     id: 2,
-    icon: <Calendar size={48} />,
+    icon: <Calendar size={28} />,
     title: 'Due Dates & Smart Sorting',
     description: 'Add due dates to your tasks and let us automatically sort them by deadline. Never miss a priority again with deadline-soonest-first sorting.',
     color: 'from-green-500 to-emerald-500',
@@ -54,7 +54,7 @@ const premiumFeatures: PremiumFeature[] = [
   },
   {
     id: 3,
-    icon: <Sparkles size={48} />,
+    icon: <Sparkles size={28} />,
     title: 'Beautiful Toast Notifications',
     description: 'Get elegant, animated toast notifications for success and error messages. Stay informed with style - beautiful dismissals and slide-in animations.',
     color: 'from-purple-500 to-pink-500',
@@ -62,7 +62,7 @@ const premiumFeatures: PremiumFeature[] = [
   },
   {
     id: 4,
-    icon: <Share2 size={48} />,
+    icon: <Share2 size={28} />,
     title: 'Public Shareable Lists',
     description: 'Share your productivity setup with the world! Generate public links to showcase how you organize your life and inspire others.',
     color: 'from-indigo-500 to-blue-500',
@@ -70,7 +70,7 @@ const premiumFeatures: PremiumFeature[] = [
   },
   {
     id: 5,
-    icon: <Gift size={48} />,
+    icon: <Gift size={28} />,
     title: 'Referral Program',
     description: 'Invite friends and earn rewards! Get exclusive features and badges for every friend who joins. Build your network of productivity champions.',
     color: 'from-rose-500 to-red-500',
@@ -78,7 +78,7 @@ const premiumFeatures: PremiumFeature[] = [
   },
   {
     id: 6,
-    icon: <Code size={48} />,
+    icon: <Code size={28} />,
     title: 'Embed Widget',
     description: 'Add a "Add this task to your Todo App" widget to any website. Perfect for bloggers, developers, and content creators.',
     color: 'from-orange-500 to-amber-500',
@@ -86,7 +86,7 @@ const premiumFeatures: PremiumFeature[] = [
   },
   {
     id: 7,
-    icon: <Infinity size={48} />,
+    icon: <Infinity size={28} />,
     title: 'Unlimited Tasks (Free)',
     description: 'No more limits! Create as many tasks as you need, completely free. Your productivity should never be constrained by arbitrary limits.',
     color: 'from-yellow-500 to-orange-500',
@@ -94,7 +94,7 @@ const premiumFeatures: PremiumFeature[] = [
   },
   {
     id: 8,
-    icon: <Palette size={48} />,
+    icon: <Palette size={28} />,
     title: 'Unlimited Themes',
     description: 'Access hundreds of beautiful themes and color schemes. Express yourself with complete customization of your workspace appearance.',
     color: 'from-violet-500 to-purple-500',
@@ -102,7 +102,7 @@ const premiumFeatures: PremiumFeature[] = [
   },
   {
     id: 9,
-    icon: <Users size={48} />,
+    icon: <Users size={28} />,
     title: 'Unlimited Sharing',
     description: 'Share unlimited lists with unlimited people. Collaborate without boundaries - family, friends, or teams can all access your shared tasks.',
     color: 'from-teal-500 to-cyan-500',
@@ -110,7 +110,7 @@ const premiumFeatures: PremiumFeature[] = [
   },
   {
     id: 10,
-    icon: <Brain size={48} />,
+    icon: <Brain size={28} />,
     title: 'AI-Powered Task Breakdown',
     description: 'Let AI analyze your tasks and suggest breakdowns, smart priorities, and optimal scheduling based on your work patterns.',
     color: 'from-cyan-500 to-blue-500',
@@ -118,7 +118,7 @@ const premiumFeatures: PremiumFeature[] = [
   },
   {
     id: 11,
-    icon: <Trophy size={48} />,
+    icon: <Trophy size={28} />,
     title: 'Gamification System',
     description: 'Earn points, unlock levels, and collect badges as you complete tasks. Stay motivated with streaks, achievements, and progress tracking.',
     color: 'from-amber-500 to-yellow-500',
@@ -126,7 +126,7 @@ const premiumFeatures: PremiumFeature[] = [
   },
   {
     id: 12,
-    icon: <Focus size={48} />,
+    icon: <Focus size={28} />,
     title: 'Focus Mode + Pomodoro',
     description: 'Built-in Pomodoro timer with focus mode. Block distractions, set work intervals, and take productive breaks to maximize your output.',
     color: 'from-red-500 to-rose-500',
@@ -134,7 +134,7 @@ const premiumFeatures: PremiumFeature[] = [
   },
   {
     id: 13,
-    icon: <Layers size={48} />,
+    icon: <Layers size={28} />,
     title: 'Shared Team Lists',
     description: 'Collaborate with family or team members on shared lists. Assign tasks, track progress together, and sync in real-time.',
     color: 'from-emerald-500 to-green-500',
@@ -142,7 +142,7 @@ const premiumFeatures: PremiumFeature[] = [
   },
   {
     id: 14,
-    icon: <Heart size={48} />,
+    icon: <Heart size={28} />,
     title: 'Mood & Energy Tracking',
     description: 'Track your mood and energy levels with each task. Get insights over time to understand your productivity patterns and optimize your schedule.',
     color: 'from-pink-500 to-rose-500',
@@ -150,7 +150,7 @@ const premiumFeatures: PremiumFeature[] = [
   },
   {
     id: 15,
-    icon: <Mail size={48} />,
+    icon: <Mail size={28} />,
     title: 'Email Summaries',
     description: 'Receive daily or weekly email summaries: "You completed 12 tasks this week!" Stay motivated with progress updates delivered to your inbox.',
     color: 'from-blue-500 to-indigo-500',
@@ -158,7 +158,7 @@ const premiumFeatures: PremiumFeature[] = [
   },
   {
     id: 16,
-    icon: <Bell size={48} />,
+    icon: <Bell size={28} />,
     title: 'Push Notifications',
     description: 'Get instant push notifications on your devices for task reminders, deadlines, and collaboration updates. Never miss a due date again.',
     color: 'from-green-500 to-teal-500',
@@ -166,7 +166,7 @@ const premiumFeatures: PremiumFeature[] = [
   },
   {
     id: 17,
-    icon: <Flame size={48} />,
+    icon: <Flame size={28} />,
     title: 'Streaks & Freeze Tokens',
     description: 'Keep your streaks visible on the dashboard. Freeze tokens let you maintain your streak even on days when you can\'t complete tasks.',
     color: 'from-orange-500 to-red-500',
@@ -180,7 +180,7 @@ interface PremiumFeaturesModalProps {
 }
 
 // Animated Circular Progress Component
-const CircularProgress = ({ progress, size = 120, strokeWidth = 8 }: { progress: number; size?: number; strokeWidth?: number }) => {
+const CircularProgress = ({ progress, size = 80, strokeWidth = 6 }: { progress: number; size?: number; strokeWidth?: number }) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
   const offset = circumference - (progress / 100) * circumference;
@@ -220,7 +220,7 @@ const CircularProgress = ({ progress, size = 120, strokeWidth = 8 }: { progress:
         </defs>
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-2xl font-bold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
+        <span className="text-lg font-bold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
           {Math.round(progress)}%
         </span>
       </div>
@@ -241,9 +241,9 @@ const FeatureCard = ({ feature, isActive }: { feature: PremiumFeature; isActive:
       `}
     >
       {/* Icon Container */}
-      <div className="flex justify-center mb-6">
+      <div className="flex justify-center mb-3 sm:mb-6">
         <div className={`
-          relative w-28 h-28 sm:w-32 sm:h-32 rounded-3xl 
+          relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl 
           bg-gradient-to-br ${feature.color}
           flex items-center justify-center
           shadow-xl ${feature.glowColor}
@@ -255,18 +255,18 @@ const FeatureCard = ({ feature, isActive }: { feature: PremiumFeature; isActive:
           </div>
           {/* Sparkle effects */}
           <div className="absolute -top-2 -right-2">
-            <SparklesIcon className="w-6 h-6 text-white/80 animate-bounce" />
+            <SparklesIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white/80 animate-bounce" />
           </div>
         </div>
       </div>
       
       {/* Title */}
-      <h3 className="text-xl sm:text-2xl font-bold text-center mb-3 text-[var(--text-primary)]">
+      <h3 className="text-base sm:text-xl font-bold text-center mb-2 text-[var(--text-primary)]">
         {feature.title}
       </h3>
       
       {/* Description */}
-      <p className="text-sm sm:text-base text-center text-[var(--text-muted)] leading-relaxed max-w-sm mx-auto">
+      <p className="text-xs sm:text-sm text-center text-[var(--text-muted)] leading-relaxed max-w-xs mx-auto">
         {feature.description}
       </p>
     </div>
@@ -365,15 +365,15 @@ export const PremiumFeaturesModal: React.FC<PremiumFeaturesModalProps> = ({
 
       <div
         className="
-          w-full max-w-3xl mx-4 max-h-[95vh] overflow-hidden
-          bg-[var(--bg-primary)] rounded-3xl
+          w-full max-w-2xl sm:max-w-3xl mx-2 sm:mx-4 max-h-[90vh] overflow-hidden
+          bg-[var(--bg-primary)] rounded-2xl sm:rounded-3xl
           border border-[var(--border-secondary)]
           shadow-[0_25px_80px_rgba(0,0,0,0.5)]
           animate-fade-in
         "
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[var(--border-secondary)]">
+        <div className="flex items-center justify-between p-3 sm:p-6 border-b border-[var(--border-secondary)]">
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="relative p-1.5 sm:p-2 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
               <Zap size={18} className="sm:w-6 sm:h-6 text-white animate-pulse" />
@@ -397,9 +397,9 @@ export const PremiumFeaturesModal: React.FC<PremiumFeaturesModalProps> = ({
         </div>
 
         {/* Main Content */}
-        <div className="p-6 sm:p-10">
+        <div className="p-3 sm:p-6">
           {/* Feature Display */}
-          <div className="min-h-[320px] flex items-center justify-center">
+          <div className="min-h-[200px] sm:min-h-[260px] flex items-center justify-center">
             <FeatureCard 
               feature={currentFeature} 
               isActive={true} 
@@ -407,20 +407,20 @@ export const PremiumFeaturesModal: React.FC<PremiumFeaturesModalProps> = ({
           </div>
 
           {/* Progress Section */}
-          <div className="mt-8">
+          <div className="mt-4 sm:mt-6">
             {/* Circular Progress */}
-            <div className="flex justify-center mb-6">
+            <div className="flex justify-center mb-3 sm:mb-4">
               <CircularProgress progress={progress} />
             </div>
             
             {/* Navigation Dots - Thumbnail Style */}
-            <div className="flex items-center justify-center gap-2 mb-6 flex-wrap px-4">
+            <div className="flex items-center justify-center gap-1 sm:gap-2 mb-3 sm:mb-4 flex-wrap px-2">
               {premiumFeatures.map((feature, index) => (
                 <button
                   key={index}
                   onClick={() => goToSlide(index)}
                   className={`
-                    flex-shrink-0 w-10 h-10 rounded-xl transition-all duration-300
+                    flex-shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-lg transition-all duration-300
                     flex items-center justify-center
                     ${index === currentIndex 
                       ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white scale-110 shadow-lg shadow-indigo-500/30' 
@@ -429,7 +429,7 @@ export const PremiumFeaturesModal: React.FC<PremiumFeaturesModalProps> = ({
                   `}
                   title={feature.title}
                 >
-                  <div className="scale-75">
+                  <div className="scale-50 sm:scale-60">
                     {feature.icon}
                   </div>
                 </button>
@@ -437,12 +437,12 @@ export const PremiumFeaturesModal: React.FC<PremiumFeaturesModalProps> = ({
             </div>
 
             {/* Arrow Navigation */}
-            <div className="flex items-center justify-between px-4">
+            <div className="flex items-center justify-between px-2 sm:px-4">
               <button
                 onClick={goToPrevious}
                 disabled={isAnimating}
                 className="
-                  p-4 rounded-2xl bg-[var(--hover-bg)] 
+                  p-2 sm:p-3 rounded-xl bg-[var(--hover-bg)] 
                   text-[var(--text-primary)] 
                   hover:bg-gradient-to-r hover:from-indigo-500/20 hover:to-purple-500/20
                   transition-all duration-200
@@ -451,22 +451,22 @@ export const PremiumFeaturesModal: React.FC<PremiumFeaturesModalProps> = ({
                   group
                 "
               >
-                <ChevronLeft size={28} className="group-hover:-translate-x-1 transition-transform" />
+                <ChevronLeft size={20} className="sm:w-6 sm:h-6 group-hover:-translate-x-1 transition-transform" />
               </button>
 
-              <div className="flex items-center gap-2">
-                <Star size={16} className="text-yellow-500 fill-yellow-500" />
-                <span className="text-sm font-medium text-[var(--text-muted)]">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Star size={12} className="sm:w-4 sm:h-4 text-yellow-500 fill-yellow-500" />
+                <span className="text-xs sm:text-sm font-medium text-[var(--text-muted)]">
                   {currentIndex === premiumFeatures.length - 1 ? '🎉 All features to be unlocked!' : 'Swipe or use arrow keys to explore'}
                 </span>
-                <Star size={16} className="text-yellow-500 fill-yellow-500" />
+                <Star size={12} className="sm:w-4 sm:h-4 text-yellow-500 fill-yellow-500" />
               </div>
 
               <button
                 onClick={goToNext}
                 disabled={isAnimating}
                 className="
-                  p-4 rounded-2xl bg-[var(--hover-bg)] 
+                  p-2 sm:p-3 rounded-xl bg-[var(--hover-bg)] 
                   text-[var(--text-primary)] 
                   hover:bg-gradient-to-r hover:from-indigo-500/20 hover:to-purple-500/20
                   transition-all duration-200
@@ -475,20 +475,20 @@ export const PremiumFeaturesModal: React.FC<PremiumFeaturesModalProps> = ({
                   group
                 "
               >
-                <ChevronRight size={28} className="group-hover:translate-x-1 transition-transform" />
+                <ChevronRight size={20} className="sm:w-6 sm:h-6 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="p-4 sm:p-5 border-t border-[var(--border-secondary)] bg-gradient-to-r from-indigo-500/5 via-purple-500/5 to-pink-5 rounded-b-3xl">
-          <div className="flex items-center justify-center gap-3">
-            <Rocket size={18} className="text-indigo-500" />
-            <p className="text-center text-sm font-medium text-[var(--text-secondary)]">
+        <div className="p-3 sm:p-5 border-t border-[var(--border-secondary)] bg-gradient-to-r from-indigo-500/5 via-purple-500/5 to-pink-5 rounded-b-2xl sm:rounded-b-3xl">
+          <div className="flex items-center justify-center gap-2 sm:gap-3">
+            <Rocket size={14} className="sm:w-[18px] sm:h-[18px] text-indigo-500" />
+            <p className="text-center text-xs sm:text-sm font-medium text-[var(--text-secondary)]">
               🚀 We're working hard to bring these features to life!
             </p>
-            <Rocket size={18} className="text-purple-500" />
+            <Rocket size={14} className="sm:w-[18px] sm:h-[18px] text-purple-500" />
           </div>
         </div>
       </div>

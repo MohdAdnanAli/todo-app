@@ -123,14 +123,9 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
       onDelete(todoId);
     }, [onDelete]);
 
-    // Empty state
-    if (todos.length === 0) {
-      return (
-        <p className="text-center p-8 rounded-xl border-2 border-dashed border-[var(--border-primary)] text-[var(--text-muted)] bg-[var(--bg-secondary)]">
-          No tasks yet. Add one above! ✨
-        </p>
-      );
-    }
+    // Empty state check - must be a variable, not an early return
+    // to ensure hooks are always called in the same order
+    const renderEmptyState = todos.length === 0;
 
     // Filter panel component (memoized)
     const FilterPanel = useMemo(() => (
@@ -416,7 +411,17 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
         )}
 
         {/* Todo list */}
-        {filteredTodos.length > 0 && renderTodoList()}
+        {renderEmptyState ? (
+          <p className="text-center p-8 rounded-xl border-2 border-dashed border-[var(--border-primary)] text-[var(--text-muted)] bg-[var(--bg-secondary)]">
+            No tasks yet. Add one above! ✨
+          </p>
+        ) : filteredTodos.length > 0 ? (
+          renderTodoList()
+        ) : (
+          <p className="text-center p-8 rounded-xl border-2 border-dashed border-[var(--border-primary)] text-[var(--text-muted)] bg-[var(--bg-secondary)]">
+            No tasks match your filters. Try adjusting them! 🔍
+          </p>
+        )}
       </div>
     );
   }

@@ -1,12 +1,13 @@
 import type { Request, Response } from 'express';
+import type { CookieOptions } from 'express';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
+import { RefreshToken } from '../models/RefreshToken';
 import { googleCallbackSchema } from '../schemas/auth';
 import { logger } from '../utils/logger';
 
 // JWT_SECRET is now checked lazily inside functions that need it
-// This allows dotenv to load first from index.ts
 const getJwtSecret = () => {
   const JWT_SECRET = process.env.JWT_SECRET;
   if (!JWT_SECRET) {
@@ -15,25 +16,31 @@ const getJwtSecret = () => {
   return JWT_SECRET;
 };
 
-const COOKIE_NAME = 'auth_token';
+// Cookie names - match auth.ts
+const ACCESS_TOKEN_COOKIE = 'auth_token';
+const REFRESH_TOKEN_COOKIE = 'refresh_token';
+const ENCRYPTION_SALT_COOKIE = 'enc_salt';
+
+// Token durations
+const ACCESS_TOKEN_EXPIRY = '15m';
+const REFRESH_TOKEN_EXPIRY_DAYS = 30;
 
 // Google OAuth configuration
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
-// CRITICAL: The redirect URI must ALWAYS point to the BACKEND callback, not frontend
-// Production detection - check multiple sources
+// Production detection
 const isProduction = process.env.NODE_ENV === 'production' || 
   process.env.VERCEL === '1' || 
   process.env.RENDER === 'true' ||
   !!process.env.RENDER_URL ||
   !!process.env.VERCEL_URL;
 
-// Hardcoded production URLs as ultimate fallback
+// Production URLs
 const PRODUCTION_BACKEND_URL = 'https://todo-app-srbx.onrender.com';
 const PRODUCTION_FRONTEND_URL = 'https://metb-todo.vercel.app';
 
-// Determine backend URL based on environment
+// Determine URLs based on environment
 let BACKEND_URL = 'http://localhost:5000';
 if (isProduction) {
   BACKEND_URL = PRODUCTION_BACKEND_URL;
@@ -41,7 +48,6 @@ if (isProduction) {
   BACKEND_URL = process.env.API_URL;
 }
 
-// Determine frontend URL based on environment
 let FRONTEND_URL = 'http://localhost:5173';
 if (isProduction) {
   FRONTEND_URL = PRODUCTION_FRONTEND_URL;
@@ -49,7 +55,6 @@ if (isProduction) {
   FRONTEND_URL = process.env.FRONTEND_URL;
 }
 
-// CRITICAL: The redirect URI must ALWAYS point to the BACKEND callback
 let GOOGLE_REDIRECT_URI = `${BACKEND_URL}/api/auth/google/callback`;
 
 logger.info('[Google OAuth] Production mode:', isProduction);
@@ -62,6 +67,34 @@ if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
   logger.warn('[Google OAuth] Google login will not be available');
 }
 
+// ============================================
+// Helper Functions
+// ============================================
+
+// Cookie options helper
+const getCookieOptions = (maxAge?: number): CookieOptions => {
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: (isProduction ? 'none' : 'lax') as CookieOptions['sameSite'],
+    maxAge: maxAge,
+  };
+};
+
+const getClearCookieOptions = (): CookieOptions => {
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: (isProduction ? 'none' : 'lax') as CookieOptions['sameSite'],
+  };
+};
+
+// Generate short-lived access token
+const generateAccessToken = (userId: string): string => {
+  return jwt.sign({ id: userId }, getJwtSecret(), { expiresIn: ACCESS_TOKEN_EXPIRY });
+};
+
+// Interface definitions
 interface GoogleTokenResponse {
   access_token: string;
   id_token: string;
@@ -83,6 +116,7 @@ interface IdTokenPayload {
   email_verified: boolean;
 }
 
+// Google OAuth functions
 const getGoogleAuthUrl = (state?: string): string => {
   if (!GOOGLE_CLIENT_ID) {
     throw new Error('Google OAuth not configured');
@@ -160,6 +194,10 @@ const getGoogleUserInfo = async (accessToken: string, idToken: string): Promise<
   };
 };
 
+// ============================================
+// OAuth Handlers
+// ============================================
+
 export const getGoogleAuthUrlHandler = async (req: Request, res: Response) => {
   try {
     const frontendUrl = req.query.frontendUrl as string | undefined;
@@ -180,33 +218,14 @@ export const getGoogleAuthUrlHandler = async (req: Request, res: Response) => {
     const state = crypto.randomBytes(32).toString('hex');
     const isPopup = req.query.popup === 'true';
     
-    // Store state in cookie (for server-side validation)
-    res.cookie('google_oauth_state', state, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      maxAge: 10 * 60 * 1000,
-    });
-    
-    res.cookie('google_oauth_frontend_url', validatedFrontendUrl, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      maxAge: 10 * 60 * 1000,
-    });
+    // Store state in cookie
+    res.cookie('google_oauth_state', state, getCookieOptions(10 * 60 * 1000));
+    res.cookie('google_oauth_frontend_url', validatedFrontendUrl, getCookieOptions(10 * 60 * 1000));
 
-    // Store popup flag in cookie
     if (isPopup) {
-      res.cookie('google_oauth_is_popup', 'true', {
-        httpOnly: true,
-        secure: isProduction,
-        sameSite: isProduction ? 'none' : 'lax',
-        maxAge: 10 * 60 * 1000,
-      });
+      res.cookie('google_oauth_is_popup', 'true', getCookieOptions(10 * 60 * 1000));
     }
 
-    // Build the auth URL - include state as query param for redundancy
-    // This allows validation via URL param if cookie fails (e.g., in Safari private browsing)
     const authUrlParams = new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID || '',
       redirect_uri: GOOGLE_REDIRECT_URI,
@@ -214,7 +233,7 @@ export const getGoogleAuthUrlHandler = async (req: Request, res: Response) => {
       scope: 'email profile openid',
       access_type: 'offline',
       prompt: 'consent',
-      state: state, // Include state in URL as backup
+      state: state,
     });
 
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${authUrlParams.toString()}`;
@@ -286,7 +305,6 @@ export const googleCallback = async (req: Request, res: Response) => {
     }
 
     let user = await User.findOne({ googleId: googleUser.id });
-    let token = '';
     
     if (!user) {
       // PARALLEL: Check for existing user and get their data in parallel
@@ -353,15 +371,30 @@ export const googleCallback = async (req: Request, res: Response) => {
         $set: { lastLoginAt: new Date() }
       });
 
-      // Generate our own JWT for the todo app
-token = jwt.sign({ id: user._id }, getJwtSecret(), { expiresIn: '7d' });
+      // Generate our own JWT for the todo app (short-lived)
+      const accessToken = jwt.sign({ id: user._id }, getJwtSecret(), { expiresIn: ACCESS_TOKEN_EXPIRY });
 
-      res.cookie(COOKIE_NAME, token, {
-        httpOnly: true,
-        secure: isProduction,
-        sameSite: isProduction ? 'none' : 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
+      // Get device info from request
+      const deviceInfo = {
+        type: 'web',
+        userAgent: req.headers['user-agent'] || null,
+        ipAddress: req.ip || req.socket.remoteAddress || null,
+        name: 'Current Device',
+      };
+
+      // Create refresh token with rotation
+      const { token: refreshToken } = await RefreshToken.createForUser(user._id.toString(), {
+        device: deviceInfo,
+        expiresInDays: REFRESH_TOKEN_EXPIRY_DAYS,
       });
+
+      // Get encryption salt
+      const encryptionSalt = user.encryptionSalt || '';
+
+      // Set all cookies - access token (short-lived), refresh token (long-lived), encryption salt
+      res.cookie(ACCESS_TOKEN_COOKIE, accessToken, getCookieOptions(15 * 60 * 1000));
+      res.cookie(REFRESH_TOKEN_COOKIE, refreshToken, getCookieOptions(REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000));
+      res.cookie(ENCRYPTION_SALT_COOKIE, encryptionSalt, getCookieOptions(7 * 24 * 60 * 60 * 1000));
     }
 
     // Check if this is a popup request - read from cookie instead of query param

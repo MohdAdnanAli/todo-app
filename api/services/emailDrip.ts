@@ -335,28 +335,53 @@ export const emailDripService = {
       const day3 = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
       const day7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-      // Use lean() for faster queries - parallel execution
-      const [day3Users, day7Users] = await Promise.all([
-        User.find({
-          'emailDripSchedule.day3TipsSent': false,
-          'emailDripSchedule.createdAt': { $lte: day3 },
-        }).select('_id email displayName').lean(),
-        
-        User.find({
-          'emailDripSchedule.day7CheckInSent': false,
-          'emailDripSchedule.createdAt': { $lte: day7 },
-        }).select('_id email displayName').lean(),
-      ]);
+      // OPTIMIZED: Single aggregation to find all users needing emails
+      const usersNeedingEmails = await User.aggregate([
+        {
+          $match: {
+            $or: [
+              { 'emailDripSchedule.day3TipsSent': false, 'emailDripSchedule.createdAt': { $lte: day3 } },
+              { 'emailDripSchedule.day7CheckInSent': false, 'emailDripSchedule.createdAt': { $lte: day7 } },
+            ],
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            email: 1,
+            displayName: 1,
+            'emailDripSchedule.day3TipsSent': 1,
+            'emailDripSchedule.day7CheckInSent': 1,
+          },
+        },
+      ]).option({ lean: true });
+
+      if (usersNeedingEmails.length === 0) {
+        logger.info('No pending email drips to process');
+        return;
+      }
+
+      // Separate users by email type
+      const day3Users = usersNeedingEmails.filter(
+        (u: any) => !u.emailDripSchedule?.day3TipsSent
+      );
+      const day7Users = usersNeedingEmails.filter(
+        (u: any) => !u.emailDripSchedule?.day7CheckInSent
+      );
 
       // Create email sending tasks but don't await them - fire and forget
       const sendTasks = [
-        ...day3Users.map(user => this.sendTipsEmail(user._id.toString(), user.email, user.displayName || 'User').catch(() => {})),
-        ...day7Users.map(user => this.sendCheckInEmail(user._id.toString(), user.email, user.displayName || 'User').catch(() => {})),
+        ...day3Users.map((user: any) => 
+          this.sendTipsEmail(user._id.toString(), user.email, user.displayName || 'User').catch(() => {})
+        ),
+        ...day7Users.map((user: any) => 
+          this.sendCheckInEmail(user._id.toString(), user.email, user.displayName || 'User').catch(() => {})
+        ),
       ];
       
       // Fire and forget - process in background
       Promise.allSettled(sendTasks).then(() => {
-        logger.info('Processed pending email drips');
+        logger.info(`Processed pending email drips: ${day3Users.length} day3, ${day7Users.length} day7`);
       });
 
       // Return immediately - don't wait for emails to send

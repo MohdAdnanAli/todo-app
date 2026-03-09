@@ -455,9 +455,12 @@ interface CacheEntry<T> {
 
 class QueryCache {
   private cache: Map<string, CacheEntry<any>> = new Map();
-  private defaultTTL: number = 5000; // 5 seconds default TTL
-  private maxCacheSize: number = 100;
+  private defaultTTL: number = 30000; // 30 seconds default TTL - increased from 5s
+  private maxCacheSize: number = 1000; // Increased from 100 for better caching
   private cleanupInterval: NodeJS.Timeout | null = null;
+  // Hit/miss tracking
+  private hits: number = 0;
+  private misses: number = 0;
 
   constructor() {
     // Cleanup expired entries every 10 seconds
@@ -483,13 +486,18 @@ class QueryCache {
 
   get<T>(key: string): T | null {
     const entry = this.cache.get(key);
-    if (!entry) return null;
-    
-    if (entry.expiresAt < Date.now()) {
-      this.cache.delete(key);
+    if (!entry) {
+      this.misses++;
       return null;
     }
     
+    if (entry.expiresAt < Date.now()) {
+      this.cache.delete(key);
+      this.misses++;
+      return null;
+    }
+    
+    this.hits++;
     return entry.data as T;
   }
 
@@ -530,11 +538,13 @@ class QueryCache {
     }
   }
 
-  getStats(): { size: number; hits: number; misses: number } {
+  getStats(): { size: number; hits: number; misses: number; hitRate: number } {
+    const total = this.hits + this.misses;
     return {
       size: this.cache.size,
-      hits: 0,
-      misses: 0,
+      hits: this.hits,
+      misses: this.misses,
+      hitRate: total > 0 ? this.hits / total : 0,
     };
   }
 

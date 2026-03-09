@@ -24,10 +24,79 @@ const api = axios.create({
   },
 });
 
-// Response interceptor for error handling
+// Track if a refresh is in progress
+let isRefreshing = false;
+let refreshSubscribers: Array<(token: string) => void> = [];
+
+// Subscribe to token refresh
+const subscribeTokenRefresh = (cb: (token: string) => void) => {
+  refreshSubscribers.push(cb);
+};
+
+// Notify all subscribers when new token arrives
+const onTokenRefreshed = (token: string) => {
+  refreshSubscribers.forEach(cb => cb(token));
+  refreshSubscribers = [];
+};
+
+// Response interceptor for error handling and token refresh
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError<ApiError>) => {
+  async (error: AxiosError<ApiError>) => {
+    // Handle network errors gracefully - don't crash the app
+    if (!error.response) {
+      const networkError = new Error('Unable to connect to server. Please check your internet connection.') as Error & { isNetworkError?: boolean };
+      networkError.isNetworkError = true;
+      console.warn('Network error:', error.message);
+      throw networkError;
+    }
+
+    const originalRequest = error.config as any;
+
+    // If 401 and not already refreshing, try to refresh token
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        // If already refreshing, wait for new token
+        return new Promise((resolve) => {
+          subscribeTokenRefresh((token: string) => {
+            originalRequest.headers['Authorization'] = `Bearer ${token}`;
+            resolve(api(originalRequest));
+          });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        // Call the refresh endpoint
+        const response = await axios.post(
+          `${API_URL}/api/auth/refresh`,
+          {},
+          { withCredentials: true }
+        );
+        
+        const { accessToken } = response.data;
+        
+        // Notify all waiting requests
+        onTokenRefreshed(accessToken);
+        isRefreshing = false;
+
+        // Retry the original request
+        originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        isRefreshing = false;
+        // Refresh failed - dispatch logout event but don't crash
+        try {
+          window.dispatchEvent(new CustomEvent('auth:logout', { detail: { reason: 'token_expired' } }));
+        } catch (e) {
+          console.warn('Failed to dispatch logout event:', e);
+        }
+        return Promise.reject(refreshError);
+      }
+    }
+
     if (error.response?.status === 429) {
       const retryAfter = error.response.data?.retryAfter || 60;
       const customError = new Error('Rate limit exceeded') as Error & { retryAfter?: number; isRateLimit?: boolean };
@@ -35,6 +104,9 @@ api.interceptors.response.use(
       customError.isRateLimit = true;
       throw customError;
     }
+
+    // Log other errors for debugging but don't crash
+    console.warn('API Error:', error.response?.status, error.response?.data);
     throw error;
   }
 );
@@ -69,6 +141,11 @@ export const authApi = {
 
   resetPassword: async (token: string, password: string): Promise<{ message: string }> => {
     const res = await api.post<{ message: string }>('/api/auth/reset-password', { token, password });
+    return res.data;
+  },
+
+  refreshToken: async (): Promise<{ accessToken: string; expiresIn: number }> => {
+    const res = await api.post<{ accessToken: string; expiresIn: number }>('/api/auth/refresh');
     return res.data;
   },
 

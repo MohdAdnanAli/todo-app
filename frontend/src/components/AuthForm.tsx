@@ -462,36 +462,6 @@ const AuthForm = ({ onLogin, onRegister }: AuthFormProps): JSX.Element => {
             </div>
           )}
 
-          {/* Google Sign-In Button - Show for login and register */}
-          {(mode === 'login' || mode === 'register') && (
-            <div className="mb-4">
-              <button
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={isLoading}
-                className="w-full py-3 px-4 rounded-lg font-medium text-base transition-all duration-200
-                  bg-white text-gray-700 border border-gray-300 hover:bg-gray-50
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  flex items-center justify-center gap-3"
-              >
-                <GoogleIcon />
-                {isLoading ? 'Please wait...' : mode === 'login' ? 'Continue with Google' : 'Sign up with Google'}
-              </button>
-            </div>
-          )}
-
-          {/* Divider */}
-          {(mode === 'login' || mode === 'register') && (
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-[var(--border-secondary)]"></div>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-[var(--bg-secondary)] px-2 text-[var(--text-muted)]">Or</span>
-              </div>
-            </div>
-          )}
-
           {/* Submit Button */}
           <button
             type="submit"
@@ -521,6 +491,36 @@ const AuthForm = ({ onLogin, onRegister }: AuthFormProps): JSX.Element => {
               >
                 Forgot Password?
               </span>
+            </div>
+          )}
+
+          {/* Divider - Show after Forgot Password for login/register */}
+          {(mode === 'login' || mode === 'register') && (
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-[var(--border-secondary)]"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-[var(--bg-secondary)] px-2 text-[var(--text-muted)]">Or</span>
+              </div>
+            </div>
+          )}
+
+          {/* Google Sign-In Button - Show after Forgot Password for login/register */}
+          {(mode === 'login' || mode === 'register') && (
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isLoading}
+                className="w-full py-3 px-4 rounded-lg font-medium text-base transition-all duration-200
+                  bg-white text-gray-700 border border-gray-300 hover:bg-gray-50
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  flex items-center justify-center gap-3"
+              >
+                <GoogleIcon />
+                {isLoading ? 'Please wait...' : mode === 'login' ? 'Continue with Google' : 'Sign up with Google'}
+              </button>
             </div>
           )}
 

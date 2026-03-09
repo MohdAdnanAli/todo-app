@@ -8,7 +8,7 @@ import cookieParser from 'cookie-parser';
 import path from 'path';
 import compression from 'compression';
 
-import { register, login, verifyEmail, requestPasswordReset, resetPassword, updateProfile, getProfile, deleteUser, getOnboardingStatus, completeOnboarding, updateQuickStartProgress, resetOnboarding } from './controllers/auth';
+import { register, login, verifyEmail, requestPasswordReset, resetPassword, updateProfile, getProfile, deleteUser, getOnboardingStatus, completeOnboarding, updateQuickStartProgress, resetOnboarding, refreshToken, logout, getSessions, revokeSession, revokeAllSessions } from './controllers/auth';
 import { getDashboardStats, getAllUsers, getUserDetails, updateUser, deleteUser as adminDeleteUser, getAllTodos, deleteTodo as adminDeleteTodo, deleteMultipleTodos, getSystemHealth } from './controllers/admin';
 import { getGoogleAuthUrlHandler, googleCallback, googleError, linkGoogleAccount, unlinkGoogleAccount, getGoogleAuthStatus } from './controllers/googleAuth';
 import { checkEmailAvailability } from './controllers/emailCheck';
@@ -152,11 +152,19 @@ app.post('/api/auth/set-token', (req, res) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'none' : 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    maxAge: 15 * 60 * 1000, // 15 minutes - short-lived access token
   });
   
   res.json({ message: 'Token set successfully' });
 });
+
+// NEW: Token refresh endpoint (for automatic token rotation)
+app.post('/api/auth/refresh', refreshToken);
+
+// Session management endpoints
+app.get('/api/auth/sessions', protect, getSessions);
+app.post('/api/auth/sessions/revoke', protect, revokeSession);
+app.post('/api/auth/sessions/revoke-all', protect, revokeAllSessions);
 
 // Protected routes
 app.get('/api/todos', protect, getTodos);
@@ -203,16 +211,7 @@ app.get('/api/profile', protect, getProfile);
 app.put('/api/profile', protect, updateProfile);
 app.delete('/api/profile', protect, deleteUser);
 
-app.post('/api/auth/logout', (req, res) => {
-  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
-  res.clearCookie('auth_token', {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'lax',
-  });
-
-  res.status(200).json({ message: 'Logged out successfully' });
-});
+app.post('/api/auth/logout', logout);
 
 // Onboarding routes
 app.get('/api/onboarding/status', protect, getOnboardingStatus);

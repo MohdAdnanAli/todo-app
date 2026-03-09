@@ -49,8 +49,13 @@ const TodoItemCore: React.FC<TodoItemProps> = memo(({
   isDragging = false,
 }) => {
   // Defensive check: ensure todo has required properties
+  // Return a placeholder instead of null to maintain hook consistency
   if (!todo || !todo._id || typeof todo.text !== 'string') {
-    return null;
+    return (
+      <li className="p-2 sm:p-3 mb-2 sm:mb-3 rounded-xl border border-dashed border-[var(--border-secondary)] bg-[var(--bg-secondary)] opacity-50">
+        <span className="text-sm text-[var(--text-muted)]">Invalid task data</span>
+      </li>
+    );
   }
   
   const { category = 'other', priority = 'medium', tags = [], dueDate } = todo;

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { offlineStorage } from '../services/offlineStorage';
+import { authApi } from '../services/api';
 
 interface GoogleAuthHandlerProps {
   onGoogleAuth?: (token: string, googleId: string, encryptionSalt: string) => void;
@@ -12,8 +13,10 @@ interface GoogleAuthHandlerProps {
  * This component listens for URL parameters from Google OAuth redirect
  * and saves the encryptionSalt and googleId for todo encryption.
  * 
- * Note: Authentication is primarily cookie-based, so token handling
- * is minimal. The main purpose is to capture encryption credentials.
+ * Primary flow: encryptionSalt is now stored in httpOnly cookie (enc_salt)
+ * and retrieved from /api/me endpoint after successful authentication.
+ * 
+ * Fallback: URL params (encryptionSalt, googleId) for backwards compatibility
  */
 export const GoogleAuthHandler: React.FC<GoogleAuthHandlerProps> = ({ onGoogleAuth }) => {
   const navigate = useNavigate();
@@ -34,27 +37,55 @@ export const GoogleAuthHandler: React.FC<GoogleAuthHandlerProps> = ({ onGoogleAu
       }
 
       if (googleAuth === 'success') {
-        // Save encryption salt for todo decryption
-        if (salt) {
-          try {
-            await offlineStorage.saveEncryptionSalt(salt);
-          } catch (err) {
-            console.error('Failed to save encryption salt:', err);
-          }
-        }
+        // Try to get encryption salt from URL params first (backwards compatibility)
+        // Then fetch from /api/me for the secure cookie-based approach
+        let encryptionSalt = salt || '';
         
-        // Save googleId as password for encryption
-        if (googleId) {
-          try {
-            await offlineStorage.savePassword(googleId);
-          } catch (err) {
-            console.error('Failed to save googleId:', err);
+        try {
+          // Fetch user data to get encryption salt from secure cookie
+          const meData = await authApi.getMe();
+          if (meData.encryptionSalt) {
+            encryptionSalt = meData.encryptionSalt;
+            
+            // Save to offline storage for local encryption
+            try {
+              await offlineStorage.saveEncryptionSalt(encryptionSalt);
+            } catch (err) {
+              console.error('Failed to save encryption salt:', err);
+            }
+          }
+          
+          // Also save googleId if available
+          if (meData.googleId) {
+            try {
+              await offlineStorage.savePassword(meData.googleId);
+            } catch (err) {
+              console.error('Failed to save googleId:', err);
+            }
+          }
+        } catch (err) {
+          // Fallback: use URL params if /api/me fails
+          console.warn('Failed to fetch /api/me, using URL params for encryption salt');
+          if (salt) {
+            try {
+              await offlineStorage.saveEncryptionSalt(salt);
+            } catch (err) {
+              console.error('Failed to save encryption salt:', err);
+            }
+          }
+          
+          if (googleId) {
+            try {
+              await offlineStorage.savePassword(googleId);
+            } catch (err) {
+              console.error('Failed to save googleId:', err);
+            }
           }
         }
         
         // Call optional callback if provided
-        if (onGoogleAuth && token && googleId && salt) {
-          onGoogleAuth(token, googleId, salt);
+        if (onGoogleAuth && token && googleId && encryptionSalt) {
+          onGoogleAuth(token, googleId, encryptionSalt);
         }
 
         // Clear URL params
