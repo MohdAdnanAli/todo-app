@@ -10,7 +10,6 @@ const todoSchema = new Schema({
     required: true,
     trim: true,
     maxlength: 500,
-    index: 'text',
   },
   completed: {
     type: Boolean,
