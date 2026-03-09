@@ -20,8 +20,6 @@ import mongoose from 'mongoose';
 import { logger } from './utils/logger';
 import { connectDB, gracefulShutdown, getDBState } from './utils/database';
 
-dotenv.config();
-
 // Set trust proxy BEFORE creating express app
 const app = express();
 app.enable('trust proxy'); // Enable trust proxy at app level

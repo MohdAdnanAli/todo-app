@@ -239,10 +239,14 @@ export const emailDripService = {
         html: template.html,
       });
 
-      await User.findByIdAndUpdate(userId, {
-        'emailDripSchedule.day1WelcomeSent': true,
-        'emailDripSchedule.day1WelcomeSentAt': new Date(),
-      });
+      // Use findOneAndUpdate directly instead of findById for efficiency
+      await User.findOneAndUpdate(
+        { _id: userId },
+        {
+          'emailDripSchedule.day1WelcomeSent': true,
+          'emailDripSchedule.day1WelcomeSentAt': new Date(),
+        },
+      );
 
       logger.info(`Welcome email sent to ${email}`);
     } catch (error) {
@@ -331,23 +335,22 @@ export const emailDripService = {
       const day3 = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
       const day7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
+      // Use lean() for faster queries
       const day3Users = await User.find({
         'emailDripSchedule.day3TipsSent': false,
         'emailDripSchedule.createdAt': { $lte: day3 },
-      });
-
-      for (const user of day3Users) {
-        await this.sendTipsEmail(user._id.toString(), user.email, user.displayName || 'User');
-      }
+      }).select('_id email displayName').lean();
 
       const day7Users = await User.find({
         'emailDripSchedule.day7CheckInSent': false,
         'emailDripSchedule.createdAt': { $lte: day7 },
-      });
+      }).select('_id email displayName').lean();
 
-      for (const user of day7Users) {
-        await this.sendCheckInEmail(user._id.toString(), user.email, user.displayName || 'User');
-      }
+      // Process in parallel using Promise.all for better performance
+      await Promise.all([
+        ...day3Users.map(user => this.sendTipsEmail(user._id.toString(), user.email, user.displayName || 'User')),
+        ...day7Users.map(user => this.sendCheckInEmail(user._id.toString(), user.email, user.displayName || 'User')),
+      ]);
 
       logger.info('Processed pending email drips');
     } catch (error) {

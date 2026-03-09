@@ -60,7 +60,7 @@ export const register = async (req: Request, res: Response) => {
       return res.status(409).json({ error: 'Email already in use' });
     }
 
-    const salt = await bcrypt.genSalt(12);
+    const salt = await bcrypt.genSalt(10);
     const hashed = await bcrypt.hash(password, salt);
     const verificationToken = generateVerificationToken();
     
@@ -305,7 +305,7 @@ export const resetPassword = async (req: Request, res: Response) => {
       return res.status(400).json({ error: passwordValidation.errors[0] || 'Password does not meet requirements' });
     }
 
-    const salt = await bcrypt.genSalt(12);
+    const salt = await bcrypt.genSalt(10);
     const hashed = await bcrypt.hash(password, salt);
 
     // Use findOneAndUpdate for efficiency - avoids fetching then saving

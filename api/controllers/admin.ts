@@ -105,26 +105,33 @@ export const getAllUsers = async (req: AdminRequest, res: Response) => {
       User.countDocuments(query),
     ]);
 
-    // Get todo counts for each user
-    const usersWithCounts = await Promise.all(
-      users.map(async (user: any) => {
-        const todoCount = await Todo.countDocuments({ user: user._id });
-        const completedCount = await Todo.countDocuments({ user: user._id, completed: true });
-        return {
-          id: user._id,
-          email: user.email,
-          displayName: user.displayName,
-          bio: user.bio,
-          avatar: user.avatar,
-          emailVerified: user.emailVerified,
-          todoCount,
-          completedCount,
-          completionRate: todoCount > 0 ? Math.round((completedCount / todoCount) * 100) : 0,
-          lastLoginAt: user.lastLoginAt,
-          createdAt: user.createdAt,
-        };
-      })
-    );
+    // Get todo counts using aggregation for better performance (single query instead of N+1)
+    const userIds = users.map((u: any) => u._id);
+    const todoStats = await Todo.aggregate([
+      { $match: { user: { $in: userIds } } },
+      { $group: { _id: '$user', total: { $sum: 1 }, completed: { $sum: { $cond: ['$completed', 1, 0] } } } }
+    ]);
+
+    // Create a map for quick lookup
+    const todoStatsMap = new Map(todoStats.map((stat: any) => [stat._id.toString(), stat]));
+
+    // Map users with their todo counts
+    const usersWithCounts = users.map((user: any) => {
+      const stats = todoStatsMap.get(user._id.toString()) || { total: 0, completed: 0 };
+      return {
+        id: user._id,
+        email: user.email,
+        displayName: user.displayName,
+        bio: user.bio,
+        avatar: user.avatar,
+        emailVerified: user.emailVerified,
+        todoCount: stats.total,
+        completedCount: stats.completed,
+        completionRate: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0,
+        lastLoginAt: user.lastLoginAt,
+        createdAt: user.createdAt,
+      };
+    });
 
     res.json({
       users: usersWithCounts,
@@ -161,6 +168,13 @@ export const getUserDetails = async (req: AdminRequest, res: Response) => {
       .select('-__v')
       .lean();
 
+    // Use single reduce pass instead of two filter passes for efficiency
+    const todoStats = todos.reduce((acc: { completed: number; pending: number }, t: any) => {
+      if (t.completed) acc.completed++;
+      else acc.pending++;
+      return acc;
+    }, { completed: 0, pending: 0 });
+
     res.json({
       user: {
         id: user._id,
@@ -175,8 +189,8 @@ export const getUserDetails = async (req: AdminRequest, res: Response) => {
       },
       todos: {
         total: todos.length,
-        completed: todos.filter((t: any) => t.completed).length,
-        pending: todos.filter((t: any) => !t.completed).length,
+        completed: todoStats.completed,
+        pending: todoStats.pending,
         items: todos,
       },
     });

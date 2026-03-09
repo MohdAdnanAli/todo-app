@@ -315,7 +315,7 @@ export const googleCallback = async (req: Request, res: Response) => {
         if (!existingUser.password) {
           const bcrypt = await import('bcryptjs');
           const generatedPassword = `google_${googleUser.id}_${Date.now()}`;
-          existingUser.password = await bcrypt.hash(generatedPassword, 12);
+          existingUser.password = await bcrypt.hash(generatedPassword, 10);
         }
         
         await existingUser.save();
@@ -329,7 +329,7 @@ export const googleCallback = async (req: Request, res: Response) => {
         
         user = await User.create({
           email: googleUser.email.toLowerCase(),
-          password: await bcrypt.hash(generatedPassword, 12),
+          password: await bcrypt.hash(generatedPassword, 10),
           displayName: googleUser.name || googleUser.given_name || 'Google User',
           authProvider: 'google',
           isGoogleUser: true,
