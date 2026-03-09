@@ -29,9 +29,15 @@ const serializeTodo = (todo: any) => ({
 // Helper to serialize array of todos
 const serializeTodos = (todos: any[]) => todos.map(serializeTodo);
 
-// Invalidate todo cache for a user
+// Invalidate todo cache for a user - FIRE AND FORGET for performance
+// This runs asynchronously without blocking the response
 const invalidateTodoCache = (userId: string) => {
-  queryCache.invalidatePrefix(`todos:${userId}`);
+  // Fire and forget - cache invalidation is not critical
+  try {
+    queryCache.invalidatePrefix(`todos:${userId}`);
+  } catch {
+    // Silently ignore cache errors
+  }
 };
 
 const createTodoSchema = z.object({
@@ -90,6 +96,16 @@ export const getTodos = async (req: Request & { user?: { id: string } }, res: Re
     const cacheKey = `todos:${userId}:p${page}:l${limit}`;
     const cached = queryCache.get<any[]>(cacheKey);
     if (cached !== null && page === 1) {
+      // Generate ETag for cached content
+      const etag = `W/"${Buffer.from(JSON.stringify(cached)).toString('base64')}"`;
+      
+      // Check If-None-Match header
+      if (req.headers['if-none-match'] === etag) {
+        return res.status(304).end();
+      }
+      
+      res.setHeader('ETag', etag);
+      res.setHeader('Cache-Control', 'private, max-age=3'); // Cache for 3 seconds
       return res.json(cached);
     }
     
@@ -104,6 +120,18 @@ export const getTodos = async (req: Request & { user?: { id: string } }, res: Re
       .lean();
 
     const serialized = serializeTodos(todos);
+    
+    // Generate ETag
+    const etag = `W/"${Buffer.from(JSON.stringify(serialized)).toString('base64')}"`;
+    
+    // Check If-None-Match header
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end();
+    }
+    
+    // Set caching headers
+    res.setHeader('ETag', etag);
+    res.setHeader('Cache-Control', page === 1 ? 'private, max-age=3' : 'no-cache');
     
     // Cache first page results for 3 seconds
     if (page === 1) {
@@ -223,32 +251,32 @@ export const deleteTodo = async (req: Request & { user?: { id: string } }, res: 
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    // Optimized: Simple delete without transaction - single document operation
-    const todo = await Todo.findOneAndDelete({ _id: id, user: userId }).lean();
+    // Get the order of the todo being deleted BEFORE deleting
+    const todoToDelete = await Todo.findOne({ _id: id, user: userId })
+      .select('order')
+      .lean();
 
-    if (!todo) {
+    if (!todoToDelete) {
       return res.status(404).json({ error: 'Todo not found or not owned by user' });
     }
 
-    // Normalize orders after deletion - use bulkWrite for efficiency
-    const remainingTodos = await Todo.find({ user: userId })
-      .sort({ order: 1 })
-      .select('_id order')
-      .lean();
+    const deletedOrder = todoToDelete.order;
 
-    if (remainingTodos.length > 0) {
-      // Rebuild all orders sequentially using bulkWrite (more efficient than individual updates)
-      const bulkOps = remainingTodos.map((t, index) => ({
-        updateOne: {
-          filter: { _id: t._id },
-          update: { $set: { order: index } },
-        },
-      }));
-      
-      await Todo.bulkWrite(bulkOps);
+    // Optimized: Simple delete without transaction - single document operation
+    const result = await Todo.deleteOne({ _id: id, user: userId });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Todo not found or not owned by user' });
     }
 
-    // Invalidate cache for this user
+    // OPTIMIZED: Only update orders for items that were AFTER the deleted item
+    // This is much faster than rebuilding ALL orders
+    await Todo.updateMany(
+      { user: userId, order: { $gt: deletedOrder } },
+      { $inc: { order: -1 } }
+    );
+
+    // Invalidate cache for this user (fire and forget)
     invalidateTodoCache(userId);
 
     // Optimized: Return only the deleted todo ID instead of full list

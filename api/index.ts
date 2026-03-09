@@ -6,6 +6,7 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import path from 'path';
+import compression from 'compression';
 
 import { register, login, verifyEmail, requestPasswordReset, resetPassword, updateProfile, getProfile, deleteUser, getOnboardingStatus, completeOnboarding, updateQuickStartProgress, resetOnboarding } from './controllers/auth';
 import { getDashboardStats, getAllUsers, getUserDetails, updateUser, deleteUser as adminDeleteUser, getAllTodos, deleteTodo as adminDeleteTodo, deleteMultipleTodos, getSystemHealth } from './controllers/admin';
@@ -61,8 +62,12 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// Compression middleware for faster responses
+app.use(compression());
+
 app.use(cookieParser());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true, limit: '10kb' })); // Limit body size for performance
 app.use(apiLimiter); // Apply general rate limiter
 
 const dns = require('dns');
@@ -72,9 +77,15 @@ dns.setServers(['8.8.8.8', '8.8.4.4']);
 // Database - Using new improved database utility
 // ────────────────────────────────────────────────
 
-// Lazy connection middleware - MUST be before routes
+// Lazy connection middleware - OPTIMIZED: skip check if already connected
 // This ensures database is connected before each request in serverless environments
 app.use(async (req, res, next) => {
+  // Fast path: if already connected, skip any async operations
+  if (mongoose.connection.readyState === 1) {
+    return next();
+  }
+  
+  // Slow path: need to ensure connection
   try {
     const connected = await connectDB();
     if (!connected) {

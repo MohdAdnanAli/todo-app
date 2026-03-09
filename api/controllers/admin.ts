@@ -19,39 +19,54 @@ interface AdminRequest extends Request {
 // ───────────────────────────────────────────────
 
 /**
- * Get comprehensive dashboard statistics
+ * Get comprehensive dashboard statistics - OPTIMIZED with single aggregation pipeline
  */
 export const getDashboardStats = async (req: AdminRequest, res: Response) => {
   try {
-    const [
-      totalUsers,
-      totalTodos,
-      completedTodos,
-      pendingTodos,
-      recentUsers,
-    ] = await Promise.all([
-      User.countDocuments({}),
-      Todo.countDocuments({}),
-      Todo.countDocuments({ completed: true }),
-      Todo.countDocuments({ completed: false }),
-      User.find({})
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .select('email displayName createdAt lastLoginAt')
-        .lean(),
+    // Use single aggregation pipeline for all stats - much faster than individual queries
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const [userStats, todoStats, activeUsersResult] = await Promise.all([
+      // Single aggregation for all user stats
+      User.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalUsers: { $sum: 1 },
+          }
+        }
+      ]),
+      // Single aggregation for all todo stats
+      Todo.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalTodos: { $sum: 1 },
+            completedTodos: { $sum: { $cond: ['$completed', 1, 0] } },
+          }
+        }
+      ]),
+      // Active users in last 7 days
+      User.countDocuments({ lastLoginAt: { $gte: sevenDaysAgo } }),
     ]);
+
+    const totalUsers = userStats[0]?.totalUsers || 0;
+    const totalTodos = todoStats[0]?.totalTodos || 0;
+    const completedTodos = todoStats[0]?.completedTodos || 0;
+    const pendingTodos = totalTodos - completedTodos;
 
     // Get todo completion rate
     const completionRate = totalTodos > 0 
       ? Math.round((completedTodos / totalTodos) * 100) 
       : 0;
 
-    // Get active users (last 7 days)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const activeUsers = await User.countDocuments({
-      lastLoginAt: { $gte: sevenDaysAgo },
-    });
+    // Get recent users - lean query with projection
+    const recentUsers = await User.find({})
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select('email displayName createdAt lastLoginAt')
+      .lean();
 
     res.json({
       stats: {
@@ -60,7 +75,7 @@ export const getDashboardStats = async (req: AdminRequest, res: Response) => {
         completedTodos,
         pendingTodos,
         completionRate,
-        activeUsers,
+        activeUsers: activeUsersResult,
       },
       recentUsers,
     });

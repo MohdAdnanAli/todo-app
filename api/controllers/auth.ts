@@ -77,58 +77,56 @@ export const register = async (req: Request, res: Response) => {
       encryptionSalt,
     });
 
-    // Schedule email drip sequence (non-blocking)
-    emailDripService.scheduleEmailDrip(user._id.toString(), email, user.displayName || 'User').catch(err => {
-      logger.warn('[Email Drip] Could not schedule email drip (SMTP not configured)');
-    });
-
-    // Create example todos for the user (non-blocking with error isolation)
-    // Don't let todo creation failure prevent user registration
-    try {
-      const { Todo } = await import('../models/Todo');
-      const exampleTodos = [
-        {
-          text: '📧 Check welcome email for tips',
-          completed: false,
-          category: 'personal',
-          priority: 'high',
-          tags: ['getting-started'],
-          dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
-          order: 0,
-          user: user._id,
-        },
-        {
-          text: '🚀 Set up your first project',
-          completed: false,
-          category: 'work',
-          priority: 'high',
-          tags: ['getting-started'],
-          dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-          order: 1,
-          user: user._id,
-        },
-        {
-          text: '🎯 Review your goals for this week',
-          completed: false,
-          category: 'personal',
-          priority: 'medium',
-          tags: ['getting-started', 'planning'],
-          dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-          order: 2,
-          user: user._id,
-        },
-      ];
-      
-      await Todo.insertMany(exampleTodos);
-      logger.info(`[Onboarding] Created ${exampleTodos.length} example todos for user ${user._id}`);
-    } catch (todoErr) {
-      // Log but don't fail - user can still use the app
-      logger.warn('[Onboarding] Could not create example todos:', todoErr instanceof Error ? todoErr.message : 'Unknown error');
-    }
-
-    // Send verification email (non-blocking, log error but continue)
-    sendVerificationEmail(email, verificationToken).catch(err => {
-      logger.warn('[Email] Verification email could not be sent (SMTP not configured)');
+    // PARALLEL OPERATIONS: Run non-critical tasks in parallel (fire and forget)
+    // This significantly reduces response time
+    Promise.allSettled([
+      // Schedule email drip sequence
+      emailDripService.scheduleEmailDrip(user._id.toString(), email, user.displayName || 'User'),
+      // Send verification email
+      sendVerificationEmail(email, verificationToken),
+      // Create example todos
+      (async () => {
+        try {
+          const { Todo } = await import('../models/Todo');
+          const exampleTodos = [
+            {
+              text: '📧 Check welcome email for tips',
+              completed: false,
+              category: 'personal',
+              priority: 'high',
+              tags: ['getting-started'],
+              dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
+              order: 0,
+              user: user._id,
+            },
+            {
+              text: '🚀 Set up your first project',
+              completed: false,
+              category: 'work',
+              priority: 'high',
+              tags: ['getting-started'],
+              dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+              order: 1,
+              user: user._id,
+            },
+            {
+              text: '🎯 Review your goals for this week',
+              completed: false,
+              category: 'personal',
+              priority: 'medium',
+              tags: ['getting-started', 'planning'],
+              dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+              order: 2,
+              user: user._id,
+            },
+          ];
+          await Todo.insertMany(exampleTodos);
+        } catch (todoErr) {
+          logger.warn('[Onboarding] Could not create example todos:', todoErr instanceof Error ? todoErr.message : 'Unknown error');
+        }
+      })(),
+    ]).catch(() => {
+      // Silently handle background task errors
     });
 
     return res.status(201).json({

@@ -335,24 +335,31 @@ export const emailDripService = {
       const day3 = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
       const day7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-      // Use lean() for faster queries
-      const day3Users = await User.find({
-        'emailDripSchedule.day3TipsSent': false,
-        'emailDripSchedule.createdAt': { $lte: day3 },
-      }).select('_id email displayName').lean();
-
-      const day7Users = await User.find({
-        'emailDripSchedule.day7CheckInSent': false,
-        'emailDripSchedule.createdAt': { $lte: day7 },
-      }).select('_id email displayName').lean();
-
-      // Process in parallel using Promise.all for better performance
-      await Promise.all([
-        ...day3Users.map(user => this.sendTipsEmail(user._id.toString(), user.email, user.displayName || 'User')),
-        ...day7Users.map(user => this.sendCheckInEmail(user._id.toString(), user.email, user.displayName || 'User')),
+      // Use lean() for faster queries - parallel execution
+      const [day3Users, day7Users] = await Promise.all([
+        User.find({
+          'emailDripSchedule.day3TipsSent': false,
+          'emailDripSchedule.createdAt': { $lte: day3 },
+        }).select('_id email displayName').lean(),
+        
+        User.find({
+          'emailDripSchedule.day7CheckInSent': false,
+          'emailDripSchedule.createdAt': { $lte: day7 },
+        }).select('_id email displayName').lean(),
       ]);
 
-      logger.info('Processed pending email drips');
+      // Create email sending tasks but don't await them - fire and forget
+      const sendTasks = [
+        ...day3Users.map(user => this.sendTipsEmail(user._id.toString(), user.email, user.displayName || 'User').catch(() => {})),
+        ...day7Users.map(user => this.sendCheckInEmail(user._id.toString(), user.email, user.displayName || 'User').catch(() => {})),
+      ];
+      
+      // Fire and forget - process in background
+      Promise.allSettled(sendTasks).then(() => {
+        logger.info('Processed pending email drips');
+      });
+
+      // Return immediately - don't wait for emails to send
     } catch (error) {
       logger.error('Error processing pending emails:', error);
     }

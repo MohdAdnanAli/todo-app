@@ -289,37 +289,38 @@ export const googleCallback = async (req: Request, res: Response) => {
     let token = '';
     
     if (!user) {
-      const existingUser = await User.findOne({ email: googleUser.email.toLowerCase() });
+      // PARALLEL: Check for existing user and get their data in parallel
+      const [existingUser] = await Promise.all([
+        User.findOne({ email: googleUser.email.toLowerCase() }).lean()
+      ]);
       
       if (existingUser) {
         if (existingUser.authProvider === 'local' && existingUser.password) {
           return res.redirect(`${frontendUrl}?google_error=${encodeURIComponent('This email is already registered with email/password. Please login with your email and password to link your Google account, or use a different Google account.')}`);
         }
         
-        existingUser.googleId = googleUser.id;
-        existingUser.authProvider = 'google';
-        existingUser.isGoogleUser = true;
-        existingUser.googleProfile = {
-          picture: googleUser.picture,
-          givenName: googleUser.given_name,
-          familyName: googleUser.family_name,
-        };
-        existingUser.emailVerified = googleUser.email_verified;
-        existingUser.lastLoginAt = new Date();
+        // Use findByIdAndUpdate for efficiency instead of save()
+        const bcrypt = await import('bcryptjs');
+        const generatedPassword = `google_${googleUser.id}_${Date.now()}`;
         
-        if (!existingUser.encryptionSalt) {
-          existingUser.encryptionSalt = crypto.randomBytes(16).toString('hex');
-        }
+        await User.findByIdAndUpdate(existingUser._id, {
+          $set: {
+            googleId: googleUser.id,
+            authProvider: 'google',
+            isGoogleUser: true,
+            googleProfile: {
+              picture: googleUser.picture,
+              givenName: googleUser.given_name,
+              familyName: googleUser.family_name,
+            },
+            emailVerified: googleUser.email_verified,
+            lastLoginAt: new Date(),
+            encryptionSalt: existingUser.encryptionSalt || crypto.randomBytes(16).toString('hex'),
+            password: existingUser.password || await bcrypt.hash(generatedPassword, 10),
+          }
+        });
         
-        // Generate a password for Google user for encryption/decryption purposes
-        if (!existingUser.password) {
-          const bcrypt = await import('bcryptjs');
-          const generatedPassword = `google_${googleUser.id}_${Date.now()}`;
-          existingUser.password = await bcrypt.hash(generatedPassword, 10);
-        }
-        
-        await existingUser.save();
-        user = existingUser;
+        user = await User.findById(existingUser._id);
       } else {
         const newEncryptionSalt = crypto.randomBytes(16).toString('hex');
         
@@ -347,8 +348,10 @@ export const googleCallback = async (req: Request, res: Response) => {
     }
 
     if (user) {
-      user.lastLoginAt = new Date();
-      await user.save();
+      // Use findByIdAndUpdate instead of save() for faster update
+      await User.findByIdAndUpdate(user._id, {
+        $set: { lastLoginAt: new Date() }
+      });
 
       // Generate our own JWT for the todo app
 token = jwt.sign({ id: user._id }, getJwtSecret(), { expiresIn: '7d' });
@@ -506,51 +509,60 @@ export const linkGoogleAccount = async (req: Request & { user?: { id: string } }
 
     const googleUser = await googleUserInfoResponse.json() as GoogleUserInfo;
 
-    const existingGoogleUser = await User.findOne({ googleId: googleUser.id });
+    // Use lean() for faster queries
+    const existingGoogleUser = await User.findOne({ googleId: googleUser.id }).lean();
     if (existingGoogleUser && existingGoogleUser._id.toString() !== userId) {
       return res.status(409).json({ error: 'This Google account is already linked to another user' });
     }
 
-    const user = await User.findById(userId);
+    // Use findById with lean() for faster query
+    const user = await User.findById(userId).lean();
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+
+    // Store values we need before the update
+    const userEmail = user.email;
+    const userDisplayName = user.displayName;
+    const userAvatar = user.avatar;
 
     if (user.googleId) {
       return res.status(409).json({ error: 'Google account already linked' });
     }
 
+    // Use lean() for query
     const existingEmailUser = await User.findOne({ 
       email: googleUser.email.toLowerCase(),
       _id: { $ne: userId }
-    });
+    }).lean();
     
     if (existingEmailUser) {
       return res.status(409).json({ error: 'This Google email is already registered with another account' });
     }
 
-    user.googleId = googleUser.id;
-    user.authProvider = 'google';
-    user.isGoogleUser = true;
-    user.googleProfile = {
-      picture: googleUser.picture,
-      givenName: googleUser.given_name,
-      familyName: googleUser.family_name,
-    };
-    user.emailVerified = true;
-    if (!user.avatar) {
-      user.avatar = googleUser.picture;
-    }
-    
-    await user.save();
+    // Use findByIdAndUpdate for efficiency - single operation instead of save()
+    await User.findByIdAndUpdate(userId, {
+      $set: {
+        googleId: googleUser.id,
+        authProvider: 'google',
+        isGoogleUser: true,
+        googleProfile: {
+          picture: googleUser.picture,
+          givenName: googleUser.given_name,
+          familyName: googleUser.family_name,
+        },
+        emailVerified: true,
+        avatar: userAvatar || googleUser.picture,
+      }
+    });
 
     return res.json({ 
       message: 'Google account linked successfully',
       user: { 
-        id: user._id, 
-        email: user.email, 
-        displayName: user.displayName,
-        isGoogleUser: user.isGoogleUser,
+        id: userId, 
+        email: userEmail, 
+        displayName: userDisplayName,
+        isGoogleUser: true,
       }
     });
   } catch (err: unknown) {
@@ -572,31 +584,38 @@ export const unlinkGoogleAccount = async (req: Request & { user?: { id: string }
       return res.status(400).json({ error: 'Password is required to unlink Google account' });
     }
 
-    const user = await User.findById(userId);
+    // Use lean() + select for faster query
+    const user = await User.findById(userId).select('password googleId').lean();
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+
+    // Store password locally to avoid TS error
+    const userPassword = user.password;
 
     if (!user.googleId) {
       return res.status(400).json({ error: 'Google account not linked' });
     }
 
     const bcrypt = await import('bcryptjs');
-    const match = await bcrypt.compare(password, user.password || '');
+    const match = await bcrypt.compare(password, userPassword || '');
     if (!match) {
       return res.status(401).json({ error: 'Invalid password' });
     }
 
-    if (!user.password) {
+    if (!userPassword) {
       return res.status(400).json({ error: 'Please set a password before unlinking Google account' });
     }
 
-    user.googleId = null;
-    user.authProvider = 'local';
-    user.isGoogleUser = false;
-    user.googleProfile = null;
-    
-    await user.save();
+    // Use findByIdAndUpdate for efficiency - single operation
+    await User.findByIdAndUpdate(userId, {
+      $set: {
+        googleId: null,
+        authProvider: 'local',
+        isGoogleUser: false,
+        googleProfile: null,
+      }
+    });
 
     return res.json({ message: 'Google account unlinked successfully' });
   } catch (err: unknown) {
@@ -612,15 +631,21 @@ export const getGoogleAuthStatus = async (req: Request & { user?: { id: string }
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const user = await User.findById(userId);
+    // Use lean() + select for faster query
+    const user = await User.findById(userId).select('googleId isGoogleUser authProvider').lean();
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Store values locally to avoid TS error
+    const isGoogleUser = user.isGoogleUser;
+    const googleId = user.googleId;
+    const authProvider = user.authProvider;
+
     return res.json({
-      isGoogleUser: user.isGoogleUser,
-      hasGoogleLinked: !!user.googleId,
-      authProvider: user.authProvider,
+      isGoogleUser,
+      hasGoogleLinked: !!googleId,
+      authProvider,
     });
   } catch (err: unknown) {
     logger.error('[Google OAuth] Get status error:', err);

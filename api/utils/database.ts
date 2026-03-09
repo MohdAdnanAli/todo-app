@@ -73,13 +73,13 @@ const isProduction = process.env.NODE_ENV === 'production';
 const isServerless = process.env.VERCEL === '1';
 const isDevelopment = !isProduction && !isServerless;
 
-// Base connection options
+// Base connection options - OPTIMIZED for lower latency
 const baseOptions: mongoose.ConnectOptions = {
-  serverSelectionTimeoutMS: 15000,
-  socketTimeoutMS: 45000,
-  maxPoolSize: 10,
-  minPoolSize: 2,
-  maxIdleTimeMS: 30000,
+  serverSelectionTimeoutMS: 5000, // Reduced from 15000 - faster failure
+  socketTimeoutMS: 30000, // Reduced from 45000
+  maxPoolSize: 50, // Increased from 10 for better concurrency
+  minPoolSize: 5, // Increased from 2 for warm connections
+  maxIdleTimeMS: 60000, // Increased from 30000 - keep connections alive longer
   family: 4,
   retryWrites: true,
   retryReads: true,
@@ -265,10 +265,23 @@ export const forceReconnect = async (): Promise<boolean> => {
 // ============================================
 
 /**
- * Check if database is connected
+ * Check if database is connected - FAST PATH with caching
  */
+let _lastConnectionCheck = 0;
+let _cachedConnectionStatus = false;
+const CONNECTION_CHECK_CACHE_MS = 1000; // Cache for 1 second
+
 export const isDBConnected = (): boolean => {
-  return state.isConnected || mongoose.connection.readyState === 1;
+  const now = Date.now();
+  
+  // Return cached result if checked within cache window
+  if (now - _lastConnectionCheck < CONNECTION_CHECK_CACHE_MS) {
+    return _cachedConnectionStatus;
+  }
+  
+  _lastConnectionCheck = now;
+  _cachedConnectionStatus = state.isConnected || mongoose.connection.readyState === 1;
+  return _cachedConnectionStatus;
 };
 
 /**
