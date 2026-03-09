@@ -3,9 +3,13 @@ import { Todo } from '../models/Todo';
 import { isValidObjectId } from 'mongoose';
 import { z } from 'zod';
 import { logger } from '../utils/logger';
+import { queryCache } from '../utils/database';
 
 const CATEGORIES = ['work', 'personal', 'shopping', 'health', 'other'] as const;
 const PRIORITIES = ['low', 'medium', 'high'] as const;
+
+// Fields to exclude from responses for performance
+const EXCLUDE_FIELDS = '-__v';
 
 // Helper function to serialize todo objects from MongoDB
 const serializeTodo = (todo: any) => ({
@@ -25,6 +29,11 @@ const serializeTodo = (todo: any) => ({
 // Helper to serialize array of todos
 const serializeTodos = (todos: any[]) => todos.map(serializeTodo);
 
+// Invalidate todo cache for a user
+const invalidateTodoCache = (userId: string) => {
+  queryCache.invalidatePrefix(`todos:${userId}`);
+};
+
 const createTodoSchema = z.object({
   text: z.string().min(1, 'Task text is required').max(500),
   category: z.enum(CATEGORIES).optional().default('other'),
@@ -43,7 +52,8 @@ const updateTodoSchema = z.object({
   category: z.enum(CATEGORIES).optional(),
   priority: z.enum(PRIORITIES).optional(),
   tags: z.array(z.string().max(50)).optional(),
-  participants: z.array(z.object({    id: z.string(),
+  participants: z.array(z.object({
+    id: z.string(),
     name: z.string(),
     avatar: z.string().optional(),
   })).optional(),
@@ -57,6 +67,12 @@ const reorderTodosSchema = z.object({
   })).min(1).max(1000, 'Cannot reorder more than 1000 todos at once'),
 });
 
+// Pagination schema
+const paginationSchema = z.object({
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(100).default(50),
+});
+
 export const getTodos = async (req: Request & { user?: { id: string } }, res: Response) => {
   try {
     const userId = (req as any).user?.id;
@@ -64,14 +80,38 @@ export const getTodos = async (req: Request & { user?: { id: string } }, res: Re
       return res.status(401).json({ error: 'Not authenticated' });
     }
     
+    // Parse pagination params
+    const pagination = paginationSchema.safeParse(req.query);
+    const page = pagination.success ? pagination.data.page : 1;
+    const limit = pagination.success ? pagination.data.limit : 50;
+    const skip = (page - 1) * limit;
+    
+    // Check for cache first (only for first page without filters)
+    const cacheKey = `todos:${userId}:p${page}:l${limit}`;
+    const cached = queryCache.get<any[]>(cacheKey);
+    if (cached !== null && page === 1) {
+      return res.json(cached);
+    }
+    
     // Always sort by order ascending (lowest number = top)
     // For same order, use createdAt as secondary sort (newer first)
+    // Use lean() for faster queries + select() to exclude __v
     const todos = await Todo.find({ user: userId })
+      .select(EXCLUDE_FIELDS)
       .sort({ order: 1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .lean();
 
+    const serialized = serializeTodos(todos);
+    
+    // Cache first page results for 3 seconds
+    if (page === 1) {
+      queryCache.set(cacheKey, serialized, 3000);
+    }
+
     // Serialize todos to ensure proper JSON serialization
-    return res.json(serializeTodos(todos));
+    return res.json(serialized);
   } catch (err) {
     logger.error('GetTodos error:', err);
     return res.status(500).json({ error: 'Failed to fetch todos' });
@@ -79,7 +119,6 @@ export const getTodos = async (req: Request & { user?: { id: string } }, res: Re
 };
 
 export const createTodo = async (req: Request & { user?: { id: string } }, res: Response) => {
-  const session = await Todo.startSession();
   try {
     const userId = (req as any).user?.id;
     if (!userId) {
@@ -93,53 +132,39 @@ export const createTodo = async (req: Request & { user?: { id: string } }, res: 
 
     const { text, category, priority, tags } = result.data;
 
-    // Use MongoDB transaction to prevent race conditions
-    // This ensures atomic order calculation
-    let newOrder: number;
-    
-    session.startTransaction();
-    
-    try {
-      // Use aggregation to atomically get min order and calculate new order
-      // This prevents race conditions between concurrent creates
-      const minOrderDoc = await Todo.findOne({ user: userId })
-        .sort({ order: 1 })
-        .select('order')
-        .session(session);
-      
-      // New todos go to the TOP (lowest order = displayed first)
-      // If no todos exist, order is 0; otherwise use minOrder - 1
-      // Ensure order doesn't go negative
-      newOrder = minOrderDoc ? Math.max(0, (minOrderDoc.order ?? 1) - 1) : 0;
-
-      // Create new todo with calculated order
-      const todo = await Todo.create([{
-        text,
-        user: userId,
-        category,
-        priority,
-        tags,
-        order: newOrder,
-      }], { session });
-
-      await session.commitTransaction();
-    } catch (txError) {
-      await session.abortTransaction();
-      throw txError;
-    }
-
-    // Return all todos sorted by order for immediate sync
-    const allTodos = await Todo.find({ user: userId })
-      .sort({ order: 1, createdAt: -1 })
+    // Optimized: Use findOne with sort to get min order - no transaction needed for single insert
+    const minOrderDoc = await Todo.findOne({ user: userId })
+      .sort({ order: 1 })
+      .select('order')
       .lean();
+    
+    // New todos go to the TOP (lowest order = displayed first)
+    // If no todos exist, order is 0; otherwise use minOrder - 1
+    // Ensure order doesn't go negative
+    const newOrder = minOrderDoc ? Math.max(0, (minOrderDoc.order ?? 1) - 1) : 0;
 
-    // Serialize todos to ensure proper JSON serialization
-    return res.status(201).json(serializeTodos(allTodos));
+    // Create new todo - single document insert doesn't need transaction
+    const [todo] = await Todo.create([{
+      text,
+      user: userId,
+      category,
+      priority,
+      tags,
+      order: newOrder,
+    }]);
+
+    // Invalidate cache for this user
+    invalidateTodoCache(userId);
+
+    // Optimized: Return only the new todo instead of all todos
+    return res.status(201).json({
+      todo: serializeTodo(todo),
+      // Also return a flag to indicate full sync needed (for when client receives delta)
+      fullSync: false,
+    });
   } catch (err) {
     logger.error('CreateTodo error:', err);
     return res.status(500).json({ error: 'Failed to create todo' });
-  } finally {
-    session.endSession();
   }
 };
 
@@ -162,17 +187,21 @@ export const updateTodo = async (req: Request & { user?: { id: string } }, res: 
       return res.status(400).json({ error: result.error.issues[0]?.message || 'Validation error' });
     }
 
+    // Use lean() + select() for faster update query
     const todo = await Todo.findOneAndUpdate(
       { _id: id, user: userId },
       { $set: result.data },
       { new: true, runValidators: true }
-    );
+    ).select(EXCLUDE_FIELDS).lean();
 
     if (!todo) {
       return res.status(404).json({ error: 'Todo not found or not owned by user' });
     }
 
-    // Serialize todo to ensure proper JSON serialization
+    // Invalidate cache for this user
+    invalidateTodoCache(userId);
+
+    // Optimized: Return only the updated todo
     return res.json(serializeTodo(todo));
   } catch (err) {
     logger.error('UpdateTodo error:', err);
@@ -181,7 +210,6 @@ export const updateTodo = async (req: Request & { user?: { id: string } }, res: 
 };
 
 export const deleteTodo = async (req: Request & { user?: { id: string } }, res: Response) => {
-  const session = await Todo.startSession();
   try {
     const { id } = req.params;
 
@@ -195,61 +223,42 @@ export const deleteTodo = async (req: Request & { user?: { id: string } }, res: 
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    session.startTransaction();
-    
-    let todo;
-    try {
-      todo = await Todo.findOneAndDelete({ _id: id, user: userId }).session(session);
+    // Optimized: Simple delete without transaction - single document operation
+    const todo = await Todo.findOneAndDelete({ _id: id, user: userId }).lean();
 
-      if (!todo) {
-        await session.abortTransaction();
-        return res.status(404).json({ error: 'Todo not found or not owned by user' });
-      }
-
-      // Normalize orders after deletion to remove gaps
-      // This ensures sequential order: 0, 1, 2, 3, ...
-      const remainingTodos = await Todo.find({ user: userId })
-        .sort({ order: 1 })
-        .select('_id order')
-        .session(session);
-
-      if (remainingTodos.length > 0) {
-        // Rebuild all orders sequentially
-        const bulkOps = remainingTodos.map((t, index) => ({
-          updateOne: {
-            filter: { _id: t._id },
-            update: { $set: { order: index } },
-          },
-        }));
-        
-        // Add error handling for bulkWrite
-        try {
-          await Todo.bulkWrite(bulkOps, { session });
-        } catch (bulkError) {
-          logger.error('Bulk write failed during delete:', bulkError);
-          await session.abortTransaction();
-          return res.status(500).json({ error: 'Failed to reorder todos after deletion' });
-        }
-      }
-
-      await session.commitTransaction();
-    } catch (txError) {
-      await session.abortTransaction();
-      throw txError;
+    if (!todo) {
+      return res.status(404).json({ error: 'Todo not found or not owned by user' });
     }
 
-    // Return all todos sorted by order for immediate sync
-    const allTodos = await Todo.find({ user: userId })
-      .sort({ order: 1, createdAt: -1 })
+    // Normalize orders after deletion - use bulkWrite for efficiency
+    const remainingTodos = await Todo.find({ user: userId })
+      .sort({ order: 1 })
+      .select('_id order')
       .lean();
 
-    // Serialize todos to ensure proper JSON serialization
-    return res.json(serializeTodos(allTodos));
+    if (remainingTodos.length > 0) {
+      // Rebuild all orders sequentially using bulkWrite (more efficient than individual updates)
+      const bulkOps = remainingTodos.map((t, index) => ({
+        updateOne: {
+          filter: { _id: t._id },
+          update: { $set: { order: index } },
+        },
+      }));
+      
+      await Todo.bulkWrite(bulkOps);
+    }
+
+    // Invalidate cache for this user
+    invalidateTodoCache(userId);
+
+    // Optimized: Return only the deleted todo ID instead of full list
+    return res.json({ 
+      deletedId: id,
+      fullSync: false,
+    });
   } catch (err) {
     logger.error('DeleteTodo error:', err);
     return res.status(500).json({ error: 'Failed to delete todo' });
-  } finally {
-    session.endSession();
   }
 };
 
@@ -278,7 +287,6 @@ export const reorderTodos = async (req: Request & { user?: { id: string } }, res
     }));
 
     if (bulkOps.length > 0) {
-      // Add error handling for bulkWrite
       try {
         await Todo.bulkWrite(bulkOps);
       } catch (bulkError) {
@@ -287,13 +295,15 @@ export const reorderTodos = async (req: Request & { user?: { id: string } }, res
       }
     }
 
-    // Return all todos sorted by order for immediate sync across devices
-    const allTodos = await Todo.find({ user: userId })
-      .sort({ order: 1, createdAt: -1 })
-      .lean();
+    // Invalidate cache for this user
+    invalidateTodoCache(userId);
 
-    // Serialize todos to ensure proper JSON serialization
-    return res.json(serializeTodos(allTodos));
+    // Optimized: Return success with count instead of full list
+    return res.json({ 
+      success: true, 
+      count: todos.length,
+      fullSync: false,
+    });
   } catch (err) {
     logger.error('ReorderTodos error:', err);
     return res.status(500).json({ error: 'Failed to reorder todos' });

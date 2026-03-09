@@ -1,3 +1,4 @@
+
 import type { Request, Response } from 'express';
 import { User } from '../models/User';
 import { Todo } from '../models/Todo';
@@ -36,7 +37,8 @@ export const getDashboardStats = async (req: AdminRequest, res: Response) => {
       User.find({})
         .sort({ createdAt: -1 })
         .limit(5)
-        .select('email displayName createdAt lastLoginAt'),
+        .select('email displayName createdAt lastLoginAt')
+        .lean(),
     ]);
 
     // Get todo completion rate
@@ -92,19 +94,20 @@ export const getAllUsers = async (req: AdminRequest, res: Response) => {
       ];
     }
 
-    // Execute query with pagination
+    // Execute query with pagination - use lean() for faster queries
     const [users, total] = await Promise.all([
       User.find(query)
         .sort({ [sortBy]: sortOrder })
         .skip((page - 1) * limit)
         .limit(limit)
-        .select('-password -emailVerificationToken -passwordResetToken'),
+        .select('-password -emailVerificationToken -passwordResetToken -__v')
+        .lean(),
       User.countDocuments(query),
     ]);
 
     // Get todo counts for each user
     const usersWithCounts = await Promise.all(
-      users.map(async (user) => {
+      users.map(async (user: any) => {
         const todoCount = await Todo.countDocuments({ user: user._id });
         const completedCount = await Todo.countDocuments({ user: user._id, completed: true });
         return {
@@ -145,12 +148,18 @@ export const getUserDetails = async (req: AdminRequest, res: Response) => {
   try {
     const { userId } = req.params;
 
-    const user = await User.findById(userId).select('-password -emailVerificationToken -passwordResetToken');
+    const user = await User.findById(userId)
+      .select('-password -emailVerificationToken -passwordResetToken -__v')
+      .lean();
+    
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const todos = await Todo.find({ user: userId }).sort({ createdAt: -1 });
+    const todos = await Todo.find({ user: userId })
+      .sort({ createdAt: -1 })
+      .select('-__v')
+      .lean();
 
     res.json({
       user: {
@@ -166,8 +175,8 @@ export const getUserDetails = async (req: AdminRequest, res: Response) => {
       },
       todos: {
         total: todos.length,
-        completed: todos.filter(t => t.completed).length,
-        pending: todos.filter(t => !t.completed).length,
+        completed: todos.filter((t: any) => t.completed).length,
+        pending: todos.filter((t: any) => !t.completed).length,
         items: todos,
       },
     });
@@ -195,7 +204,7 @@ export const updateUser = async (req: AdminRequest, res: Response) => {
       userId,
       { $set: updateData },
       { new: true }
-    ).select('-password -emailVerificationToken -passwordResetToken');
+    ).select('-password -emailVerificationToken -passwordResetToken -__v').lean();
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -263,12 +272,14 @@ export const getAllTodos = async (req: AdminRequest, res: Response) => {
         .populate('user', 'email displayName')
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
-        .limit(limit),
+        .limit(limit)
+        .select('-__v')
+        .lean(),
       Todo.countDocuments(query),
     ]);
 
     res.json({
-      todos: todos.map(todo => ({
+      todos: todos.map((todo: any) => ({
         _id: todo._id,
         text: todo.text,
         completed: todo.completed,
@@ -277,9 +288,9 @@ export const getAllTodos = async (req: AdminRequest, res: Response) => {
         createdAt: todo.createdAt,
         updatedAt: todo.updatedAt,
         user: todo.user ? {
-          id: (todo.user as any)._id,
-          email: (todo.user as any).email,
-          displayName: (todo.user as any).displayName,
+          id: todo.user._id,
+          email: todo.user.email,
+          displayName: todo.user.displayName,
         } : null,
       })),
       pagination: {

@@ -432,6 +432,131 @@ export const pingDB = async (): Promise<boolean> => {
 };
 
 // ============================================
+// Query Cache with TTL - Performance Optimization
+// ============================================
+
+interface CacheEntry<T> {
+  data: T;
+  expiresAt: number;
+}
+
+class QueryCache {
+  private cache: Map<string, CacheEntry<any>> = new Map();
+  private defaultTTL: number = 5000; // 5 seconds default TTL
+  private maxCacheSize: number = 100;
+  private cleanupInterval: NodeJS.Timeout | null = null;
+
+  constructor() {
+    // Cleanup expired entries every 10 seconds
+    if (typeof setInterval !== 'undefined') {
+      this.cleanupInterval = setInterval(() => this.cleanup(), 10000);
+    }
+  }
+
+  private cleanup(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.cache.entries()) {
+      if (entry.expiresAt < now) {
+        this.cache.delete(key);
+      }
+    }
+    // If cache is too large, remove oldest entries
+    if (this.cache.size > this.maxCacheSize) {
+      const entriesToRemove = this.cache.size - this.maxCacheSize;
+      const keys = Array.from(this.cache.keys()).slice(0, entriesToRemove);
+      keys.forEach(key => this.cache.delete(key));
+    }
+  }
+
+  get<T>(key: string): T | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    
+    if (entry.expiresAt < Date.now()) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return entry.data as T;
+  }
+
+  set<T>(key: string, data: T, ttl?: number): void {
+    // Don't cache null/undefined
+    if (data === null || data === undefined) return;
+    
+    // Remove oldest if at capacity
+    if (this.cache.size >= this.maxCacheSize && !this.cache.has(key)) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey) this.cache.delete(firstKey);
+    }
+    
+    this.cache.set(key, {
+      data,
+      expiresAt: Date.now() + (ttl || this.defaultTTL),
+    });
+  }
+
+  invalidate(pattern?: string): void {
+    if (!pattern) {
+      this.cache.clear();
+      return;
+    }
+    // Invalidate keys matching pattern
+    for (const key of this.cache.keys()) {
+      if (key.includes(pattern)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  invalidatePrefix(prefix: string): void {
+    for (const key of this.cache.keys()) {
+      if (key.startsWith(prefix)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  getStats(): { size: number; hits: number; misses: number } {
+    return {
+      size: this.cache.size,
+      hits: 0,
+      misses: 0,
+    };
+  }
+
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+    this.cache.clear();
+  }
+}
+
+export const queryCache = new QueryCache();
+
+// Cache helper for MongoDB queries
+export const cachedQuery = async <T>(
+  cacheKey: string,
+  queryFn: () => Promise<T>,
+  ttl?: number
+): Promise<T> => {
+  // Check cache first
+  const cached = queryCache.get<T>(cacheKey);
+  if (cached !== null) {
+    return cached;
+  }
+  
+  // Execute query
+  const result = await queryFn();
+  
+  // Cache result
+  queryCache.set(cacheKey, result, ttl);
+  
+  return result;
+};
+
+// ============================================
 // Graceful Shutdown
 // ============================================
 

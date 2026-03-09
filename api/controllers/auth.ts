@@ -8,6 +8,10 @@ import { sanitizeInput, generateVerificationToken, generateResetToken, validateP
 import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/email';
 import { emailDripService } from '../services/emailDrip';
 import { logger } from '../utils/logger';
+import { queryCache } from '../utils/database';
+
+// Fields to exclude from queries for performance
+const EXCLUDE_FIELDS = '-password -emailVerificationToken -passwordResetToken -__v';
 
 // JWT_SECRET is now checked lazily inside functions that need it
 // This allows dotenv to load first from index.ts
@@ -29,27 +33,17 @@ const isAccountLocked = (user: any): boolean => {
   return user.accountLockedUntil && new Date(user.accountLockedUntil) > new Date();
 };
 
-// Helper: Lock account
-const lockAccount = async (user: any): Promise<void> => {
-  user.accountLockedUntil = new Date(Date.now() + LOCK_TIME);
-  await user.save();
-};
-
-// Helper: Reset login attempts
-const resetLoginAttempts = async (user: any): Promise<void> => {
-  user.failedLoginAttempts = 0;
-  user.accountLockedUntil = null;
-  await user.save();
-};
-
-// Helper: Increment failed attempts
-const incrementFailedAttempts = async (user: any): Promise<void> => {
-  user.failedLoginAttempts += 1;
-  if (user.failedLoginAttempts >= MAX_LOGIN_ATTEMPTS) {
-    await lockAccount(user);
-  } else {
-    await user.save();
-  }
+// Helper: Increment failed attempts - uses atomic update for efficiency
+const incrementFailedAttempts = async (userId: any, currentAttempts: number): Promise<void> => {
+  const newAttempts = currentAttempts + 1;
+  const shouldLock = newAttempts >= MAX_LOGIN_ATTEMPTS;
+  
+  await User.findByIdAndUpdate(userId, {
+    $set: {
+      failedLoginAttempts: newAttempts,
+      ...(shouldLock && { accountLockedUntil: new Date(Date.now() + LOCK_TIME) }),
+    },
+  });
 };
 
 export const register = async (req: Request, res: Response) => {
@@ -61,7 +55,7 @@ export const register = async (req: Request, res: Response) => {
 
     const { email, password, displayName } = result.data;
 
-    const existing = await User.findOne({ email });
+    const existing = await User.findOne({ email }).select('_id').lean();
     if (existing) {
       return res.status(409).json({ error: 'Email already in use' });
     }
@@ -157,19 +151,25 @@ export const verifyEmail = async (req: Request, res: Response) => {
 
     const { token } = result.data;
 
-    const user = await User.findOne({
-      emailVerificationToken: token,
-      emailVerificationExpires: { $gt: new Date() },
-    });
+    // Use findOneAndUpdate for efficiency - avoids fetching then saving
+    const user = await User.findOneAndUpdate(
+      {
+        emailVerificationToken: token,
+        emailVerificationExpires: { $gt: new Date() },
+      },
+      {
+        $set: {
+          emailVerified: true,
+          emailVerificationToken: null,
+          emailVerificationExpires: null,
+        },
+      },
+      { new: true }
+    ).select(EXCLUDE_FIELDS).lean();
 
     if (!user) {
       return res.status(400).json({ error: 'Invalid or expired verification token' });
     }
-
-    user.emailVerified = true;
-    user.emailVerificationToken = null;
-    user.emailVerificationExpires = null;
-    await user.save();
 
     return res.json({ message: 'Email verified successfully! You can now login.' });
   } catch (err) {
@@ -187,7 +187,11 @@ export const login = async (req: Request, res: Response) => {
 
     const { email, password } = result.data;
 
-    const user = await User.findOne({ email });
+    // Use lean() + select only needed fields for faster query
+    const user = await User.findOne({ email })
+      .select('password failedLoginAttempts accountLockedUntil encryptionSalt email isGoogleUser')
+      .lean();
+    
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -209,7 +213,7 @@ export const login = async (req: Request, res: Response) => {
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
-      await incrementFailedAttempts(user);
+      await incrementFailedAttempts(user._id, user.failedLoginAttempts);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -258,16 +262,21 @@ export const requestPasswordReset = async (req: Request, res: Response) => {
 
     const { email } = result.data;
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select('_id').lean();
     if (!user) {
       // Don't reveal if email exists - return success anyway
       return res.json({ message: 'If an account with that email exists, a password reset link has been sent.' });
     }
 
     const resetToken = generateResetToken();
-    user.passwordResetToken = resetToken;
-    user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-    await user.save();
+
+    // Use findOneAndUpdate for efficiency - avoids fetching then saving
+    await User.findByIdAndUpdate(user._id, {
+      $set: {
+        passwordResetToken: resetToken,
+        passwordResetExpires: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+      },
+    });
 
     // Send reset email (non-blocking)
     sendPasswordResetEmail(email, resetToken).catch(err => {
@@ -296,24 +305,30 @@ export const resetPassword = async (req: Request, res: Response) => {
       return res.status(400).json({ error: passwordValidation.errors[0] || 'Password does not meet requirements' });
     }
 
-    const user = await User.findOne({
-      passwordResetToken: token,
-      passwordResetExpires: { $gt: new Date() },
-    });
+    const salt = await bcrypt.genSalt(12);
+    const hashed = await bcrypt.hash(password, salt);
+
+    // Use findOneAndUpdate for efficiency - avoids fetching then saving
+    const user = await User.findOneAndUpdate(
+      {
+        passwordResetToken: token,
+        passwordResetExpires: { $gt: new Date() },
+      },
+      {
+        $set: {
+          password: hashed,
+          passwordResetToken: null,
+          passwordResetExpires: null,
+          failedLoginAttempts: 0,
+          accountLockedUntil: null,
+        },
+      },
+      { new: true }
+    ).select(EXCLUDE_FIELDS).lean();
 
     if (!user) {
       return res.status(400).json({ error: 'Invalid or expired reset token. Please request a new password reset.' });
     }
-
-    const salt = await bcrypt.genSalt(12);
-    const hashed = await bcrypt.hash(password, salt);
-
-    user.password = hashed;
-    user.passwordResetToken = null;
-    user.passwordResetExpires = null;
-    user.failedLoginAttempts = 0;
-    user.accountLockedUntil = null;
-    await user.save();
 
     return res.json({ message: 'Password reset successful! You can now login with your new password.' });
   } catch (err) {
@@ -344,7 +359,7 @@ export const updateProfile = async (req: Request & { user?: { id: string } }, re
         ...(avatar && { avatar }),
       },
       { new: true }
-    );
+    ).select('email displayName bio').lean();
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -352,7 +367,7 @@ export const updateProfile = async (req: Request & { user?: { id: string } }, re
 
     return res.json({
       message: 'Profile updated',
-      user: { id: user._id, email: user.email, displayName: user.displayName, bio: user.bio },
+      user: { id: userId, email: user.email, displayName: user.displayName, bio: user.bio },
     });
   } catch (err) {
     logger.error('UpdateProfile error:', err);
@@ -367,7 +382,8 @@ export const getProfile = async (req: Request & { user?: { id: string } }, res: 
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const user = await User.findById(userId).select('-password -emailVerificationToken -passwordResetToken');
+    // Use lean() + select for faster query
+    const user = await User.findById(userId).select(EXCLUDE_FIELDS).lean();
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -423,7 +439,7 @@ export const getOnboardingStatus = async (req: Request & { user?: { id: string }
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const user = await User.findById(userId).select('hasCompletedOnboarding onboardingCompletedAt quickStartProgress');
+    const user = await User.findById(userId).select('hasCompletedOnboarding onboardingCompletedAt quickStartProgress').lean();
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -461,7 +477,7 @@ export const completeOnboarding = async (req: Request & { user?: { id: string } 
         },
       },
       { new: true }
-    );
+    ).select('hasCompletedOnboarding onboardingCompletedAt').lean();
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -498,7 +514,7 @@ export const updateQuickStartProgress = async (req: Request & { user?: { id: str
       userId,
       { $set: updateObj },
       { new: true }
-    );
+    ).select('quickStartProgress').lean();
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -536,7 +552,7 @@ export const resetOnboarding = async (req: Request & { user?: { id: string } }, 
         },
       },
       { new: true }
-    );
+    ).select('hasCompletedOnboarding quickStartProgress').lean();
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
