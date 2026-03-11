@@ -403,13 +403,6 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
         {/* Expandable Filter Panel */}
         {showFilters && FilterPanel}
 
-        {/* No results message */}
-        {filteredTodos.length === 0 && hasActiveFilters && (
-          <p className="text-center p-8 rounded-xl border-2 border-dashed border-[var(--border-primary)] text-[var(--text-muted)] bg-[var(--bg-secondary)]">
-            No tasks match your filters. Try adjusting them! 🔍
-          </p>
-        )}
-
         {/* Todo list */}
         {renderEmptyState ? (
           <p className="text-center p-8 rounded-xl border-2 border-dashed border-[var(--border-primary)] text-[var(--text-muted)] bg-[var(--bg-secondary)]">
