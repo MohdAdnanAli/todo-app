@@ -330,12 +330,12 @@ export const reorderTodos = async (req: Request & { user?: { id: string } }, res
     invalidateTodoCache(userId);
 
     // Fetch all todos with the new order and return to client
-    const todos = await Todo.find({ user: userId })
+    const reorderedTodos = await Todo.find({ user: userId })
       .select(EXCLUDE_FIELDS)
       .sort({ order: 1, createdAt: -1 })
       .lean();
 
-    const serialized = serializeTodos(todos);
+    const serialized = serializeTodos(reorderedTodos);
 
     // Optimized: Return all todos with new order
     return res.json(serialized);

@@ -20,6 +20,7 @@ import { User } from './models/User';
 import mongoose from 'mongoose';
 import { logger } from './utils/logger';
 import { connectDB, gracefulShutdown, getDBState } from './utils/database';
+import { testSMTPConnection, isSMTPConfigured, getSMTPConfig } from './utils/smtp';
 
 // Set trust proxy BEFORE creating express app
 const app = express();
@@ -238,6 +239,32 @@ app.post('/api/admin/todos/delete-many', adminProtect, deleteMultipleTodos);
 
 // System health
 app.get('/api/admin/health', adminProtect, getSystemHealth);
+
+// SMTP Test endpoints
+app.get('/api/admin/smtp-status', adminProtect, (req, res) => {
+  const configured = isSMTPConfigured();
+  const config = getSMTPConfig();
+  
+  // Return sanitized config (no passwords)
+  res.json({
+    configured,
+    host: configured ? config.host : null,
+    port: configured ? config.port : null,
+    secure: configured ? config.secure : null,
+    from: configured ? config.from : null,
+    user: configured ? config.user : null,
+  });
+});
+
+app.post('/api/admin/smtp-test', adminProtect, async (req, res) => {
+  try {
+    const result = await testSMTPConnection();
+    res.json(result);
+  } catch (error: any) {
+    logger.error('[Admin] SMTP test error:', error);
+    res.status(500).json({ success: false, message: `Test failed: ${error.message}` });
+  }
+});
 
 // Error handler - MUST be after all routes and middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

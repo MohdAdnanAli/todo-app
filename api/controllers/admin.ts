@@ -5,6 +5,7 @@ import { User } from '../models/User';
 import { Todo } from '../models/Todo';
 import { logger } from '../utils/logger';
 import { healthCheck } from '../utils/database';
+import { isSMTPConfigured, getSMTPConfig, testSMTPConnection } from '../utils/smtp';
 
 /**
  * Admin Controller - Full backend management
@@ -407,6 +408,25 @@ export const getSystemHealth = async (req: AdminRequest, res: Response) => {
     // Use the new enhanced health check from database utility
     const healthResult = await healthCheck();
     
+    // Get SMTP status
+    const smtpConfigured = isSMTPConfigured();
+    let smtpStatus = { configured: smtpConfigured };
+    
+    if (smtpConfigured) {
+      const smtpConfig = getSMTPConfig();
+      // Test SMTP connection if configured
+      const smtpTest = await testSMTPConnection();
+      smtpStatus = {
+        configured: true,
+        host: smtpConfig.host,
+        port: smtpConfig.port,
+        secure: smtpConfig.secure,
+        from: smtpConfig.from,
+        connectionTest: smtpTest.success ? 'passed' : 'failed',
+        connectionMessage: smtpTest.message,
+      };
+    }
+    
     res.json({
       status: healthResult.status,
       timestamp: new Date().toISOString(),
@@ -421,6 +441,7 @@ export const getSystemHealth = async (req: AdminRequest, res: Response) => {
         responseTime: healthResult.responseTime,
         ...(healthResult.errors && { errors: healthResult.errors }),
       },
+      smtp: smtpStatus,
       uptime: process.uptime ? `${Math.floor(process.uptime())}s` : 'N/A',
       environment: process.env.NODE_ENV || 'development',
     });
