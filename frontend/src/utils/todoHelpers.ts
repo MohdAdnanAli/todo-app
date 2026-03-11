@@ -100,6 +100,49 @@ export function formatDueDate(dueDate?: string | null): string | null {
   }
 }
 
+/**
+ * Format createdAt timestamp to a human-readable relative string
+ * Returns null if no createdAt
+ * Shows "Today", "Yesterday", or date like "Jan 5"
+ */
+export function formatTimestamp(createdAt?: string | null): string | null {
+  if (!createdAt) return null;
+  
+  try {
+    const date = new Date(createdAt);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    // Today - show time
+    if (diffDays === 0) {
+      return date.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+    }
+    
+    // Yesterday
+    if (diffDays === 1) {
+      return 'Yesterday';
+    }
+    
+    // Within the last week - show day name
+    if (diffDays < 7) {
+      return date.toLocaleDateString('en-US', { weekday: 'short' });
+    }
+    
+    // Older - show month and day
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  } catch {
+    return null;
+  }
+}
+
 // ============================================
 // STABLE KEY GENERATOR
 // ============================================

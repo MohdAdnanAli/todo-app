@@ -45,6 +45,7 @@ const createTodoSchema = z.object({
   category: z.enum(CATEGORIES).optional().default('other'),
   priority: z.enum(PRIORITIES).optional().default('medium'),
   tags: z.array(z.string().max(50)).optional().default([]),
+  dueDate: z.string().optional().nullable(),
   participants: z.array(z.object({
     id: z.string(),
     name: z.string(),
@@ -58,6 +59,7 @@ const updateTodoSchema = z.object({
   category: z.enum(CATEGORIES).optional(),
   priority: z.enum(PRIORITIES).optional(),
   tags: z.array(z.string().max(50)).optional(),
+  dueDate: z.string().optional().nullable(),
   participants: z.array(z.object({
     id: z.string(),
     name: z.string(),
@@ -158,7 +160,7 @@ export const createTodo = async (req: Request & { user?: { id: string } }, res: 
       return res.status(400).json({ error: result.error.issues[0]?.message || 'Validation error' });
     }
 
-    const { text, category, priority, tags } = result.data;
+    const { text, category, priority, tags, dueDate } = result.data;
 
     // Optimized: Use findOne with sort to get min order - no transaction needed for single insert
     const minOrderDoc = await Todo.findOne({ user: userId })
@@ -178,6 +180,7 @@ export const createTodo = async (req: Request & { user?: { id: string } }, res: 
       category,
       priority,
       tags,
+      dueDate: dueDate || null,
       order: newOrder,
     }]);
 

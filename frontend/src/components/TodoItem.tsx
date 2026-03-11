@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import type { Todo, TodoCategory, TodoPriority } from '../types';
 import { getSmartIcon } from '../utils/todoIcons';
-import { getIconColor, CATEGORY_COLORS, PRIORITY_COLORS, formatDueDate } from '../utils/todoHelpers';
+import { getIconColor, CATEGORY_COLORS, PRIORITY_COLORS, formatDueDate, formatTimestamp } from '../utils/todoHelpers';
 import type { LucideIcon } from 'lucide-react';
 import { Trash2, Tag, AlertCircle } from 'lucide-react';
 
@@ -58,7 +58,7 @@ const TodoItemCore: React.FC<TodoItemProps> = memo(({
     );
   }
   
-  const { category = 'other', priority = 'medium', tags = [], dueDate } = todo;
+  const { category = 'other', priority = 'medium', tags = [], dueDate, createdAt } = todo;
   
   const SmartIcon: LucideIcon = React.useMemo(
     () => getSmartIcon(todo.text),
@@ -68,6 +68,7 @@ const TodoItemCore: React.FC<TodoItemProps> = memo(({
   const iconColor = useIconColor(todo.text, !!todo.completed, category);
   const priorityStyle = usePriorityStyle(priority);
   const formattedDueDate = formatDueDate(dueDate);
+  const formattedTimestamp = formatTimestamp(createdAt);
 
   // Stable handlers that don't cause re-renders
   const handleToggle = React.useCallback(() => {
@@ -127,6 +128,13 @@ const TodoItemCore: React.FC<TodoItemProps> = memo(({
             dangerouslySetInnerHTML={{ __html: sanitizeText(todo.text) }}
           />
         </div>
+        
+        {/* Timestamp - small grey text */}
+        {formattedTimestamp && (
+          <span className="text-xs text-[var(--text-muted)] mt-0.5 block">
+            {formattedTimestamp}
+          </span>
+        )}
         
         {/* Badges row - show on all screen sizes */}
         <div className="flex items-center gap-1.5 flex-wrap mt-1">
