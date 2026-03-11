@@ -340,7 +340,7 @@ const AuthForm = ({ onLogin, onRegister }: AuthFormProps): JSX.Element => {
           {(mode === 'register' || mode === 'forgot-password' || mode === 'login') && (
             <div className="mb-4">
               <label className="block mb-2 text-sm font-medium text-[var(--text-primary)]">
-                Email
+                Email {mode === 'register' && '*'}
               </label>
               <input
                 type="email"

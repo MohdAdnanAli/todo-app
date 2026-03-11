@@ -329,12 +329,16 @@ export const reorderTodos = async (req: Request & { user?: { id: string } }, res
     // Invalidate cache for this user
     invalidateTodoCache(userId);
 
-    // Optimized: Return success with count instead of full list
-    return res.json({ 
-      success: true, 
-      count: todos.length,
-      fullSync: false,
-    });
+    // Fetch all todos with the new order and return to client
+    const todos = await Todo.find({ user: userId })
+      .select(EXCLUDE_FIELDS)
+      .sort({ order: 1, createdAt: -1 })
+      .lean();
+
+    const serialized = serializeTodos(todos);
+
+    // Optimized: Return all todos with new order
+    return res.json(serialized);
   } catch (err) {
     logger.error('ReorderTodos error:', err);
     return res.status(500).json({ error: 'Failed to reorder todos' });
