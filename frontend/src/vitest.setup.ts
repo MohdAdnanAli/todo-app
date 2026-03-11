@@ -84,13 +84,13 @@ globalThis.ResizeObserver = class ResizeObserver {
 };
 
 // Mock requestAnimationFrame
-globalThis.requestAnimationFrame = (callback: FrameRequestCallback) => {
-  return setTimeout(callback as any, 16);
-};
+globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+  return setTimeout(callback, 16) as unknown as number;
+}) as (callback: FrameRequestCallback) => number;
 
-globalThis.cancelAnimationFrame = (id: number) => {
+globalThis.cancelAnimationFrame = ((id: number) => {
   clearTimeout(id);
-};
+}) as (id: number) => void;
 
 // Mock IntersectionObserver
 globalThis.IntersectionObserver = class IntersectionObserver implements IntersectionObserver {
