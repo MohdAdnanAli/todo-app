@@ -155,15 +155,16 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
               <button
                 key={cat.value}
                 onClick={() => setCategoryFilter(cat.value)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 border
+                className={`px-3 py-2 min-h-[44px] rounded-lg text-xs font-medium transition-all duration-200 border flex-1 sm:flex-none
                   ${categoryFilter === cat.value
-                    ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-transparent'
-                    : 'border-[var(--border-secondary)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
+                    ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-transparent shadow-md hover:shadow-lg'
+                    : 'border-[var(--border-secondary)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] hover:shadow-sm'
                   }`}
               >
                 {cat.label}
               </button>
             ))}
+
           </div>
         </div>
         
@@ -175,15 +176,16 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
               <button
                 key={pri.value}
                 onClick={() => setPriorityFilter(pri.value)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 border
+                className={`px-3 py-2 min-h-[44px] rounded-lg text-xs font-medium transition-all duration-200 border flex-1 sm:flex-none
                   ${priorityFilter === pri.value
-                    ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-transparent'
-                    : 'border-[var(--border-secondary)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
+                    ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-transparent shadow-md hover:shadow-lg'
+                    : 'border-[var(--border-secondary)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] hover:shadow-sm'
                   }`}
               >
                 {pri.label}
               </button>
             ))}
+
           </div>
         </div>
         
@@ -193,34 +195,35 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
           <div className="flex flex-wrap gap-1.5">
             <button
               onClick={() => setShowCompleted('all')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 border
+              className={`px-3 py-2 min-h-[44px] rounded-lg text-xs font-medium transition-all duration-200 border flex-1 sm:flex-none
                 ${showCompleted === 'all'
-                  ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-transparent'
-                  : 'border-[var(--border-secondary)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
+                  ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-transparent shadow-md hover:shadow-lg'
+                  : 'border-[var(--border-secondary)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] hover:shadow-sm'
                 }`}
             >
               All
             </button>
             <button
               onClick={() => setShowCompleted(false)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 border
+              className={`px-3 py-2 min-h-[44px] rounded-lg text-xs font-medium transition-all duration-200 border flex-1 sm:flex-none
                 ${showCompleted === false
-                  ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-transparent'
-                  : 'border-[var(--border-secondary)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
+                  ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-transparent shadow-md hover:shadow-lg'
+                  : 'border-[var(--border-secondary)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] hover:shadow-sm'
                 }`}
             >
               Pending ({stats.pending})
             </button>
             <button
               onClick={() => setShowCompleted(true)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 border
+              className={`px-3 py-2 min-h-[44px] rounded-lg text-xs font-medium transition-all duration-200 border flex-1 sm:flex-none
                 ${showCompleted === true
-                  ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-transparent'
-                  : 'border-[var(--border-secondary)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
+                  ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white border-transparent shadow-md hover:shadow-lg'
+                  : 'border-[var(--border-secondary)] text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] hover:shadow-sm'
                 }`}
             >
               Done ({stats.completed})
             </button>
+
           </div>
         </div>
         
@@ -328,12 +331,13 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
                       <button
                         {...attributes}
                         {...listeners}
-                        className="p-1.5 sm:p-2 cursor-grab active:cursor-grabbing text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                        className="p-2.5 sm:p-3 min-h-[44px] min-w-[44px] cursor-grab active:cursor-grabbing text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shadow-sm hover:shadow-md rounded-lg"
                         style={{ touchAction: 'none' }}
                         aria-label="Drag to reorder"
                       >
-                        <GripVertical size={16} />
+                        <GripVertical size={18} className="mx-auto" />
                       </button>
+
                     </div>
                   );
 

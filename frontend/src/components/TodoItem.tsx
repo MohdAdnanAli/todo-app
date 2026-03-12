@@ -118,15 +118,14 @@ const TodoItemCore: React.FC<TodoItemProps> = memo(({
       <div className="flex-1 min-w-0 py-1">
         <div className="flex items-start gap-2">
           <span
-            className="flex-1 text-sm sm:text-base transition-all duration-200 leading-snug"
+            className="flex-1 text-sm sm:text-base transition-all duration-200 leading-snug max-w-[85vw] sm:max-w-[400px] hyphens-auto overflow-wrap-anywhere break-words"
             style={{
               textDecoration: todo.completed ? 'line-through' : 'none',
               color: todo.completed ? 'var(--text-muted)' : 'var(--text-primary)',
-              wordBreak: 'break-word',
-              whiteSpace: 'pre-wrap',
             }}
             dangerouslySetInnerHTML={{ __html: sanitizeText(todo.text) }}
           />
+
         </div>
         
         {/* Timestamp - small grey text */}
@@ -137,23 +136,24 @@ const TodoItemCore: React.FC<TodoItemProps> = memo(({
         )}
         
         {/* Badges row - show on all screen sizes */}
-        <div className="flex items-center gap-1.5 flex-wrap mt-1">
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap mt-1 min-h-[20px]">
           {priority !== 'medium' && (
             <span
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold uppercase"
+              className="inline-flex items-center gap-1 px-2 py-1 min-h-[24px] rounded-md text-xs font-semibold uppercase touch-man"
               style={{
                 background: priorityStyle.bg,
                 border: `1px solid ${priorityStyle.border}`,
                 color: priorityStyle.border,
               }}
             >
-              <AlertCircle size={10} />
+              <AlertCircle size={12} />
               {priorityStyle.label}
             </span>
           )}
+
           
           <span
-            className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium capitalize"
+            className="inline-flex items-center px-2 py-1 min-h-[24px] rounded-md text-xs font-medium capitalize touch-man"
             style={{
               background: `${CATEGORY_COLORS[category]}15`,
               border: `1px solid ${CATEGORY_COLORS[category]}40`,
@@ -162,6 +162,7 @@ const TodoItemCore: React.FC<TodoItemProps> = memo(({
           >
             {category}
           </span>
+
 
           {formattedDueDate && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-[var(--bg-tertiary)] border border-[var(--border-secondary)] text-[var(--text-secondary)]">

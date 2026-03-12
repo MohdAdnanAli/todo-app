@@ -51,7 +51,39 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background: var(--bg-gradient, linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%));
+  
+  /* Mobile scrollbar polish */
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-track { background: var(--bg-secondary); }
+  &::-webkit-scrollbar-thumb { 
+    background: var(--text-muted); 
+    border-radius: 2px;
+  }
+  &::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
 }
+
+/* Hide scrollbars on mobile/iOS */
+@media (max-width: 768px) {
+  html {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  html::-webkit-scrollbar {
+    display: none;
+  }
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* iOS input zoom fix */
+@supports (-webkit-touch-callout: none) {
+  input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="search"] {
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+}
+
 
 #root {
   display: flex;

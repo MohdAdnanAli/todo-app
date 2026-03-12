@@ -839,32 +839,33 @@ function App() {
       {user ? (
         <div>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-[1.5rem] gap-2">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
               <p
                 onClick={() => setShowProfileModal(true)}
-                className="font-semibold text-lg text-[var(--text-primary)] flex items-center gap-2 m-0 cursor-pointer hover:opacity-80 transition-opacity"
+                className="font-semibold text-lg text-[var(--text-primary)] flex items-center gap-2 m-0 cursor-pointer hover:opacity-80 transition-opacity flex-1 min-w-0"
               >
                 {user.avatar ? (
                   <img 
                     src={user.avatar} 
                     alt={user.displayName || user.email}
-                    className="w-8 h-8 rounded-full object-cover"
+                    className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                   />
                 ) : (
                   <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm flex-shrink-0">
                     {(user.displayName || user.email.split('@')[0]).charAt(0).toUpperCase()}
                   </span>
                 )}
-                <span className="whitespace-nowrap">
+                <span className="truncate max-w-[180px] sm:max-w-[250px]">
                   Welcome, {user.displayName || user.email.split('@')[0]}!
                 </span>
               </p>
               {user.bio && (
-                <span className="text-xs text-[var(--text-muted)]">
+                <span className="text-xs text-[var(--text-muted)] truncate max-w-[150px]">
                   ({user.bio.length > 20 ? user.bio.substring(0, 20) + '...' : user.bio})
                 </span>
               )}
             </div>
+
 
             <div className="flex items-center gap-2 ml-auto sm:ml-0">
               <button
