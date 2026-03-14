@@ -61,3 +61,7 @@ Welcome Tour (7 Steps)	✅ Complete	Integrated
 Quick-Start Checklist (3 Tasks)	✅ Complete	Integrated
 Example Todos on Signup	✅ Complete	Integrated
 Email Drip Sequence (Day 1,3,7)	✅ Complete	Integrated
+
+
+
+4: Mail AI summarisation and promptfoo integration and system desgin = false

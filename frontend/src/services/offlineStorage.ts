@@ -159,14 +159,7 @@ setupNetworkListeners();
 // API Service
 // ============================================
 
-let api: typeof import('axios').default | null = null;
-const getApi = async () => {
-  if (!api) {
-    const axios = await import('axios');
-    api = axios.default;
-  }
-  return api;
-};
+
 
 // ============================================
 // LocalStorage Helpers

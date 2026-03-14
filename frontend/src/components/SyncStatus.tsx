@@ -1,8 +1,8 @@
 import React from 'react';
-import { Wifi, WifiOff, Loader2, AlertCircle, Clock, CheckCircle } from 'lucide-react';
+import { Wifi, WifiOff, Loader2, AlertCircle, Clock } from 'lucide-react';
 import { offlineStorage, addSyncListener } from '../services/offlineStorage';
 import type { SyncStatus as SyncStatusType } from '../services/offlineStorage';
-import type { MessageType } from '../types';
+
 
 interface SyncStatusProps {
   className?: string;
