@@ -156,9 +156,14 @@ export const register = async (req: Request, res: Response) => {
       })(),
     ]).catch(() => {});
 
+    // Check if admin
+    const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+    const isAdmin = ADMIN_EMAIL ? user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() : false;
+
     return res.status(201).json({
       message: 'Account created successfully!',
       user: { id: user._id, email: user.email, displayName: user.displayName },
+      isAdmin,
       encryptionSalt: user.encryptionSalt,
     });
   } catch (err) {
@@ -293,9 +298,14 @@ export const login = async (req: Request, res: Response) => {
       await setCachedUser(user._id.toString(), buildCachedUserData(fullUser));
     }
 
+    // Check if admin
+    const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+    const isAdmin = ADMIN_EMAIL ? user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() : false;
+
     return res.json({
       message: 'Logged in',
       user: { id: user._id, email: user.email, displayName: fullUser?.displayName },
+      isAdmin,
       encryptionSalt,
     });
   } catch (err) {

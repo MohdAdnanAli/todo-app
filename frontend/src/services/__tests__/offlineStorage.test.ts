@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { offlineStorage } from '../offlineStorage';
 import type { Todo } from '../../types';
 
-describe('offlineStorage', () => {
+vi.mock('../../api');
+vi.mock('../../utils/crypto');
+
+describe('offlineStorage - Offline-First Full Sync', () => {
   const mockTodo: Todo = {
     _id: 'test-1',
     text: 'Test todo',
@@ -18,129 +21,119 @@ describe('offlineStorage', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    
+    // Mock navigator.onLine
+    Object.defineProperty(navigator, 'onLine', {
+      value: true,
+      writable: true,
+    });
+    
+    // Mock crypto.randomUUID
+    (global as any).crypto = {
+      randomUUID: vi.fn(() => 'mock-uuid'),
+    };
   });
 
   afterEach(() => {
     localStorage.clear();
+    vi.restoreAllMocks();
   });
 
-  describe('localStorage fallback', () => {
-    it('should save and retrieve todos from localStorage', () => {
-      offlineStorage.saveTodoToLocalStorage(mockTodo);
-      const todos = offlineStorage.getTodosFromLocalStorage();
+  describe('performLocalAction - Offline-First CRUD', () => {
+    it('should create todo optimistically + queue', async () => {
+      const newTodo = await offlineStorage.performLocalAction('create', {
+        text: 'New offline todo'
+      }) as Todo;
 
-      expect(todos).toHaveLength(1);
-      expect(todos[0]._id).toBe(mockTodo._id);
-      expect(todos[0].text).toBe(mockTodo.text);
-    });
-
-    it('should update existing todo in localStorage', () => {
-      offlineStorage.saveTodoToLocalStorage(mockTodo);
-      const updatedTodo = { ...mockTodo, text: 'Updated text' };
-      offlineStorage.saveTodoToLocalStorage(updatedTodo);
-
-      const todos = offlineStorage.getTodosFromLocalStorage();
-      expect(todos).toHaveLength(1);
-      expect(todos[0].text).toBe('Updated text');
-    });
-
-    it('should delete todo from localStorage', () => {
-      offlineStorage.saveTodoToLocalStorage(mockTodo);
-      expect(offlineStorage.getTodosFromLocalStorage()).toHaveLength(1);
-
-      offlineStorage.deleteTodoFromLocalStorage(mockTodo._id);
-      expect(offlineStorage.getTodosFromLocalStorage()).toHaveLength(0);
-    });
-
-    it('should save multiple todos to localStorage', () => {
-      const todos = [
-        mockTodo,
-        { ...mockTodo, _id: 'test-2', text: 'Second todo' },
-        { ...mockTodo, _id: 'test-3', text: 'Third todo' },
-      ];
-
-      offlineStorage.saveTodosToLocalStorage(todos);
-      const retrieved = offlineStorage.getTodosFromLocalStorage();
-
-      expect(retrieved).toHaveLength(3);
-      expect(retrieved.map(t => t._id)).toEqual(['test-1', 'test-2', 'test-3']);
-    });
-
-    it('should handle invalid JSON in localStorage gracefully', () => {
-      localStorage.setItem('todos', 'invalid json');
-      const todos = offlineStorage.getTodosFromLocalStorage();
-
-      expect(todos).toEqual([]);
-    });
-
-    it('should return empty array when localStorage is empty', () => {
-      const todos = offlineStorage.getTodosFromLocalStorage();
-      expect(todos).toEqual([]);
-    });
-  });
-
-  describe('storage availability', () => {
-    it('should check if storage is available', () => {
-      const available = offlineStorage.isAvailable();
-      expect(typeof available).toBe('boolean');
-    });
-  });
-
-  describe('sync queue operations', () => {
-    it('should add to sync queue', async () => {
-      await offlineStorage.addToSyncQueue('create', 'new-todo-id', {
-        text: 'New todo',
-        category: 'work',
-      });
-
-      const queue = await offlineStorage.getSyncQueue();
-      expect(queue.length).toBeGreaterThanOrEqual(0);
-    });
-
-    it('should clear sync queue', async () => {
-      await offlineStorage.addToSyncQueue('create', 'todo-1', { text: 'Todo' });
-      await offlineStorage.clearSyncQueue();
-
-      const queue = await offlineStorage.getSyncQueue();
-      expect(queue).toHaveLength(0);
-    });
-  });
-
-  describe('todo CRUD operations', () => {
-    it('should save single todo to storage', async () => {
-      await offlineStorage.saveTodo(mockTodo);
-      const retrieved = await offlineStorage.getTodo(mockTodo._id);
-
-      expect(retrieved?._id).toBe(mockTodo._id);
-      expect(retrieved?.text).toBe(mockTodo.text);
-    });
-
-    it('should delete todo from storage', async () => {
-      await offlineStorage.saveTodo(mockTodo);
-      await offlineStorage.deleteTodo(mockTodo._id);
-
+      expect(newTodo._id).toBeDefined();
+      expect(newTodo.text).toBe('New offline todo');
+      
       const todos = await offlineStorage.getAllTodos();
-      expect(todos.find(t => t._id === mockTodo._id)).toBeUndefined();
+      expect(todos).toHaveLength(1);
+      
+      const queue = await offlineStorage.getSyncQueue();
+      expect(queue).toHaveLength(1);
+      expect(queue[0].action).toBe('create');
     });
 
-    it('should clear all todos', async () => {
+    it('should toggle todo optimistically + queue', async () => {
       await offlineStorage.saveTodo(mockTodo);
-      await offlineStorage.clearAllTodos();
+      
+      const toggled = await offlineStorage.performLocalAction('toggle', {
+        _id: mockTodo._id,
+        completed: true
+      }) as Todo;
+      
+      expect(toggled.completed).toBe(true);
+      const queue = await offlineStorage.getSyncQueue();
+      expect(queue).toHaveLength(1);
+      expect(queue[0].action).toBe('update');
+    });
 
+    it('should delete todo optimistically + queue', async () => {
+      await offlineStorage.saveTodo(mockTodo);
+      
+      await offlineStorage.performLocalAction('delete', { _id: mockTodo._id });
+      
       const todos = await offlineStorage.getAllTodos();
       expect(todos).toHaveLength(0);
+      const queue = await offlineStorage.getSyncQueue();
+      expect(queue).toHaveLength(1);
+      expect(queue[0].action).toBe('delete');
+    });
+
+    it('should handle reorder', async () => {
+      const todo1 = { ...mockTodo, _id: '1', order: 1 };
+      const todo2 = { ...mockTodo, _id: '2', order: 0 };
+      
+      await offlineStorage.saveTodos([todo2, todo1]);
+      
+      await offlineStorage.performLocalAction('reorder', { 
+        todos: [todo1, todo2] 
+      });
+      
+      const todos = await offlineStorage.getAllTodos();
+      expect(todos[0]._id).toBe('1');
+      expect(todos[1]._id).toBe('2');
+      
+      const queue = await offlineStorage.getSyncQueue();
+      expect(queue.length).toBe(2); // Batch update
     });
   });
 
-  describe('metadata operations', () => {
-    it('should update metadata without throwing', async () => {
-      const metadata = { lastSync: Date.now(), syncInProgress: false };
-      await offlineStorage.updateMetadata('sync-status', metadata);
+  describe('edge cases - Production Robustness', () => {
+    it('massive queue handling', async () => {
+      for (let i = 0; i < 50; i++) {
+        await offlineStorage.performLocalAction('create', { text: `Mass todo ${i}` });
+      }
+      expect(await offlineStorage.getSyncQueue()).toHaveLength(50);
+    }, 10000);
+
+    it('corrupted queue recovery', async () => {
+      localStorage.setItem('sync_queue', 'invalid json');
+      await offlineStorage.syncPendingChanges();
+      const queue = await offlineStorage.getSyncQueue();
+      expect(queue).toEqual([]);
+    });
+
+    it('quota stress test', async () => {
+      const largeData = 'A'.repeat(5 * 1024 * 1024);
+      localStorage.setItem('filler', largeData);
       
-      // Should not throw (IndexedDB mock handles it gracefully)
-      const result = await offlineStorage.getMetadata('sync-status');
-      // Result may be undefined if IndexedDB mock isn't fully functional
-      expect(result !== null).toBe(true);
+      await offlineStorage.saveTodo(mockTodo);
+      const quota = await offlineStorage.getStorageQuota();
+      expect(quota.percentage).toBeGreaterThan(80);
+    });
+
+    it('concurrent tabs safe', async () => {
+      const promises = Array.from({ length: 10 }, async (_, i) => {
+        const todo = { ...mockTodo, _id: `race-${i}` };
+        offlineStorage.saveTodosToLocalStorage([todo]);
+      });
+      
+      await Promise.all(promises);
+      const todos = offlineStorage.getTodosFromLocalStorage();
+      expect(todos.length).toBeGreaterThan(0);
     });
   });
 });

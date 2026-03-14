@@ -15,21 +15,15 @@ describe('Todo API', () => {
   let authToken: string;
   let testUserId: string;
 
-  beforeAll(async () => {
-    try {
-      await mongoose.connect(TEST_DB_URI);
-    } catch (error) {
-      console.warn('Test database not available');
-    }
-    agent = request(app);
-  });
+beforeAll(async () => {
+  await setupTestDB();
+  agent = request(app);
+});
+
+import { teardownTestDB } from './test-setup';
 
   afterAll(async () => {
-    try {
-      await mongoose.disconnect();
-    } catch (error) {
-      // Ignore
-    }
+    await teardownTestDB();
   });
 
   beforeEach(async () => {

@@ -4,6 +4,7 @@
  */
 
 import type { Todo } from '../types';
+import { todoApi } from './api.js';
 
 // ============================================
 // Console wrapper
@@ -41,13 +42,15 @@ export interface StorageQuota {
   percentage: number;
 }
 
-export interface SyncStatus {
+export interface SyncStatusInterface {
   pendingCount: number;
   isOnline: boolean;
   syncInProgress: boolean;
   lastSyncAt: number | null;
   lastError: string | null;
 }
+
+export type SyncStatus = SyncStatusInterface;
 
 // ============================================
 // Storage Keys
@@ -73,6 +76,26 @@ let syncStatus: SyncStatus = {
   lastError: null,
 };
 
+export interface SyncListener {
+  (status: SyncStatus): void;
+}
+
+const syncListeners: SyncListener[] = [];
+
+// Notify all listeners when sync status changes
+const notifySyncListeners = async () => {
+  const currentStatus = await offlineStorage.getSyncStatus();
+  syncListeners.forEach(listener => listener(currentStatus));
+};
+
+export const addSyncListener = (listener: SyncListener) => {
+  syncListeners.push(listener);
+  return () => {
+    const index = syncListeners.indexOf(listener);
+    if (index > -1) syncListeners.splice(index, 1);
+  };
+};
+
 const eventListeners: Array<{ type: string; handler: (e: Event) => void }> = [];
 
 const cleanupEventListeners = () => {
@@ -87,23 +110,44 @@ const cleanupEventListeners = () => {
 const setupNetworkListeners = () => {
   if (typeof window === 'undefined') return;
   
-  const onlineHandler = () => {
+  const onlineHandler = async () => {
     logger.info('Network is online');
     isOnline = true;
     syncStatus.isOnline = true;
-    offlineStorage.syncPendingChanges().catch(() => {});
+    notifySyncListeners();
+    // Full sync (queue + remote merge)
+    await offlineStorage.syncAll().catch(err => logger.error('Online sync failed:', err));
   };
 
   const offlineHandler = () => {
     logger.warn('Network is offline');
     isOnline = false;
     syncStatus.isOnline = false;
+    notifySyncListeners();
+  };
+
+  // Additional sync triggers
+  const visibilityHandler = () => {
+    if (!document.hidden && isOnline) {
+      offlineStorage.syncAll().catch(() => {});
+    }
+  };
+
+  const focusHandler = () => {
+    if (isOnline) {
+      offlineStorage.syncAll().catch(() => {});
+    }
   };
 
   window.addEventListener('online', onlineHandler);
   window.addEventListener('offline', offlineHandler);
+  window.addEventListener('visibilitychange', visibilityHandler);
+  window.addEventListener('focus', focusHandler);
+  
   eventListeners.push({ type: 'online', handler: onlineHandler });
   eventListeners.push({ type: 'offline', handler: offlineHandler });
+  eventListeners.push({ type: 'visibilitychange', handler: visibilityHandler });
+  eventListeners.push({ type: 'focus', handler: focusHandler });
   
   isOnline = navigator.onLine;
   syncStatus.isOnline = isOnline;
@@ -154,11 +198,144 @@ function setToStorage<T>(key: string, value: T): void {
 export const offlineStorage = {
   cleanup: cleanupEventListeners,
   
-  // ===== Todo Methods =====
+// ===== Core Todo Methods =====
   
   async getAllTodos(): Promise<Todo[]> {
     const todos = getFromStorage<Todo[]>(STORAGE_KEYS.TODOS, []);
     return todos.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  },
+
+  // Generate UUID for new todos (local-first)
+  generateId(): string {
+    if (crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    // Fallback for older browsers
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  },
+
+  // OPTIMISTIC LOCAL ACTIONS - Full offline-first CRUD
+  async performLocalAction(action: 'create' | 'update' | 'delete' | 'toggle' | 'reorder', data: any): Promise<Todo | void> {
+    const todos = await this.getAllTodos();
+    
+    switch (action) {
+      case 'create': {
+        const newTodo: Todo = {
+          _id: this.generateId(),
+          text: data.text,
+          completed: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          ...data, // category, priority, etc.
+        };
+        todos.unshift(newTodo); // Add to top
+        await this.saveTodos(todos);
+        await this.addToSyncQueue('create', newTodo._id, newTodo);
+        notifySyncListeners();
+        return newTodo;
+      }
+      
+      case 'update':
+      case 'toggle': {
+        const todoIndex = todos.findIndex(t => t._id === data._id);
+        if (todoIndex === -1) throw new Error('Todo not found');
+        
+        const updatedTodo = { ...todos[todoIndex], ...data, updatedAt: new Date().toISOString() };
+        todos[todoIndex] = updatedTodo;
+        await this.saveTodos(todos);
+        await this.addToSyncQueue('update', data._id, updatedTodo);
+        notifySyncListeners();
+        return updatedTodo;
+      }
+      
+      case 'delete': {
+        const filtered = todos.filter(t => t._id !== data._id);
+        await this.saveTodos(filtered);
+        await this.addToSyncQueue('delete', data._id, {});
+        notifySyncListeners();
+        return;
+      }
+      
+      case 'reorder': {
+        const reordered = data.todos.map((todo: Todo, index: number) => ({ ...todo, order: index }));
+        await this.saveTodos(reordered);
+        // Batch queue updates
+        for (const todo of reordered) {
+          await this.addToSyncQueue('update', todo._id, { order: todo.order });
+        }
+        notifySyncListeners();
+        return;
+      }
+    }
+  },
+
+  // FULL BIDIRECTIONAL SYNC: queue → remote + remote → local merge
+  async syncAll(): Promise<{ success: boolean; synced: number; merged: number; conflicts: number }> {
+    if (syncInProgress || !isOnline) {
+      return { success: false, synced: 0, merged: 0, conflicts: 0 };
+    }
+
+    syncInProgress = true;
+    syncStatus.syncInProgress = true;
+    
+    let synced = 0, merged = 0, conflicts = 0;
+
+    try {
+      // 1. Push local queue to remote
+      const queueResult = await this.syncPendingChanges();
+      synced = queueResult.synced;
+
+      // 2. Fetch remote todos for merge
+      const remoteTodos = await todoApi.getTodos().catch(() => [] as Todo[]);
+      
+      // 3. Smart merge: updatedAt wins, new locals already queued, new remotes added
+      const localTodos = await this.getAllTodos();
+      const mergedTodos: Todo[] = [];
+      const processedRemoteIds = new Set<string>();
+
+      for (const localTodo of localTodos) {
+        const remoteMatch = remoteTodos.find((r: Todo) => r._id === localTodo._id);
+        if (remoteMatch) {
+          // Conflict resolution: newer updatedAt wins
+          const localNewer = new Date(localTodo.updatedAt || localTodo.createdAt) > new Date(remoteMatch.updatedAt || remoteMatch.createdAt);
+          mergedTodos.push(localNewer ? localTodo : remoteMatch);
+          if (localNewer) conflicts++;
+          processedRemoteIds.add(localTodo._id);
+        } else {
+          // Local-only: keep (will sync later)
+          mergedTodos.push(localTodo);
+        }
+      }
+
+      // Add new remote todos
+      for (const remoteTodo of remoteTodos) {
+        if (!processedRemoteIds.has(remoteTodo._id)) {
+          mergedTodos.push(remoteTodo);
+          merged++;
+        }
+      }
+
+      // Save merged result
+      await this.saveTodos(mergedTodos.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
+      
+      syncStatus.lastSyncAt = Date.now();
+      syncStatus.lastError = null;
+      notifySyncListeners();
+      
+      return { success: true, synced, merged, conflicts };
+    } catch (error: unknown) {
+      logger.error('Full sync failed:', error);
+      syncStatus.lastError = (error as Error)?.message || 'Sync failed';
+      notifySyncListeners();
+      return { success: false, synced, merged, conflicts };
+    } finally {
+      syncInProgress = false;
+      syncStatus.syncInProgress = false;
+      notifySyncListeners();
+    }
   },
 
   async getTodo(id: string): Promise<Todo | undefined> {
@@ -267,15 +444,29 @@ export const offlineStorage = {
         } catch {
           failed++;
           item.retries = (item.retries ?? 0) + 1;
-          if (item.retries >= 5) {
-            queue.splice(queue.indexOf(item), 1);
+          item.lastError = item.lastError ? `${item.lastError}; retry ${item.retries}` : `retry ${item.retries}`;
+          
+          // Exponential backoff: delay = Math.min(2 ** retries * 100, 30000) ms
+          const backoffDelay = Math.min(Math.pow(2, item.retries) * 100, 30000);
+          
+          if (item.retries >= 10) {
+            // Move to permanent failed queue
+            logger.error(`Permanent sync failure for ${item.todoId} (${item.action}): ${item.lastError}`);
+            // Keep in queue but mark as failed (UI can show)
+          } else {
+            // Re-queue at end with backoff
+            const delayedSync = () => this.syncPendingChanges().catch(() => {});
+            setTimeout(delayedSync, backoffDelay);
           }
         }
       }
 
       setToStorage(STORAGE_KEYS.SYNC_QUEUE, queue);
       syncStatus.lastSyncAt = Date.now();
-      syncStatus.lastError = failed > 0 ? `${failed} items failed` : null;
+      syncStatus.lastError = failed > 0 ? `${failed} sync failures (check console)` : null;
+      if (failed > 0) {
+        logger.error(`Sync summary: ${synced} succeeded, ${failed} failed after retries`);
+      }
     } catch (error: unknown) {
       logger.error('Sync failed:', error);
       syncStatus.lastError = (error as Error)?.message || 'Sync failed';

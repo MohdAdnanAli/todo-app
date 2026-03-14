@@ -11,23 +11,15 @@ const TEST_DB_URI = process.env.TEST_DB_URI || 'mongodb://localhost:27017/todo-a
 describe('Auth API', () => {
   let agent: request.SuperTest<request.Response>;
 
-  beforeAll(async () => {
-    // Connect to test database
-    try {
-      await mongoose.connect(TEST_DB_URI);
-      console.log('Connected to test database');
-    } catch (error) {
-      console.warn('Test database not available, running with mocks');
-    }
-    agent = request(app);
-  });
+beforeAll(async () => {
+  await setupTestDB();
+  agent = request(app);
+});
+
+import { teardownTestDB } from './test-setup';
 
   afterAll(async () => {
-    try {
-      await mongoose.disconnect();
-    } catch (error) {
-      // Ignore disconnect errors
-    }
+    await teardownTestDB();
   });
 
   beforeEach(async () => {

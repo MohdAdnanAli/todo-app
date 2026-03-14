@@ -23,7 +23,7 @@ import {
 } from './components';
 import SmartTodoList from './components/SmartTodoList';
 import { onboardingService } from './services/onboarding';
-import { offlineStorage } from './services/offlineStorage';
+import { offlineStorage, addSyncListener, type SyncStatus } from './services/offlineStorage';
 import { ArrowRight } from 'lucide-react';
 
 // Known temporary/disposable email domains
@@ -87,6 +87,9 @@ function App() {
   const [showWelcomeBackModal, setShowWelcomeBackModal] = useState(false);
   const [isLoadingTodos, setIsLoadingTodos] = useState(false);
   const [showPremiumFeatures, setShowPremiumFeatures] = useState(false);
+  
+  // Sync status listener cleanup
+  const syncListenerCleanup = useRef<() => void | undefined>();
   
   // Delete confirmation dialog state
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -371,10 +374,11 @@ function App() {
       );
       
       // Get data from response - use local variables to avoid state race conditions
-      const { user: userData, encryptionSalt: salt } = response.data;
+      const { user: userData, encryptionSalt: salt, isAdmin: loginIsAdmin } = response.data;
       
       // Set user data first
       setUser(userData);
+      setIsAdmin(loginIsAdmin || false);
       setEncryptionSalt(salt || '');
       setUserPassword(loginPassword);
 
@@ -457,10 +461,11 @@ function App() {
       );
       
       // Get data from response - use local variables to avoid state race conditions
-      const { user: userData, encryptionSalt: salt } = response.data;
+      const { user: userData, encryptionSalt: salt, isAdmin: regIsAdmin } = response.data;
       
       // Set user data first
       setUser(userData);
+      setIsAdmin(regIsAdmin || false);
       setEncryptionSalt(salt || '');
       setUserPassword(regPassword);
 
@@ -561,100 +566,62 @@ function App() {
       setMessageType('warning');
       return;
     }
-  
-    // Track if this is the first task being added
+
+    // Encrypt BEFORE local action
+    let encryptedText = text;
+    if (userPassword && encryptionSalt) {
+      try {
+        encryptedText = await encrypt(text, userPassword, encryptionSalt);
+      } catch (encryptErr) {
+        console.warn('Encryption failed, saving as plain text:', encryptErr);
+      }
+    }
+    
+    // OFFLINE-FIRST: optimistic local create + auto-queue
     const isFirstTask = todos.length === 0;
     const hasCategory = !!category;
     const hasPriority = !!priority;
-  
-    setMessage('Adding...');
-    setMessageType('loading');
+    
     try {
-      // Encrypt the todo text if we have password and salt
-      let encryptedText = text;
-      if (userPassword && encryptionSalt) {
-        try {
-          encryptedText = await encrypt(text, userPassword, encryptionSalt);
-        } catch (encryptErr) {
-          console.warn('Encryption failed, saving as plain text:', encryptErr);
-          // Continue with plain text if encryption fails
-        }
-      }
-      
-      const todoData: Partial<Todo> = { 
+      const newTodo = await offlineStorage.performLocalAction('create', {
         text: encryptedText,
-      };
-      if (category) todoData.category = category;
-      if (priority) todoData.priority = priority;
-      if (tags && tags.length > 0) todoData.tags = tags;
-      if (dueDate) todoData.dueDate = dueDate;
+        category,
+        priority,
+        tags,
+        dueDate
+      }) as Todo;
       
-      const res = await axios.post(
-        `${API_URL}/api/todos`,
-        todoData,
-        { withCredentials: true }
-      );
+      // Optimistic UI update (decrypt for display)
+      const decryptedNewTodo = await decryptTodo(newTodo, userPassword, encryptionSalt);
+      setTodos(prev => [decryptedNewTodo, ...prev.filter(t => t._id !== newTodo._id)]);
       
-      // Backend returns { todo: serializedTodo, fullSync: false } or an array of all todos
-      // Handle both formats for backward compatibility
-      let todosData: Todo[] = [];
-      if (Array.isArray(res.data)) {
-        // Old format: returns all todos as array
-        todosData = res.data;
-      } else if (res.data?.todo) {
-        // New format: returns { todo, fullSync } - add the new todo to existing list
-        const newTodo = res.data.todo;
-        // Add the new todo to our existing list
-        todosData = [newTodo, ...todos];
-      } else {
-        // Fallback: fetch all todos from server
-        const fetchRes = await axios.get(`${API_URL}/api/todos`, { withCredentials: true });
-        todosData = Array.isArray(fetchRes.data) ? fetchRes.data : [];
-      }
-      
-      const decryptedTodos = await decryptAllTodos(todosData, userPassword, encryptionSalt);
-      setTodos(decryptedTodos);
-      await offlineStorage.saveTodos(decryptedTodos);
-      
-      // Auto-complete quick-start tasks
-      if (isFirstTask) {
-        await checkAndAutoCompleteTask('first-task');
-      }
-      if (hasCategory) {
-        await checkAndAutoCompleteTask('categorize');
-      }
-      if (hasPriority) {
-        await checkAndAutoCompleteTask('set-priority');
-      }
-      
-      setMessage('Todo added');
+      setMessage('Todo added ✓ (syncing...)');
       setMessageType('primary');
+      
+      // Quick-start
+      if (isFirstTask) await checkAndAutoCompleteTask('first-task');
+      if (hasCategory) await checkAndAutoCompleteTask('categorize');
+      if (hasPriority) await checkAndAutoCompleteTask('set-priority');
+      
     } catch (err: any) {
-      setMessage('Error: ' + (err.response?.data?.error || err.message));
+      setMessage('Local save failed: ' + err.message);
       setMessageType('error');
     }
   };
 
   const handleToggle = async (todo: Todo) => {
-    try {
-      const res = await axios.put(
-        `${API_URL}/api/todos/${todo._id}`,
-        { completed: !todo.completed },
-        { withCredentials: true }
-      );
-
-      const decryptedTodo = await decryptTodo(res.data, userPassword, encryptionSalt);
-      const updatedTodos = todos.map(t =>
-        t._id === todo._id ? decryptedTodo : t
-      );
-      setTodos(updatedTodos);
-      await offlineStorage.saveTodos(updatedTodos);
-      setMessage(todo.completed ? 'Task marked as pending' : 'Task completed');
-      setMessageType(todo.completed ? 'pending' : 'success');
-    } catch (err: any) {
-      setMessage('Error updating todo: ' + (err.response?.data?.error || err.message));
-      setMessageType('error');
-    }
+    // OFFLINE-FIRST toggle
+    const updatedTodo = await offlineStorage.performLocalAction('toggle', {
+      _id: todo._id,
+      completed: !todo.completed
+    }) as Todo;
+    
+    // Optimistic UI (decrypt)
+    const decryptedTodo = await decryptTodo(updatedTodo, userPassword, encryptionSalt);
+    setTodos(prev => prev.map(t => t._id === todo._id ? decryptedTodo : t));
+    
+    setMessage(todo.completed ? 'Task marked as pending ✓' : 'Task completed ✓');
+    setMessageType(todo.completed ? 'pending' : 'success');
   };
 
   const handleDeleteClick = (todoId: string) => {
@@ -667,32 +634,12 @@ function App() {
     setDeleteConfirm(prev => ({ ...prev, isDeleting: true }));
 
     try {
-      const res = await axios.delete(`${API_URL}/api/todos/${deleteConfirm.todoId}`, {
-        withCredentials: true,
-      });
-
-      // Backend returns { deletedId, fullSync } or an array of all todos
-      // Handle both formats for backward compatibility
-      let todosData: Todo[] = [];
-      if (Array.isArray(res.data)) {
-        // Old format: returns all todos as array
-        todosData = res.data;
-      } else if (res.data?.deletedId) {
-        // New format: returns { deletedId, fullSync } - remove from existing list
-        todosData = todos.filter(t => t._id !== res.data.deletedId);
-      } else {
-        // Fallback: fetch all todos from server
-        const fetchRes = await axios.get(`${API_URL}/api/todos`, { withCredentials: true });
-        todosData = Array.isArray(fetchRes.data) ? fetchRes.data : [];
-      }
-      
-      const decryptedTodos = await decryptAllTodos(todosData, userPassword, encryptionSalt);
-      setTodos(decryptedTodos);
-      await offlineStorage.saveTodos(decryptedTodos);
-      setMessage('Todo deleted');
+      await offlineStorage.performLocalAction('delete', { _id: deleteConfirm.todoId });
+      setTodos(prev => prev.filter(t => t._id !== deleteConfirm.todoId));
+      setMessage('Todo deleted ✓');
       setMessageType('accent');
     } catch (err: any) {
-      setMessage('Error deleting todo: ' + (err.response?.data?.error || err.message));
+      setMessage('Local delete failed: ' + err.message);
       setMessageType('error');
     } finally {
       setDeleteConfirm({ isOpen: false, todoId: null, isDeleting: false });
@@ -704,33 +651,14 @@ function App() {
   };
 
   const handleReorder = async (reorderedTodos: Todo[]) => {
-    // Optimistic update - show reordered immediately
-    setTodos(reorderedTodos);
-    await offlineStorage.saveTodos(reorderedTodos);
-    
-    // Use batch reorder endpoint for efficiency
     try {
-      // Send todos with their new order values based on array position
-      const reorderData = reorderedTodos.map((todo, index) => ({
-        id: todo._id,
-        order: index, // Assign sequential order based on array position
-      }));
-      
-      const res = await axios.post(
-        `${API_URL}/api/todos/reorder`,
-        { todos: reorderData },
-        { withCredentials: true }
-      );
-      
-      // Server returns all todos with correct order - decrypt and sync
-      // Ensure we have an array before mapping
-      const todosData = Array.isArray(res.data) ? res.data : [];
-      const decryptedTodos = await decryptAllTodos(todosData, userPassword, encryptionSalt);
-      setTodos(decryptedTodos);
-      await offlineStorage.saveTodos(decryptedTodos);
-    } catch (err) {
-      console.error('Error saving order:', err);
-      // On error, the optimistic update will remain - user can retry
+      await offlineStorage.performLocalAction('reorder', { todos: reorderedTodos });
+      // UI already updated via optimistic reorder in SmartTodoList
+      setMessage('Reordered ✓ (syncing...)');
+      setMessageType('primary');
+    } catch (err: any) {
+      setMessage('Local reorder failed: ' + err.message);
+      setMessageType('error');
     }
   };
 
@@ -790,12 +718,36 @@ function App() {
     checkOnboardingStatus();
   }, [user, isLoadingTodos, quickStartChecked]);
 
-  // Cleanup offline storage event listeners on unmount
+// Sync status listener - updates message bar
   useEffect(() => {
+    if (!user) return;
+    
+    const cleanup = addSyncListener((status: SyncStatus) => {
+      if (status.syncInProgress) {
+        setMessage('🔄 Syncing...');
+        setMessageType('loading');
+      } else if (status.pendingCount > 0) {
+        setMessage(`⏳ ${status.pendingCount} pending`);
+        setMessageType('pending');
+      } else if (status.lastSyncAt) {
+        const timeAgo = ((Date.now() - status.lastSyncAt) / 1000 / 60).toFixed(0);
+        setMessage(`✅ Synced ${timeAgo}m ago`);
+        setMessageType('success');
+      }
+      
+      if (status.lastError) {
+        setMessage(`⚠️ ${status.lastError}`);
+        setMessageType('warning');
+      }
+    });
+    
+    syncListenerCleanup.current = cleanup;
+    
     return () => {
+      cleanup();
       offlineStorage.cleanup();
     };
-  }, []);
+  }, [user]);
 
   // Render loading state - ensures hooks are always called in same order
   if (isLoading) {

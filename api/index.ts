@@ -203,8 +203,8 @@ app.get('/api/me', protect, async (req: any, res) => {
       googleId: user.googleId // Also return at top level for convenience
     });
   } catch (err) {
-    logger.error('/api/me error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    const { handleControllerError } = require('./utils/errorHandler');
+    handleControllerError(res, err, 'Failed to fetch user profile');
   }
 });
 
@@ -261,22 +261,14 @@ app.post('/api/admin/smtp-test', adminProtect, async (req, res) => {
     const result = await testSMTPConnection();
     res.json(result);
   } catch (error: any) {
-    logger.error('[Admin] SMTP test error:', error);
-    res.status(500).json({ success: false, message: `Test failed: ${error.message}` });
+    const { handleControllerError } = require('./utils/errorHandler');
+    handleControllerError(res, error, 'SMTP test failed');
   }
 });
 
-// Error handler - MUST be after all routes and middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  // In production, don't expose stack traces
-  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
-  if (isProduction) {
-    logger.error('Unhandled error:', err?.message || 'Unknown error');
-  } else {
-    logger.error('Unhandled error:', err?.message || err);
-  }
-  return res.status(500).json({ error: 'Internal Server Error' });
-});
+import { globalErrorHandler } from './utils/errorHandler';
+
+app.use(globalErrorHandler);
 
 // ────────────────────────────────────────────────
 // Vercel Serverless Export

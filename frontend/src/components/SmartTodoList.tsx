@@ -32,6 +32,8 @@ interface SmartTodoListProps {
   sortable?: boolean;
 }
 
+import { SyncStatus } from './SyncStatus';
+
 const SmartTodoList: React.FC<SmartTodoListProps> = memo(
   ({ todos, onToggle, onDelete, onReorder, sortable = false }) => {
     const [activeId, setActiveId] = useState<string | null>(null);
@@ -379,17 +381,18 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
       );
     };
 
-    return (
-      <div>
-        {/* Collapsible Filter Toggle */}
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center justify-between w-full px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200
-            ${hasActiveFilters 
-              ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white' 
-              : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-secondary)]'
-            }`}
-        >
+  return (
+    <div>
+      <SyncStatus className="mb-3" />
+      {/* Collapsible Filter Toggle */}
+      <button
+        onClick={() => setShowFilters(!showFilters)}
+        className={`flex items-center justify-between w-full px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200
+          ${hasActiveFilters 
+            ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white' 
+            : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-secondary)]'
+          }`}
+      >
           <div className="flex items-center gap-2">
             <SlidersHorizontal size={14} />
             <span>
