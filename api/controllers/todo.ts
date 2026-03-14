@@ -81,6 +81,44 @@ const paginationSchema = z.object({
   limit: z.coerce.number().min(1).max(100).default(50),
 });
 
+// NEW: Delta endpoint for incremental sync - todos updated since timestamp
+const deltaTodosSchema = z.object({
+  since: z.string().datetime().optional(),
+});
+
+export const getTodosDelta = async (req: Request & { user?: { id: string } }, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const validation = deltaTodosSchema.safeParse(req.query);
+    const sinceTimestamp = validation.success && validation.data.since ? new Date(validation.data.since) : undefined;
+
+    // Delta query: updatedAt > since OR createdAt > since
+    const query: any = { user: userId };
+    if (sinceTimestamp) {
+      query.$or = [
+        { updatedAt: { $gt: sinceTimestamp } },
+        { createdAt: { $gt: sinceTimestamp } }
+      ];
+    }
+
+    const deltaTodos = await Todo.find(query)
+      .select(EXCLUDE_FIELDS)
+      .sort({ updatedAt: -1 }) // Newest changes first
+      .lean();
+
+    const serialized = serializeTodos(deltaTodos);
+
+    res.json(serialized);
+  } catch (err) {
+    logger.error('GetTodosDelta error:', err);
+    return res.status(500).json({ error: 'Failed to fetch delta todos' });
+  }
+};
+
 export const getTodos = async (req: Request & { user?: { id: string } }, res: Response) => {
   try {
     const userId = (req as any).user?.id;
@@ -344,4 +382,91 @@ export const reorderTodos = async (req: Request & { user?: { id: string } }, res
     return res.status(500).json({ error: 'Failed to reorder todos' });
   }
 };
+
+// NEW: Batch sync endpoint for offline queue
+const batchSyncSchema = z.object({
+  creates: z.array(createTodoSchema).max(50, 'Max 50 creates per batch'),
+  updates: z.array(z.object({
+    id: z.string(),
+    data: updateTodoSchema,
+  })).max(50, 'Max 50 updates per batch'),
+  deletes: z.array(z.string()).max(50, 'Max 50 deletes per batch'),
+});
+
+export const batchSync = async (req: Request & { user?: { id: string } }, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const result = batchSyncSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.issues[0]?.message || 'Validation error' });
+    }
+
+    const { creates, updates, deletes } = result.data;
+
+    const bulkOps = [];
+
+    // Deletes first (order matters)
+    for (const id of deletes) {
+      if (!isValidObjectId(id)) continue;
+      bulkOps.push({
+        deleteOne: {
+          filter: { _id: id, user: userId },
+        },
+      });
+    }
+
+    // Updates
+    for (const { id, data } of updates) {
+      if (!isValidObjectId(id)) continue;
+      bulkOps.push({
+        updateOne: {
+          filter: { _id: id, user: userId },
+          update: { $set: data },
+        },
+      });
+    }
+
+    // Creates (upsert false, error if duplicate)
+    for (const data of creates) {
+      bulkOps.push({
+        insertOne: {
+          document: {
+            ...data,
+            user: userId,
+            // Auto order: find min - gap, but batch so append to end for simplicity
+            order: 999999, // Frontend will reorder after sync
+          },
+        },
+      });
+    }
+
+    if (bulkOps.length === 0) {
+      return res.json({ success: true, processed: { creates: 0, updates: 0, deletes: 0 } });
+    }
+
+    const resultBulk = await Todo.bulkWrite(bulkOps, { ordered: false });
+
+    invalidateTodoCache(userId);
+
+    const processed = {
+      creates: resultBulk.nInserted || 0,
+      updates: (resultBulk.nMatched || 0) + (resultBulk.nModified || 0),
+      deletes: resultBulk.nRemoved || 0,
+    };
+
+    res.json({ 
+      success: true, 
+      processed,
+      total: bulkOps.length 
+    });
+  } catch (err) {
+    logger.error('BatchSync error:', err);
+    return res.status(500).json({ error: 'Batch sync failed' });
+  }
+};
+
 

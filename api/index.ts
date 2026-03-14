@@ -14,7 +14,7 @@ import { getGoogleAuthUrlHandler, googleCallback, googleError, linkGoogleAccount
 import { checkEmailAvailability } from './controllers/emailCheck';
 import { protect } from './middleware/auth';
 import { adminProtect } from './middleware/admin';
-import { getTodos, createTodo, updateTodo, deleteTodo, reorderTodos } from './controllers/todo';
+import { getTodos, createTodo, updateTodo, deleteTodo, reorderTodos, batchSync, getTodosDelta } from './controllers/todo';
 import { apiLimiter, loginLimiter, registerLimiter, passwordResetLimiter } from './middleware/rateLimiter';
 import { User } from './models/User';
 import mongoose from 'mongoose';
@@ -173,6 +173,8 @@ app.post('/api/todos', protect, createTodo);
 app.put('/api/todos/:id', protect, updateTodo);
 app.delete('/api/todos/:id', protect, deleteTodo);
 app.post('/api/todos/reorder', protect, reorderTodos);
+app.post('/api/todos/batch-sync', protect, batchSync);
+app.get('/api/todos/delta', protect, getTodosDelta);
 
 app.get('/api/me', protect, async (req: any, res) => {
   try {

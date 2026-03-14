@@ -32,7 +32,6 @@ export const LED_COLORS: Record<MessageType, { bg: string; glow: string; border:
 };
 
 // API URL - use empty string in development to use Vite proxy (same origin)
-// In production/preview, use the configured VITE_API_URL or fallback to Render
 export const API_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.PROD ? 'https://todo-app-srbx.onrender.com' : 'http://localhost:5000');
 
@@ -246,3 +245,19 @@ export interface SystemHealth {
 // Auth mode for forms
 export type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password';
 
+// Batch sync types
+export interface BatchSyncInput {
+  creates: Partial<Todo>[];
+  updates: { id: string; data: Partial<Todo> }[];
+  deletes: string[];
+}
+
+export interface BatchSyncResult {
+  success: boolean;
+  processed: {
+    creates: number;
+    updates: number;
+    deletes: number;
+  };
+  total: number;
+}

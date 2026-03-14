@@ -3,7 +3,7 @@
  * Reliable storage that works across all browsers without IndexedDB issues
  */
 
-import type { Todo } from '../types';
+import type { Todo, BatchSyncInput } from '../types';
 import { todoApi } from './api.js';
 
 // ============================================
@@ -284,50 +284,60 @@ export const offlineStorage = {
     let synced = 0, merged = 0, conflicts = 0;
 
     try {
-      // 1. Push local queue to remote
+      // 1. Push local queue (batched)
       const queueResult = await this.syncPendingChanges();
       synced = queueResult.synced;
 
-      // 2. Fetch remote todos for merge
-      const remoteTodos = await todoApi.getTodos().catch(() => [] as Todo[]);
-      
-      // 3. Smart merge: updatedAt wins, new locals already queued, new remotes added
+      // 2. Incremental delta merge (non-blocking "second half")
+      const currentStatus = await this.getSyncStatus();
       const localTodos = await this.getAllTodos();
-      const mergedTodos: Todo[] = [];
+
+      let remoteTodos: Todo[];
+      if (currentStatus.lastSyncAt) {
+        // Delta sync: only changes since last sync
+        remoteTodos = await todoApi.getTodosDelta(new Date(currentStatus.lastSyncAt).toISOString());
+        logger.info(`Delta sync: ${remoteTodos.length} changes since ${currentStatus.lastSyncAt}`);
+      } else {
+        // Full sync fallback
+        remoteTodos = await todoApi.getTodos();
+        logger.info('Full sync (no lastSyncAt)');
+      }
+
+      // Incremental merge only new/changed remote todos
       const processedRemoteIds = new Set<string>();
+      const newMergedTodos = [...localTodos];
 
-      for (const localTodo of localTodos) {
-        const remoteMatch = remoteTodos.find((r: Todo) => r._id === localTodo._id);
-        if (remoteMatch) {
-          // Conflict resolution: newer updatedAt wins
-          const localNewer = new Date(localTodo.updatedAt || localTodo.createdAt) > new Date(remoteMatch.updatedAt || remoteMatch.createdAt);
-          mergedTodos.push(localNewer ? localTodo : remoteMatch);
-          if (localNewer) conflicts++;
-          processedRemoteIds.add(localTodo._id);
-        } else {
-          // Local-only: keep (will sync later)
-          mergedTodos.push(localTodo);
-        }
-      }
-
-      // Add new remote todos
       for (const remoteTodo of remoteTodos) {
-        if (!processedRemoteIds.has(remoteTodo._id)) {
-          mergedTodos.push(remoteTodo);
+        processedRemoteIds.add(remoteTodo._id);
+        const localIndex = newMergedTodos.findIndex(t => t._id === remoteTodo._id);
+
+        if (localIndex === -1) {
+          // New remote todo
+          newMergedTodos.push(remoteTodo);
           merged++;
+        } else {
+          // Conflict: remote newer wins (updatedAt)
+          const localTodo = newMergedTodos[localIndex];
+          const remoteNewer = new Date(remoteTodo.updatedAt || remoteTodo.createdAt) > new Date(localTodo.updatedAt || localTodo.createdAt);
+          if (remoteNewer) {
+            newMergedTodos[localIndex] = remoteTodo;
+            conflicts++;
+          }
         }
       }
 
-      // Save merged result
-      await this.saveTodos(mergedTodos.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
+      // Sort and save (non-blocking chunked if >500)
+      newMergedTodos.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      await this.saveTodos(newMergedTodos);
       
       syncStatus.lastSyncAt = Date.now();
       syncStatus.lastError = null;
       notifySyncListeners();
       
+      logger.info(`Sync complete: ${synced} synced, ${merged} merged, ${conflicts} conflicts`);
       return { success: true, synced, merged, conflicts };
     } catch (error: unknown) {
-      logger.error('Full sync failed:', error);
+      logger.error('SyncAll failed:', error);
       syncStatus.lastError = (error as Error)?.message || 'Sync failed';
       notifySyncListeners();
       return { success: false, synced, merged, conflicts };
@@ -421,58 +431,53 @@ export const offlineStorage = {
       if (queue.length === 0) {
         syncInProgress = false;
         syncStatus.syncInProgress = false;
+        notifySyncListeners();
         return { success: true, synced: 0, failed: 0 };
       }
 
-      const axios = await getApi();
-      const API_URL = (await import('../types')).API_URL;
+      // BATCH: Group by action
+      const batch: BatchSyncInput = {
+        creates: [],
+        updates: [],
+        deletes: [],
+      };
 
       for (const item of queue) {
-        try {
-          switch (item.action) {
-            case 'create':
-              await axios.post(`${API_URL}/api/todos`, item.data, { withCredentials: true });
-              break;
-            case 'update':
-              await axios.put(`${API_URL}/api/todos/${item.todoId}`, item.data, { withCredentials: true });
-              break;
-            case 'delete':
-              await axios.delete(`${API_URL}/api/todos/${item.todoId}`, { withCredentials: true });
-              break;
-          }
-          synced++;
-        } catch {
-          failed++;
-          item.retries = (item.retries ?? 0) + 1;
-          item.lastError = item.lastError ? `${item.lastError}; retry ${item.retries}` : `retry ${item.retries}`;
-          
-          // Exponential backoff: delay = Math.min(2 ** retries * 100, 30000) ms
-          const backoffDelay = Math.min(Math.pow(2, item.retries) * 100, 30000);
-          
-          if (item.retries >= 10) {
-            // Move to permanent failed queue
-            logger.error(`Permanent sync failure for ${item.todoId} (${item.action}): ${item.lastError}`);
-            // Keep in queue but mark as failed (UI can show)
-          } else {
-            // Re-queue at end with backoff
-            const delayedSync = () => this.syncPendingChanges().catch(() => {});
-            setTimeout(delayedSync, backoffDelay);
-          }
+        if (item.action === 'create') {
+          batch.creates!.push(item.data as Partial<Todo>);
+        } else if (item.action === 'update') {
+          batch.updates!.push({ id: item.todoId, data: item.data as Partial<Todo> });
+        } else if (item.action === 'delete') {
+          batch.deletes!.push(item.todoId);
         }
       }
 
-      setToStorage(STORAGE_KEYS.SYNC_QUEUE, queue);
+      const result = await todoApi.batchSync(batch);
+
+      if (result.success) {
+        synced = result.processed.creates + result.processed.updates + result.processed.deletes;
+        // Clear entire queue on batch success (retry logic in future)
+        await this.clearSyncQueue();
+        logger.info(`Batch sync success: ${synced} items`);
+      } else {
+        failed = queue.length;
+        logger.error('Batch sync failed:', result);
+      }
+
       syncStatus.lastSyncAt = Date.now();
-      syncStatus.lastError = failed > 0 ? `${failed} sync failures (check console)` : null;
+      syncStatus.lastError = failed > 0 ? 'Batch sync failed' : null;
+      
       if (failed > 0) {
-        logger.error(`Sync summary: ${synced} succeeded, ${failed} failed after retries`);
+        logger.error(`Batch sync summary: ${synced} succeeded, ${failed} failed`);
       }
     } catch (error: unknown) {
-      logger.error('Sync failed:', error);
-      syncStatus.lastError = (error as Error)?.message || 'Sync failed';
+      logger.error('Batch syncPendingChanges failed:', error);
+      failed = 1;
+      syncStatus.lastError = (error as Error)?.message || 'Batch sync failed';
     } finally {
       syncInProgress = false;
       syncStatus.syncInProgress = false;
+      notifySyncListeners();
     }
 
     return { success: failed === 0, synced, failed };

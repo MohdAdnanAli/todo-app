@@ -252,6 +252,22 @@ export const onboardingApi = {
 
 // ==================== TODOS ====================
 
+interface BatchSyncInput {
+  creates: Partial<Todo>[];
+  updates: { id: string; data: Partial<Todo> }[];
+  deletes: string[];
+}
+
+interface BatchSyncResult {
+  success: boolean;
+  processed: {
+    creates: number;
+    updates: number;
+    deletes: number;
+  };
+  total: number;
+}
+
 export const todoApi = {
   getTodos: async (): Promise<Todo[]> => {
     const res = await api.get<Todo[]>('/api/todos');
@@ -270,6 +286,17 @@ export const todoApi = {
 
   deleteTodo: async (id: string): Promise<{ message: string }> => {
     const res = await api.delete<{ message: string }>(`/api/todos/${id}`);
+    return res.data;
+  },
+
+  batchSync: async (batch: BatchSyncInput): Promise<BatchSyncResult> => {
+    const res = await api.post<BatchSyncResult>('/api/todos/batch-sync', batch);
+    return res.data;
+  },
+
+  getTodosDelta: async (since?: string): Promise<Todo[]> => {
+    const params = since ? { since } : {};
+    const res = await api.get<Todo[]>('/api/todos/delta', { params });
     return res.data;
   },
 };
