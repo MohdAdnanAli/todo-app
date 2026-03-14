@@ -1,3 +1,11 @@
+# wSupport my survival work → https://ko-fi.com/geralt_of_rivia ☕
+# Demo: https://metb-todo.vercel.app
+# Features: Bun full-stack • PWA offline • IndexedDB • drag-drop
+
+
+
+
+
 Planned UI Improvements:
 
 Add container styling: Rounded corners, subtle shadow, centered card layout
