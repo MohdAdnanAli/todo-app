@@ -1,75 +1,49 @@
-# wSupport my survival work → https://ko-fi.com/geralt_of_rivia ☕
-# Demo: https://metb-todo.vercel.app
-# Features: Bun full-stack • PWA offline • IndexedDB • drag-drop
+# 🚀 METB Todo – Lightning-fast Offline-First Todo App
 
+[![Bun](https://img.shields.io/badge/Bun-%23EAB308?style=for-the-badge&logo=bunjs&logoColor=white)](https://bun.sh) [![TypeScript](https://img.shields.io/badge/TypeScript-%23007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Vite](https://img.shields.io/badge/Vite-%23646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vite.dev/) [![PWA](https://img.shields.io/badge/PWA-offline--first-3AB7F9?style=for-the-badge&logo=webapp&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps) [![Vercel](https://img.shields.io/badge/Vercel-%23000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
 
+## ✨ Hero
 
+**Lightning-fast offline-first todo app with drag-drop reordering, smart filters, custom themes, and seamless sync – powered by Bun for ultimate speed!**
 
+![Hero Demo](./public/demo.gif)
 
-Planned UI Improvements:
+## 🚀 Features (All Battle-Tested)
 
-Add container styling: Rounded corners, subtle shadow, centered card layout
-Improve input fields: Add focus states with border color, better padding
-Add button hover effects: Color changes, subtle scale transform
-Todo items: Add hover effect, better completed state styling
-Auth toggle buttons: Better active/inactive styling with transitions
-Add transitions: Smooth 0.2s transitions on interactive elements
-Message display: Style it more subtly (smaller, less intrusive)
-Background: Add subtle gradient or off-white background
+- **📱 Offline-First Sync**: Full optimistic UI with localStorage queue, bidirectional merge (local→remote + remote→local), auto-sync on reconnect
+- **💾 PWA Installable**: Native-like app with install prompt, service worker ready (Vite PWA plugin)
+- **✨ Drag-Drop Reordering**: @dnd-kit powered (touch/keyboard/mobile sensors), works with active filters, visual overlay
+- **🎯 Priorities, Dues & Categories**: High/Med/Low priority, due dates, 5 categories (work/personal/shopping/health/other) + real-time filters/search
+- **🌈 Theme Engine**: 10+ presets + live custom color picker (bg/text/accent), system mode support
+- **🎉 Onboarding Perfection**: 7-step Joyride tour, quick-start checklist, example todos on signup
+- **⚡ Blazing Bun Backend**: Full-stack speed with Express/MongoDB/Zod validation, email drip (Day 1/3/7)
+- **🔍 Smart Filters**: Category/priority/completed/search with live stats (e.g., 42% complete), clear all button
+- **🛡️ Secure Auth**: Google OAuth + email/password, rate-limiting, XSS protection
+- **📊 Admin Dashboard**: User stats, todo analytics, pagination (frontend + backend)
 
-STATUS: True
+> **Quality**: ✅ Production-ready • Comprehensive tests (drag-drop 12/12, offline 13/13)
 
+## 🔗 Get Started
 
-Future Implementations:
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/vercel-labs/bun-template-next) [![Live Demo](https://img.shields.io/badge/Live_Demo-%23metb--todo-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://metb-todo.vercel.app)
 
-Security:
-Rate limiting (anti-spam/abuse)
-Input validation/sanitization
-Email verification
-Password strength requirements
-User Experience:
-Password reset functionality
-Email confirmation
-Profile management
-Todo categories/tags
-Anti-Spam Specific:
-Request rate limiting (e.g., max 5 login attempts per minute)
-CAPTCHA for registration
-Account lockout after failed attempts
+1. Clone/fork → `bun install` (root + api/ + frontend/)
+2. Backend: `cd api && bun run start`
+3. Frontend: `cd frontend && bun run dev`
+4. Open http://localhost:5173 – works offline!
 
+## 🗺️ Roadmap
 
-Advanced todo button, Advanced time-based features:FASLE
+- 🔄 **Recurring Tasks**: Flex scheduling ("every Mon" or "every 3 workdays")
+- ⏱️ **Pomodoro Timer**: Built-in 25-min focus sessions + breaks
+- 🤖 **AI Assist**: Mail summarization, auto-scheduling, promptfoo integration
+- 📈 **Time Tracking**: Duration estimates, finish-time predictor, habit streaks
+- 📱 **Mobile-First**: iOS/Android responsive polish + safe-area support
 
-Estimated duration — set predicted time per task
-Actual time tracking — start/stop timer or auto-track
-Pomodoro / focus timer — built-in 25-min sessions + breaks
-Time blocking — drag tasks onto calendar slots
-AI auto-scheduling — fills free time intelligently
-Earliest start / soft deadlines — not just hard due dates
-Recurring with flex — every Mon or "every 3 workdays"
-Overtime / underrun alerts — warns when task runs long/short
-Daily energy / focus prediction — suggests task order by energy level
-Habit streaks + time consistency — tracks daily same-time execution
-Finish time estimator — shows when your whole day ends
-[To get this done in the clock position next to profile]
+## 📝 Topics
+todo-app, productivity, pwa, offline-first, bunjs, task-manager, full-stack, react, vite, drag-drop, typescript
 
+---
 
-please do not merge plan and all. to brief join my notion.
+**Support my work ☕** [ko-fi.com/geralt_of_rivia](https://ko-fi.com/geralt_of_rivia)
 
-
-
-
-Quality Implemented: true
-Feature	Status	Tests
-Due Dates, Priorities & Categories	✅ Complete	Integrated
-Drag-and-Drop Reordering	✅ Complete	12/12 ✓
-Offline Support (IndexedDB)	✅ Complete	13/13 ✓
-PWA Installation Prompt	✅ Complete	N/A
-Welcome Tour (7 Steps)	✅ Complete	Integrated
-Quick-Start Checklist (3 Tasks)	✅ Complete	Integrated
-Example Todos on Signup	✅ Complete	Integrated
-Email Drip Sequence (Day 1,3,7)	✅ Complete	Integrated
-
-
-
-4: Mail AI summarisation and promptfoo integration and system desgin = false

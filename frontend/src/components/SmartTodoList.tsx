@@ -23,6 +23,7 @@ import { useTodoFilters } from '../hooks/useTodoFilters';
 import { TodoItemCore } from './TodoItem';
 import { CATEGORIES, PRIORITIES } from '../utils/todoHelpers';
 import { SlidersHorizontal, ChevronDown, ChevronUp, Search, FilterX, GripVertical } from 'lucide-react';
+import { SyncStatus } from './SyncStatus';
 
 interface SmartTodoListProps {
   todos: Todo[];
@@ -31,8 +32,6 @@ interface SmartTodoListProps {
   onReorder?: (reorderedTodos: Todo[]) => void;
   sortable?: boolean;
 }
-
-import { SyncStatus } from './SyncStatus';
 
 const SmartTodoList: React.FC<SmartTodoListProps> = memo(
   ({ todos, onToggle, onDelete, onReorder, sortable = false }) => {
@@ -72,7 +71,14 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
     // Only enable drag when sortable prop is true AND no filters active
     const isDragEnabled = sortable && !hasActiveFilters;
 
-    // Find the actual todo object for the active drag item
+    // CRITICAL FIX: Use the actual displayed list for DnD context
+    // This fixes index mismatch when filters are active
+    const displayedTodos = useMemo(() => 
+      hasActiveFilters ? filteredTodos : todos, 
+      [filteredTodos, todos, hasActiveFilters]
+    );
+
+    // Find the actual todo object for the active drag item (from full todos)
     const activeTodo = useMemo(() => {
       if (!activeId || !sortable) return null;
       return todos.find(t => t._id === activeId) || null;
@@ -91,26 +97,31 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
         return;
       }
 
-      // Find indices in the FULL sorted todos list (not filtered)
-      const oldIndex = todos.findIndex(todo => todo._id === active.id);
-      const newIndex = todos.findIndex(todo => todo._id === over.id);
+      // FIXED: Find indices in the DISPLAYED list (not full todos)
+      const oldIndex = displayedTodos.findIndex(todo => todo._id === active.id);
+      const newIndex = displayedTodos.findIndex(todo => todo._id === over.id);
 
       if (oldIndex === -1 || newIndex === -1) {
         return;
       }
 
-      // Move within the full todos list using arrayMove
-      const reorderedTodos = arrayMove(todos, oldIndex, newIndex);
+      // Reorder the displayed list
+      const reorderedDisplayed = arrayMove(displayedTodos, oldIndex, newIndex);
 
-      // Assign new order values based on the new positions
-      const updatedTodos = reorderedTodos.map((todo, index) => ({
-        ...todo,
-        order: index,
-      }));
+      // CRITICAL: Map new order values back to the FULL todos list
+      // This preserves order even for filtered items
+      const updatedTodos = todos.map(todo => {
+        const newPositionInDisplayed = reorderedDisplayed.findIndex(t => t._id === todo._id);
+        // If todo is in displayed list, use new position; otherwise keep old order
+        return {
+          ...todo,
+          order: newPositionInDisplayed !== -1 ? newPositionInDisplayed : (todo.order ?? 0),
+        };
+      });
 
-      // Call onReorder with the reordered todos
+      // Call onReorder with the full updated todos list
       onReorder(updatedTodos);
-    }, [todos, onReorder]);
+    }, [displayedTodos, todos, onReorder]);
 
     const handleDragCancel = useCallback(() => {
       setActiveId(null);
@@ -129,7 +140,7 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
     // to ensure hooks are always called in the same order
     const renderEmptyState = todos.length === 0;
 
-    // Filter panel component (memoized)
+    // Filter panel component (memoized) - UNCHANGED
     const FilterPanel = useMemo(() => (
       <div className="p-4 bg-[var(--bg-secondary)] rounded-b-xl border border-[var(--border-secondary)] border-t-none mb-4 animate-fade-in">
         {/* Search */}
@@ -166,7 +177,6 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
                 {cat.label}
               </button>
             ))}
-
           </div>
         </div>
         
@@ -187,7 +197,6 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
                 {pri.label}
               </button>
             ))}
-
           </div>
         </div>
         
@@ -225,7 +234,6 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
             >
               Done ({stats.completed})
             </button>
-
           </div>
         </div>
         
@@ -256,7 +264,7 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
 
     // Render the todo list
     const renderTodoList = () => {
-      // Drag disabled info
+      // Drag disabled info - shown when sortable + filters active + items exist
       if (sortable && hasActiveFilters && filteredTodos.length > 0) {
         return (
           <>
@@ -294,7 +302,7 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
         );
       }
 
-      // Sortable mode with filters disabled
+      // FIXED Sortable mode: Use displayedTodos for context + items
       return (
         <DndContext
           sensors={sensors}
@@ -304,12 +312,12 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
           onDragCancel={handleDragCancel}
         >
           <SortableContext
-            items={todos.map(t => t._id)}
+            items={displayedTodos.map(t => t._id)}
             strategy={verticalListSortingStrategy}
             disabled={!isDragEnabled}
           >
             <ul className="list-none p-0 m-0">
-              {filteredTodos.map((todo) => {
+              {displayedTodos.map((todo) => {
                 // For sortable items, we need to wrap with useSortable
                 const SortableItem = React.memo(() => {
                   const {
@@ -324,7 +332,7 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
                   const style = {
                     transform: transform ? `translateY(${transform.y}px)` : undefined,
                     transition,
-                    opacity: isDragging ? 0.5 : 1,
+                    opacity: isDragging ? 0.8 : 1,
                   };
 
                   // Drag handle
@@ -339,7 +347,6 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
                       >
                         <GripVertical size={18} className="mx-auto" />
                       </button>
-
                     </div>
                   );
 
@@ -381,18 +388,18 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
       );
     };
 
-  return (
-    <div>
-      <SyncStatus className="mb-3" />
-      {/* Collapsible Filter Toggle */}
-      <button
-        onClick={() => setShowFilters(!showFilters)}
-        className={`flex items-center justify-between w-full px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200
-          ${hasActiveFilters 
-            ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white' 
-            : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-secondary)]'
-          }`}
-      >
+    return (
+      <div>
+        <SyncStatus className="mb-3" />
+        {/* Collapsible Filter Toggle */}
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={`flex items-center justify-between w-full px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200
+            ${hasActiveFilters 
+              ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white' 
+              : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-secondary)]'
+            }`}
+        >
           <div className="flex items-center gap-2">
             <SlidersHorizontal size={14} />
             <span>

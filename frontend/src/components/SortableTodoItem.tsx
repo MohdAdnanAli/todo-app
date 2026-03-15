@@ -66,8 +66,9 @@ const SortableTodoItem: React.FC<SortableTodoItemProps> = memo(({ todo, onToggle
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    transition: transition || 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+    opacity: isDragging ? 0.85 : 1,
+    boxShadow: isDragging ? '0 10px 25px rgba(0,0,0,0.15)' : 'none',
   };
 
   const { category = 'other', priority = 'medium', tags = [], dueDate } = todo;
@@ -142,12 +143,10 @@ const SortableTodoItem: React.FC<SortableTodoItemProps> = memo(({ todo, onToggle
       <div className="flex-1 min-w-0 py-1">
         <div className="flex items-start gap-2">
           <span
-            className="flex-1 text-sm sm:text-base transition-all duration-200 leading-snug"
+            className="flex-1 text-sm sm:text-base transition-all duration-200 leading-tight line-clamp-3 break-words hyphens-auto"
             style={{
               textDecoration: todo.completed ? 'line-through' : 'none',
               color: todo.completed ? 'var(--text-muted)' : 'var(--text-primary)',
-              wordBreak: 'break-word',
-              whiteSpace: 'pre-wrap',
             }}
           >
             {todo.text}

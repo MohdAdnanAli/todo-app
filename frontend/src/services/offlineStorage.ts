@@ -222,9 +222,10 @@ export const offlineStorage = {
           completed: false,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
+          order: 0,
           ...data, // category, priority, etc.
         };
-        todos.unshift(newTodo); // Add to top
+        todos.unshift(newTodo);
         await this.saveTodos(todos);
         await this.addToSyncQueue('create', newTodo._id, newTodo);
         notifySyncListeners();
@@ -357,9 +358,10 @@ export const offlineStorage = {
     setToStorage(STORAGE_KEYS.TODOS, todos);
   },
 
-  async saveTodos(todos: Todo[]): Promise<void> {
-    setToStorage(STORAGE_KEYS.TODOS, todos);
-  },
+async saveTodos(todos: Todo[]): Promise<void> {
+  const sortedTodos = todos.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  setToStorage(STORAGE_KEYS.TODOS, sortedTodos);
+},
 
   async deleteTodo(id: string): Promise<void> {
     const todos = await this.getAllTodos();
@@ -601,7 +603,7 @@ export const offlineStorage = {
       const stored = localStorage.getItem(STORAGE_KEYS.TODOS);
       if (!stored) return [];
       const todos = JSON.parse(stored) as Todo[];
-      return todos.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      return todos.sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity));
     } catch {
       return [];
     }

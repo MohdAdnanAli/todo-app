@@ -24,6 +24,7 @@ import {
 import SmartTodoList from './components/SmartTodoList';
 import { onboardingService } from './services/onboarding';
 import { offlineStorage, addSyncListener, type SyncStatus } from './services/offlineStorage';
+import { todoApi } from './services/api';
 import { ArrowRight } from 'lucide-react';
 
 // Known temporary/disposable email domains
@@ -121,6 +122,10 @@ function App() {
     return Promise.all(todosToDecrypt.map(todo => decryptTodo(todo, password, salt)));
   }, [decryptTodo]);
 
+  const sortTodosByOrder = useCallback((todos: Todo[]): Todo[] => [...todos].sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity)), []);
+
+
+
   const handleGetIn = async () => {
     setIsLoadingTodos(true);
     try {
@@ -133,12 +138,12 @@ function App() {
       
       // If no password is set, just load the todos as-is (encrypted)
       if (!userPassword) {
-        setTodos(todosData);
+        setTodos(sortTodosByOrder(todosData));
       } else {
         const decryptedTodos = await decryptAllTodos(todosData, userPassword, encryptionSalt);
-        setTodos(decryptedTodos);
+        setTodos(sortTodosByOrder(decryptedTodos));
       }
-      await offlineStorage.saveTodos(todosData);
+      await offlineStorage.saveTodos(sortTodosByOrder(todosData));
       setShowWelcomeBackModal(false);
       setMessage('Ready to go!');
       setMessageType('success');
@@ -180,7 +185,7 @@ function App() {
                 }
               })
             );
-            setTodos(decryptedTodos);
+            setTodos(sortTodosByOrder(decryptedTodos));
           } catch (err) {
             console.warn('Decryption of offline todos failed:', err);
             setTodos(offlineTodos);
@@ -593,7 +598,7 @@ function App() {
       
       // Optimistic UI update (decrypt for display)
       const decryptedNewTodo = await decryptTodo(newTodo, userPassword, encryptionSalt);
-      setTodos(prev => [decryptedNewTodo, ...prev.filter(t => t._id !== newTodo._id)]);
+      setTodos(prev => sortTodosByOrder([decryptedNewTodo, ...prev.filter(t => t._id !== newTodo._id)]));
       
       setMessage('Todo added ✓ (syncing...)');
       setMessageType('primary');
@@ -618,7 +623,7 @@ function App() {
     
     // Optimistic UI (decrypt)
     const decryptedTodo = await decryptTodo(updatedTodo, userPassword, encryptionSalt);
-    setTodos(prev => prev.map(t => t._id === todo._id ? decryptedTodo : t));
+    setTodos(prev => sortTodosByOrder(prev.map(t => t._id === todo._id ? decryptedTodo : t)));
     
     setMessage(todo.completed ? 'Task marked as pending ✓' : 'Task completed ✓');
     setMessageType(todo.completed ? 'pending' : 'success');
@@ -635,7 +640,7 @@ function App() {
 
     try {
       await offlineStorage.performLocalAction('delete', { _id: deleteConfirm.todoId });
-      setTodos(prev => prev.filter(t => t._id !== deleteConfirm.todoId));
+      setTodos(prev => sortTodosByOrder(prev.filter(t => t._id !== deleteConfirm.todoId)));
       setMessage('Todo deleted ✓');
       setMessageType('accent');
     } catch (err: any) {
@@ -652,13 +657,24 @@ function App() {
 
   const handleReorder = async (reorderedTodos: Todo[]) => {
     try {
+      // 1. Optimistic local update
       await offlineStorage.performLocalAction('reorder', { todos: reorderedTodos });
-      // UI already updated via optimistic reorder in SmartTodoList
-      setMessage('Reordered ✓ (syncing...)');
-      setMessageType('primary');
+      setTodos(sortTodosByOrder(reorderedTodos));
+      
+      // 2. Server sync - authoritative order from backend
+      const reorderData = {
+        todos: reorderedTodos.map(t => ({ id: t._id, order: t.order ?? 0 }))
+      };
+      const response = await todoApi.reorderTodos(reorderData);
+      setTodos(sortTodosByOrder(response)); // Backend returns full sorted list
+      
+      setMessage('Reordered & synced ✓');
+      setMessageType('success');
     } catch (err: any) {
-      setMessage('Local reorder failed: ' + err.message);
-      setMessageType('error');
+      console.error('Reorder failed:', err);
+      setMessage('Local reorder saved (server sync failed)');
+      setMessageType('warning');
+      // Local optimistic update remains - sync will retry later
     }
   };
 

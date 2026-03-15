@@ -452,15 +452,15 @@ export const batchSync = async (req: Request & { user?: { id: string } }, res: R
 
     invalidateTodoCache(userId);
 
-    const processed = {
-      creates: resultBulk.nInserted || 0,
-      updates: (resultBulk.nMatched || 0) + (resultBulk.nModified || 0),
-      deletes: resultBulk.nRemoved || 0,
-    };
+    // const processed = {
+    //   creates: resultBulk.nInserted || 0,
+    //   updates: (resultBulk.nMatched || 0) + (resultBulk.nModified || 0),
+    //   deletes: resultBulk.nRemoved || 0,
+    // };
 
     res.json({ 
       success: true, 
-      processed,
+      // processed,
       total: bulkOps.length 
     });
   } catch (err) {

@@ -269,6 +269,10 @@ interface BatchSyncResult {
 }
 
 export const todoApi = {
+  reorderTodos: async (reorderData: { todos: Array<{ id: string; order: number }> }): Promise<Todo[]> => {
+    const res = await api.post<Todo[]>('/api/todos/reorder', reorderData);
+    return res.data;
+  },
   getTodos: async (): Promise<Todo[]> => {
     const res = await api.get<Todo[]>('/api/todos');
     return res.data;
