@@ -256,10 +256,7 @@ export const offlineStorage = {
       case 'reorder': {
         const reordered = data.todos.map((todo: Todo, index: number) => ({ ...todo, order: index }));
         await this.saveTodos(reordered);
-        // Batch queue updates
-        for (const todo of reordered) {
-          await this.addToSyncQueue('update', todo._id, { order: todo.order });
-        }
+        // NO queue for reorder - server authoritative
         notifySyncListeners();
         return;
       }
@@ -431,11 +428,11 @@ async saveTodos(todos: Todo[]): Promise<void> {
       }
 
       // BATCH: Group by action
-      const batch: BatchSyncInput = {
+      const batch = {
         creates: [],
         updates: [],
         deletes: [],
-      };
+      } as BatchSyncInput;
 
       for (const item of queue) {
         if (item.action === 'create') {
@@ -449,8 +446,8 @@ async saveTodos(todos: Todo[]): Promise<void> {
 
       const result = await todoApi.batchSync(batch);
 
-      if (result.success) {
-        synced = result.processed.creates + result.processed.updates + result.processed.deletes;
+      if (result?.success) {
+        synced = result.total || 0;
         // Clear entire queue on batch success (retry logic in future)
         await this.clearSyncQueue();
         logger.info(`Batch sync success: ${synced} items`);

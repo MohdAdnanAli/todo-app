@@ -15,6 +15,8 @@ import { checkEmailAvailability } from './controllers/emailCheck';
 import { protect } from './middleware/auth';
 import { adminProtect } from './middleware/admin';
 import { getTodos, createTodo, updateTodo, deleteTodo, reorderTodos, batchSync, getTodosDelta } from './controllers/todo';
+import mongoose from './utils/database';
+const ObjectId = mongoose.Types.ObjectId;
 import { apiLimiter, loginLimiter, registerLimiter, passwordResetLimiter } from './middleware/rateLimiter';
 import { User } from './models/User';
 import mongoose from 'mongoose';

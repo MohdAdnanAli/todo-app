@@ -74,6 +74,7 @@ todoSchema.index({ user: 1, category: 1, completed: 1 });
 todoSchema.index({ createdAt: -1 });
 todoSchema.index({ updatedAt: -1 });
 todoSchema.index({ text: 'text' });
+todoSchema.index({ user: 1, text: 1 }, { unique: true });
 
 // ============================================
 // Virtuals

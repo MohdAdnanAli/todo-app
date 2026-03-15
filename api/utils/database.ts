@@ -3,7 +3,7 @@
  * Production-ready with connection validation, recovery, and health monitoring
  */
 
-import mongoose, { type Mongoose } from 'mongoose';
+import mongoose, { type Mongoose, ClientSession } from 'mongoose';
 import { logger } from './logger';
 
 // ============================================
@@ -691,6 +691,29 @@ if (!isServerless && MONGODB_URI && validateConnectionString(MONGODB_URI)) {
 // Export
 // ============================================
 
+/**
+ * Execute database operations atomically within a transaction
+ */
+export const withSession = async <T>(fn: (session: ClientSession) => Promise<T>): Promise<T> => {
+  await connectDB();
+  
+  const session = await mongoose.startSession();
+  let result: T;
+  
+  try {
+    await session.withTransaction(async () => {
+      result = await fn(session);
+    });
+  } catch (error: any) {
+    logger.error('Transaction failed:', error);
+    throw error;
+  } finally {
+    await session.endSession();
+  }
+  
+  return result!;
+};
+
 export { mongoose };
 export default {
   connectDB,
@@ -701,5 +724,6 @@ export default {
   pingDB,
   forceReconnect,
   gracefulShutdown,
+  withSession,
 };
 

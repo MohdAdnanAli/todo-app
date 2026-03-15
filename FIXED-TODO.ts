@@ -74,7 +74,7 @@ export const createTodo = async (req: Request & { user?: { id: string } }, res: 
     }
 
     const minOrderDoc = await Todo.findOne({ user: userId }).sort({ order: 1 }).select('order').lean();
-    const newOrder = minOrderDoc ? minOrderDoc.order - 1 : 0;
+    const newOrder = minOrderDoc ? Math.max(0, (minOrderDoc.order ?? 1) - 1) : 0;
 
     const todo = new Todo({
       text,
@@ -103,119 +103,15 @@ export const createTodo = async (req: Request & { user?: { id: string } }, res: 
   }
 };
 
-export const getTodos = async (req: Request & { user?: { id: string } }, res: Response) => {
-  try {
-    const userId = (req as any).user?.id;
-    if (!userId) return res.status(401).json({ error: 'Not authenticated' });
-
-    const todos = await Todo.find({ user: userId })
-      .select(EXCLUDE_FIELDS)
-      .sort({ order: 1, createdAt: -1 })
-      .lean();
-
-    return res.json(serializeTodos(todos));
-  } catch (err) {
-    logger.error('GetTodos error:', err);
-    return res.status(500).json({ error: 'Failed to fetch todos' });
-  }
-};
-
-export const updateTodo = async (req: Request & { user?: { id: string } }, res: Response) => {
-  try {
-    const { id } = req.params;
-    const userId = (req as any).user?.id;
-    if (!userId || !isValidObjectId(id)) {
-      return res.status(400).json({ error: 'Invalid request' });
-    }
-
-    const todo = await Todo.findOneAndUpdate(
-      { _id: id, user: userId },
-      { $set: req.body },
-      { new: true, runValidators: true }
-    ).select(EXCLUDE_FIELDS).lean();
-
-    if (!todo) {
-      return res.status(404).json({ error: 'Todo not found' });
-    }
-
-    invalidateTodoCache(userId);
-    return res.json(serializeTodo(todo));
-  } catch (err) {
-    logger.error('UpdateTodo error:', err);
-    return res.status(500).json({ error: 'Failed to update todo' });
-  }
-};
-
-export const deleteTodo = async (req: Request & { user?: { id: string } }, res: Response) => {
-  try {
-    const { id } = req.params;
-    const userId = (req as any).user?.id;
-    if (!userId || !isValidObjectId(id)) {
-      return res.status(400).json({ error: 'Invalid request' });
-    }
-
-    const todoToDelete = await Todo.findOne({ _id: id, user: userId }).select('order').lean();
-    if (!todoToDelete) return res.status(404).json({ error: 'Todo not found' });
-
-    await Todo.deleteOne({ _id: id, user: userId });
-    await Todo.updateMany(
-      { user: userId, order: { $gt: todoToDelete.order } },
-      { $inc: { order: -1 } }
-    );
-
-    invalidateTodoCache(userId);
-    return res.json({ deletedId: id });
-  } catch (err) {
-    logger.error('DeleteTodo error:', err);
-    return res.status(500).json({ error: 'Failed to delete todo' });
-  }
-};
-
-export const reorderTodos = async (req: Request & { user?: { id: string } }, res: Response) => {
-  try {
-    const userId = (req as any).user?.id;
-    if (!userId) return res.status(401).json({ error: 'Not authenticated' });
-
-    const { todos } = req.body as { todos: Array<{ id: string; order: number }> };
-    if (!Array.isArray(todos) || todos.length === 0) {
-      return res.status(400).json({ error: 'Invalid todos array' });
-    }
-
-    const bulkOps = todos
-      .filter(({ id }) => isValidObjectId(id))
-      .map(({ id, order }, index) => ({
-        updateOne: {
-          filter: { _id: id, user: userId },
-          update: { $set: { order: order ?? index } },
-        },
-      }));
-
-    if (bulkOps.length === 0) {
-      return res.status(400).json({ error: 'No valid todos' });
-    }
-
-    await Todo.bulkWrite(bulkOps);
-
-    invalidateTodoCache(userId);
-
-    const reorderedTodos = await Todo.find({ user: userId })
-      .select(EXCLUDE_FIELDS)
-      .sort({ order: 1, createdAt: -1 })
-      .lean();
-
-    return res.json(serializeTodos(reorderedTodos));
-  } catch (err) {
-    logger.error('ReorderTodos error:', err);
-    return res.status(500).json({ error: 'Failed to reorder' });
-  }
-};
-
 export const batchSync = async (req: Request & { user?: { id: string } }, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
-    const { creates = [], updates = [], deletes = [] } = req.body || {};
+    const result = batchSyncSchema.safeParse(req.body);
+    if (!result.success) return res.status(400).json({ error: result.error.issues[0]?.message || 'Validation error' });
+
+    const { creates = [], updates = [], deletes = [] } = result.data;
 
     const bulkOps = [];
 

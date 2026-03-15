@@ -310,15 +310,14 @@ function App() {
           const currentSalt = encryptionSalt || serverSalt;
           
           // Use password from storage OR from server response to decrypt
-          if (currentPassword && currentSalt) {
-            const decryptedTodos = await decryptAllTodos(todosData, currentPassword, currentSalt);
-            setTodos(decryptedTodos);
-            await offlineStorage.saveTodos(decryptedTodos);
-          } else {
-            // No password yet - show as-is (might be plain text or need password prompt)
-            setTodos(todosData);
-            await offlineStorage.saveTodos(todosData);
-          }
+      if (currentPassword && currentSalt) {
+        const decryptedTodos = await decryptAllTodos(todosData, currentPassword, currentSalt);
+        setTodos(decryptedTodos);
+        await offlineStorage.saveTodos(todosData); // Save encrypted server version
+      } else {
+        setTodos(todosData);
+        await offlineStorage.saveTodos(todosData);
+      }
           
           // Only show welcome modal on first visit (no todos in offline storage AND no userPassword)
           const offlineTodos = await offlineStorage.getAllTodos();
@@ -655,28 +654,28 @@ function App() {
     setDeleteConfirm({ isOpen: false, todoId: null, isDeleting: false });
   };
 
-  const handleReorder = async (reorderedTodos: Todo[]) => {
-    try {
-      // 1. Optimistic local update
-      await offlineStorage.performLocalAction('reorder', { todos: reorderedTodos });
-      setTodos(sortTodosByOrder(reorderedTodos));
-      
-      // 2. Server sync - authoritative order from backend
-      const reorderData = {
-        todos: reorderedTodos.map(t => ({ id: t._id, order: t.order ?? 0 }))
-      };
-      const response = await todoApi.reorderTodos(reorderData);
-      setTodos(sortTodosByOrder(response)); // Backend returns full sorted list
-      
-      setMessage('Reordered & synced ✓');
-      setMessageType('success');
-    } catch (err: any) {
-      console.error('Reorder failed:', err);
-      setMessage('Local reorder saved (server sync failed)');
-      setMessageType('warning');
-      // Local optimistic update remains - sync will retry later
-    }
-  };
+    const handleReorder = async (reorderedTodos: Todo[]) => {
+      try {
+        // 1. Local update (no storage - server only)
+        setTodos(sortTodosByOrder(reorderedTodos));
+        
+        // 2. Server sync - authoritative order from backend
+        const reorderData = {
+          todos: reorderedTodos.map(t => ({ id: t._id.toString(), order: t.order ?? 0 }))
+        };
+        const response = await todoApi.reorderTodos(reorderData);
+        const serverTodos = response; // Encrypted server version
+        const decryptedResponse = await decryptAllTodos(serverTodos, userPassword, encryptionSalt);
+        setTodos(sortTodosByOrder(decryptedResponse));
+        
+        setMessage('Reordered ✓');
+        setMessageType('success');
+      } catch (err: any) {
+        console.error('Reorder failed:', err);
+        setMessage('Local reorder saved');
+        setMessageType('warning');
+      }
+    };
 
   const handleTourComplete = async () => {
     setShowWelcomeTour(false);
