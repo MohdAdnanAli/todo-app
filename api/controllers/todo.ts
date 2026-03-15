@@ -95,7 +95,7 @@ export const createTodo = async (req: Request & { user?: { id: string } }, res: 
     });
   } catch (err: any) {
     if (err.code === 11000) {
-      logger.warn('Duplicate todo blocked by index:', { userId, text });
+      logger.warn('Duplicate todo blocked by index:', { userId: (req as any).user?.id, text });
       return res.status(409).json({ error: 'Todo already exists' });
     }
     logger.error('CreateTodo error:', err);
@@ -256,9 +256,9 @@ export const batchSync = async (req: Request & { user?: { id: string } }, res: R
     res.json({ 
       success: true, 
       processed: {
-        creates: resultBulk.nMatched || 0,
-        updates: resultBulk.nModified || 0,
-        deletes: resultBulk.nRemoved || 0,
+        creates: (resultBulk as any).nMatched || 0,
+        updates: (resultBulk as any).nModified || 0,
+        deletes: (resultBulk as any).nRemoved || 0,
       },
       total: bulkOps.length 
     });
@@ -268,5 +268,25 @@ export const batchSync = async (req: Request & { user?: { id: string } }, res: R
   }
 };
 
+export const getTodosDelta = async (req: Request & { user?: { id: string } }, res: Response) => {
+  try {    const userId = (req as any).user?.id;
+    if (!userId) return res.status(401).json({ error: 'Not authenticated' });
+    
+    const { since } = req.query as { since?: string };
+    const query: any = { user: userId };
+    
+    if (since) {
+      const sinceDate = new Date(since);
+      query.$or = [{ updatedAt: { $gt: sinceDate } }, { createdAt: { $gt: sinceDate } }];
+    }
+    
+    const deltaTodos = await Todo.find(query).select(EXCLUDE_FIELDS).sort({ updatedAt: -1 }).lean();
+    res.json(serializeTodos(deltaTodos));
+  } catch (err) {
+    logger.error('GetTodosDelta error:', err);
+    res.status(500).json({ error: 'Failed to fetch delta' });
+  }
+};
+
 // Keep other exports for compatibility
-export * from './todo'; // getTodos, updateTodo, etc.
+export * from './todo';
