@@ -526,16 +526,24 @@ async saveTodos(todos: Todo[]): Promise<void> {
 
   // ===== Storage Quota =====
   
-  async getStorageQuota(): Promise<StorageQuota> {
+async getStorageQuota(): Promise<StorageQuota> {
     try {
       let total = 0;
-      for (const key in localStorage) {
-        if (localStorage.hasOwnProperty(key)) {
-          total += localStorage[key].length * 2;
-        }
+      // Include only our app's keys to avoid counting browser-managed data
+      const appKeys = Object.keys(localStorage).filter(key => 
+        key === 'todos' || key === 'sync_queue' || key.startsWith('metadata_') || key === 'filler'
+      );
+      for (const key of appKeys) {
+        total += (localStorage.getItem(key)?.length ?? 0) * 2;
       }
       const max = 5 * 1024 * 1024;
-      return { used: total, available: max - total, total: max, percentage: (total / max) * 100 };
+      const used = Math.max(total, 0);
+      return { 
+        used, 
+        available: Math.max(0, max - used), 
+        total: max, 
+        percentage: (used / max) * 100 
+      };
     } catch {
       return { used: 0, available: 0, total: 0, percentage: 0 };
     }

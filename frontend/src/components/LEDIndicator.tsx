@@ -2,16 +2,25 @@ import React, { useState, useEffect, memo } from 'react';
 import type { MessageType } from '../types';
 import { LED_COLORS } from '../types';
 
-interface LEDIndicatorProps {
-  message: string;
+export interface LEDIndicatorProps {
+  message?: string;
   messageType: MessageType;
-  variant?: 'default' | 'small-screen-header';
+  variant?: 'default' | 'small-screen-header' | 'sync';
+  size?: number;
 }
 
-const LEDIndicator: React.FC<LEDIndicatorProps> = memo(({ message, messageType, variant = 'default' }) => {
+const LEDIndicator: React.FC<LEDIndicatorProps> = memo(({ 
+  message, 
+  messageType, 
+  variant = 'default' as const, 
+  size 
+}) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const [showAutoMessage, setShowAutoMessage] = useState(false);
   const colors = LED_COLORS[messageType];
+  
+  const defaultSize = size ?? 3;
+  const ledSize = `${defaultSize}px`;
   
   useEffect(() => {
     if (message) {
@@ -25,24 +34,37 @@ const LEDIndicator: React.FC<LEDIndicatorProps> = memo(({ message, messageType, 
   
   const shouldShowMessage = showAutoMessage || showTooltip;
   
-  // Different positioning for small screen header variant
-  const containerClass = variant === 'small-screen-header' 
-    ? "flex items-center" 
-    : "absolute right-16 top-1/2 -translate-y-1/2 cursor-pointer";
+  const containerClass = 
+    variant === 'sync'
+      ? "absolute -top-1 -right-1 z-20 pointer-events-none" 
+    : variant === 'small-screen-header'
+      ? "flex items-center" 
+      : "absolute right-16 top-1/2 -translate-y-1/2 cursor-pointer";
+  
+  const animationClass = variant === 'sync' 
+    ? messageType === 'loading' 
+      ? 'animate-sync-flicker' 
+      : messageType === 'pending' 
+      ? 'animate-sync-pulse' 
+      : 'animate-sync-alert'
+    : message 
+      ? 'animate-pulse'
+      : '';
   
   return (
     <div 
       className={containerClass}
-      onMouseEnter={() => variant === 'default' && setShowTooltip(true)}
-      onMouseLeave={() => variant === 'default' && setShowTooltip(false)}
+      onMouseEnter={() => variant !== 'sync' && setShowTooltip(true)}
+      onMouseLeave={() => variant !== 'sync' && setShowTooltip(false)}
     >
       <div
-        className="w-3 h-3 rounded-full transition-all duration-300"
+        className={`rounded-full transition-all duration-300 border-2 ${animationClass}`}
         style={{
+          width: ledSize,
+          height: ledSize,
           backgroundColor: colors.bg,
-          boxShadow: `0 0 15px ${colors.glow}, 0 0 8px ${colors.glow}, 0 0 4px ${colors.bg}`,
-          border: `2px solid ${colors.border}`,
-          animation: message ? 'pulse 1s ease-in-out' : 'none',
+          boxShadow: `0 0 ${defaultSize * 5}px ${colors.glow}, 0 0 ${defaultSize * 2.5}px ${colors.glow}, 0 0 ${defaultSize}px ${colors.bg}`,
+          borderColor: colors.border,
         }}
       />
       
@@ -73,6 +95,30 @@ const LEDIndicator: React.FC<LEDIndicatorProps> = memo(({ message, messageType, 
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.2); }
         }
+        @keyframes sync-flicker {
+          0%, 100% { 
+            background-color: ${colors.bg};
+            box-shadow: 0 0 ${defaultSize * 5}px ${colors.glow}, 0 0 ${defaultSize * 2.5}px ${colors.glow}, 0 0 ${defaultSize}px ${colors.bg};
+          }
+          50% { 
+            background-color: #9ca3af;
+            box-shadow: 0 0 ${defaultSize * 5}px rgba(156, 163, 175, 0.5), 0 0 ${defaultSize * 2.5}px rgba(156, 163, 175, 0.3);
+          }
+        }
+        @keyframes sync-pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.3); }
+        }
+        @keyframes sync-alert {
+          0%, 100% { 
+            transform: scale(1) rotate(-5deg);
+            box-shadow: 0 0 ${defaultSize * 6}px ${colors.glow};
+          }
+          50% { 
+            transform: scale(1.2) rotate(5deg);
+            box-shadow: 0 0 ${defaultSize * 8}px ${colors.glow};
+          }
+        }
       `}</style>
     </div>
   );
@@ -81,3 +127,4 @@ const LEDIndicator: React.FC<LEDIndicatorProps> = memo(({ message, messageType, 
 LEDIndicator.displayName = 'LEDIndicator';
 
 export default LEDIndicator;
+

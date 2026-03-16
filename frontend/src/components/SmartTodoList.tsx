@@ -23,7 +23,7 @@ import { useTodoFilters } from '../hooks/useTodoFilters';
 import { TodoItemCore } from './TodoItem';
 import { CATEGORIES, PRIORITIES } from '../utils/todoHelpers';
 import { SlidersHorizontal, ChevronDown, ChevronUp, Search, FilterX, GripVertical } from 'lucide-react';
-import { SyncStatus } from './SyncStatus';
+
 
 interface SmartTodoListProps {
   todos: Todo[];
@@ -388,9 +388,8 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
       );
     };
 
-    return (
+  return (
       <div>
-        <SyncStatus className="mb-3" />
         {/* Collapsible Filter Toggle */}
         <button
           onClick={() => setShowFilters(!showFilters)}

@@ -88,13 +88,16 @@ function App() {
   const [showWelcomeBackModal, setShowWelcomeBackModal] = useState(false);
   const [isLoadingTodos, setIsLoadingTodos] = useState(false);
   const [showPremiumFeatures, setShowPremiumFeatures] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [syncMessageType, setSyncMessageType] = useState<MessageType>('idle');
   
   // Sync status listener cleanup
   const syncListenerCleanup = useRef<() => void | undefined>();
   
   // Delete confirmation dialog state
   const [deleteConfirm, setDeleteConfirm] = useState<{
-    isOpen: boolean;
+
+isOpen: boolean;
     todoId: string | null;
     isDeleting: boolean;
   }>({ isOpen: false, todoId: null, isDeleting: false });
@@ -733,27 +736,19 @@ function App() {
     checkOnboardingStatus();
   }, [user, isLoadingTodos, quickStartChecked]);
 
-// Sync status listener - updates message bar
+// Sync status listener - updates SyncLED
   useEffect(() => {
     if (!user) return;
     
+    // Initial status
+    offlineStorage.getSyncStatus().then(status => {
+      setSyncStatus(status);
+      updateSyncLED(status);
+    });
+    
     const cleanup = addSyncListener((status: SyncStatus) => {
-      if (status.syncInProgress) {
-        setMessage('🔄 Syncing...');
-        setMessageType('loading');
-      } else if (status.pendingCount > 0) {
-        setMessage(`⏳ ${status.pendingCount} pending`);
-        setMessageType('pending');
-      } else if (status.lastSyncAt) {
-        const timeAgo = ((Date.now() - status.lastSyncAt) / 1000 / 60).toFixed(0);
-        setMessage(`✅ Synced ${timeAgo}m ago`);
-        setMessageType('success');
-      }
-      
-      if (status.lastError) {
-        setMessage(`⚠️ ${status.lastError}`);
-        setMessageType('warning');
-      }
+      setSyncStatus(status);
+      updateSyncLED(status);
     });
     
     syncListenerCleanup.current = cleanup;
@@ -763,6 +758,20 @@ function App() {
       offlineStorage.cleanup();
     };
   }, [user]);
+
+  const updateSyncLED = (status: SyncStatus) => {
+    if (status.syncInProgress) {
+      setSyncMessageType('loading'); // green-grey flicker
+    } else if (status.pendingCount > 0) {
+      setSyncMessageType('pending'); // grey pulse/stuck
+    } else if (status.lastError || !status.isOnline) {
+      setSyncMessageType('error'); // red pulse
+    } else if (status.lastSyncAt) {
+      setSyncMessageType('success'); // green static
+    } else {
+      setSyncMessageType('idle'); // grey static
+    }
+  };
 
   // Render loading state - ensures hooks are always called in same order
   if (isLoading) {
@@ -799,7 +808,7 @@ function App() {
           Todo App
         </h1>
         <div className="header-led-container">
-          <LEDIndicator message={message} messageType={messageType} />
+          <LEDIndicator message={message} messageType={messageType} variant="default" />
         </div>
       </div>
 
@@ -807,25 +816,35 @@ function App() {
         <div>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-[1.5rem] gap-2">
             <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
-              <p
-                onClick={() => setShowProfileModal(true)}
-                className="font-semibold text-lg text-[var(--text-primary)] flex items-center gap-2 m-0 cursor-pointer hover:opacity-80 transition-opacity flex-1 min-w-0"
-              >
-                {user.avatar ? (
-                  <img 
-                    src={user.avatar} 
-                    alt={user.displayName || user.email}
-                    className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                  />
-                ) : (
-                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm flex-shrink-0">
-                    {(user.displayName || user.email.split('@')[0]).charAt(0).toUpperCase()}
+              <div className="relative">
+                <p
+                  onClick={() => setShowProfileModal(true)}
+                  className="font-semibold text-lg text-[var(--text-primary)] flex items-center gap-2 m-0 cursor-pointer hover:opacity-80 transition-opacity flex-1 min-w-0"
+                >
+                  {user.avatar ? (
+                    <img 
+                      src={user.avatar} 
+                      alt={user.displayName || user.email}
+                      className="w-8 h-8 rounded-full object-cover flex-shrink-0 relative z-0"
+                    />
+                  ) : (
+                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm flex-shrink-0 relative z-0">
+                      {(user.displayName || user.email.split('@')[0]).charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                  <span className="truncate max-w-[180px] sm:max-w-[250px]">
+                    Welcome, {user.displayName || user.email.split('@')[0]}!
                   </span>
+                </p>
+                {syncStatus && (
+                  <LEDIndicator 
+                    message="" 
+                    messageType={syncMessageType} 
+                    variant="sync" 
+                    size={2}
+                  />
                 )}
-                <span className="truncate max-w-[180px] sm:max-w-[250px]">
-                  Welcome, {user.displayName || user.email.split('@')[0]}!
-                </span>
-              </p>
+              </div>
               {user.bio && (
                 <span className="text-xs text-[var(--text-muted)] truncate max-w-[150px]">
                   ({user.bio.length > 20 ? user.bio.substring(0, 20) + '...' : user.bio})
