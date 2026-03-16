@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import type { User, Todo } from '../types';
 import { API_URL } from '../types';
@@ -133,3 +133,43 @@ export const useDecryption = (userPassword: string, encryptionSalt: string) => {
 
   return { decryptTodo, decryptAllTodos };
 };
+
+// NEW: Hook for local todo decryption + unlock flow
+export const useLocalTodoDecryption = (
+  rawTodos: Todo[], 
+  userPassword: string, 
+  encryptionSalt: string, 
+  setUserPassword: React.Dispatch<React.SetStateAction<string>>,
+  setTodos: React.Dispatch<React.SetStateAction<Todo[]>>
+) => {
+  const { decryptAllTodos } = useDecryption(userPassword, encryptionSalt);
+  
+  const decryptedTodos = useMemo(() => rawTodos, [rawTodos]);
+  
+  const needsUnlock = !!encryptionSalt && !userPassword && rawTodos.length > 0;
+  
+  const unlock = useCallback(async (password: string): Promise<void> => {
+    if (!encryptionSalt) {
+      console.warn('Cannot unlock: no encryption salt');
+      return;
+    }
+    
+    try {
+      const decrypted = await decryptAllTodos(rawTodos);
+      setTodos(decrypted);
+      setUserPassword(password);
+    } catch (error) {
+      console.error('Unlock failed:', error);
+    }
+  }, [encryptionSalt, decryptAllTodos, rawTodos, setTodos, setUserPassword]);
+
+  return { 
+    decryptedTodos,
+    needsUnlock, 
+    unlock, 
+    isReady: !!userPassword && !!encryptionSalt,
+    decryptAllTodos 
+  };
+};
+
+

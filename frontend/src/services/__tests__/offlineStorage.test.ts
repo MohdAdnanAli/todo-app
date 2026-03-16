@@ -117,7 +117,7 @@ describe('offlineStorage - Offline-First Full Sync', () => {
     });
 
     it('quota stress test', async () => {
-      // Test quota calculation works (no crash)
+      // Test quota calculation works without stress data
       const quota = await offlineStorage.getStorageQuota();
       expect(quota.used).toBeGreaterThanOrEqual(0);
       expect(quota.percentage).toBeGreaterThanOrEqual(0);

@@ -193,7 +193,24 @@ export const offlineStorage = {
   
 // ===== Core Todo Methods =====
   
-  async getAllTodos(): Promise<Todo[]> {
+async getAllTodos(decryptFn?: (todos: Todo[]) => Promise<Todo[]>): Promise<Todo[]> {
+    const rawTodos = getFromStorage<Todo[]>(STORAGE_KEYS.TODOS, []);
+    let todos = rawTodos.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    
+    if (decryptFn && rawTodos.length > 0) {
+      try {
+        todos = await decryptFn(rawTodos);
+      } catch (error) {
+        console.warn('[OfflineStorage] Decryption failed, returning raw:', error);
+        todos = rawTodos.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      }
+    }
+    
+    return todos;
+  },
+
+  // NEW: Always returns raw/encrypted todos (for sync/backend)
+  async getRawTodos(): Promise<Todo[]> {
     const todos = getFromStorage<Todo[]>(STORAGE_KEYS.TODOS, []);
     return todos.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   },
@@ -531,7 +548,7 @@ async getStorageQuota(): Promise<StorageQuota> {
       let total = 0;
       // Include only our app's keys to avoid counting browser-managed data
       const appKeys = Object.keys(localStorage).filter(key => 
-        key === 'todos' || key === 'sync_queue' || key.startsWith('metadata_') || key === 'filler'
+        key === STORAGE_KEYS.TODOS || key === STORAGE_KEYS.SYNC_QUEUE || key.startsWith(STORAGE_KEYS.METADATA_PREFIX)
       );
       for (const key of appKeys) {
         total += (localStorage.getItem(key)?.length ?? 0) * 2;

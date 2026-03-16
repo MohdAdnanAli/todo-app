@@ -7,6 +7,7 @@ import { encrypt, decrypt } from './utils/crypto';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { 
   AuthForm, 
+  PasswordUnlockModal,
   LEDIndicator, 
   ProfileModal,
   WelcomeBackModal,
@@ -21,6 +22,7 @@ import {
   PremiumFeaturesModal,
   ErrorBoundary,
 } from './components';
+import { useLocalTodoDecryption } from './hooks/useAuth';
 import SmartTodoList from './components/SmartTodoList';
 import { onboardingService } from './services/onboarding';
 import { offlineStorage, addSyncListener, type SyncStatus } from './services/offlineStorage';
@@ -91,6 +93,18 @@ function App() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [syncMessageType, setSyncMessageType] = useState<MessageType>('idle');
   
+  // Clean decryption state - single declaration
+  const [rawTodos, setRawTodos] = useState<Todo[]>([]);
+  
+  // Decryption hook (after state - SINGLE instance)
+  const { needsUnlock, unlock } = useLocalTodoDecryption(
+    rawTodos, 
+    userPassword, 
+    encryptionSalt, 
+    setUserPassword,
+    setTodos
+  );
+  
   // Sync status listener cleanup
   const syncListenerCleanup = useRef<() => void | undefined>();
   
@@ -109,6 +123,7 @@ isOpen: boolean;
   const initialAuthCheckDone = useRef(false);
 
   // Memoized/decrypt functions - always call in same order
+  // DEPRECATED: Use decryption hook instead - kept for legacy
   const decryptTodo = useCallback(async (todo: Todo, password: string, salt: string): Promise<Todo> => {
     if (!password || !salt) return todo;
     try {
@@ -120,6 +135,7 @@ isOpen: boolean;
     }
   }, []);
 
+  // DEPRECATED: Use decryption hook - appDecryptAllTodos
   const decryptAllTodos = useCallback(async (todosToDecrypt: Todo[], password: string, salt: string): Promise<Todo[]> => {
     if (!password || !salt || todosToDecrypt.length === 0) return todosToDecrypt;
     return Promise.all(todosToDecrypt.map(todo => decryptTodo(todo, password, salt)));
@@ -836,12 +852,11 @@ isOpen: boolean;
                     Welcome, {user.displayName || user.email.split('@')[0]}!
                   </span>
                 </p>
-                {syncStatus && (
+{syncStatus && (
                   <LEDIndicator 
                     message="" 
                     messageType={syncMessageType} 
-                    variant="sync" 
-                    size={2}
+                    variant="small-screen-header" 
                   />
                 )}
               </div>
@@ -891,6 +906,13 @@ isOpen: boolean;
                 onDelete={handleDeleteClick}
                 onReorder={handleReorder}
                 sortable={true}
+              />
+              
+              {/* Password Unlock Modal */}
+              <PasswordUnlockModal
+                isOpen={needsUnlock}
+                onUnlock={unlock}
+                isUnlocking={false}
               />
 
               <div className="flex gap-3 mt-[2rem]">

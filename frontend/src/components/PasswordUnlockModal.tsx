@@ -19,8 +19,10 @@ const PasswordUnlockModal: React.FC<PasswordUnlockModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password.trim()) {
-      await onUnlock(password);
+await onUnlock(password);
       setPassword('');
+      // Close modal after unlock (optional - controlled by parent)
+      // Modal will close when needsUnlock becomes false
     }
   };
 
