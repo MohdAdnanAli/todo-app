@@ -37,16 +37,15 @@ const LEDIndicator: React.FC<LEDIndicatorProps> = memo(({ message, messageType, 
       onMouseLeave={() => variant === 'default' && setShowTooltip(false)}
     >
       <div
-        className="w-3 h-3 rounded-full transition-all duration-300"
+        className={`w-3 h-3 rounded-full transition-all duration-300 ${message ? 'animate-pulse' : ''}`}
         style={{
           backgroundColor: colors.bg,
           boxShadow: `0 0 15px ${colors.glow}, 0 0 8px ${colors.glow}, 0 0 4px ${colors.bg}`,
           border: `2px solid ${colors.border}`,
-          animation: message ? 'pulse 1s ease-in-out' : 'none',
         }}
       />
-      
-{shouldShowMessage && message && (
+
+      {shouldShowMessage && message && (
         <div
           className="absolute top-full right-0 mt-2 px-3 py-2 rounded-md text-xs whitespace-nowrap z-50 animate-fade-in"
           style={{
@@ -67,13 +66,6 @@ const LEDIndicator: React.FC<LEDIndicatorProps> = memo(({ message, messageType, 
           />
         </div>
       )}
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.2); }
-        }
-      `}</style>
     </div>
   );
 });
@@ -81,4 +73,3 @@ const LEDIndicator: React.FC<LEDIndicatorProps> = memo(({ message, messageType, 
 LEDIndicator.displayName = 'LEDIndicator';
 
 export default LEDIndicator;
-
