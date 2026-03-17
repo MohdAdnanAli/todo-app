@@ -599,7 +599,7 @@ isOpen: boolean;
       }) as Todo;
       
       // Optimistic UI update (decrypt for display)
-      const decryptedNewTodo = await decryptTodo(newTodo, userPassword, encryptionSalt);
+const decryptedNewTodo = await decryptTodo(newTodo, encryptionPassword, encryptionSalt);
       setTodos(prev => sortTodosByOrder([decryptedNewTodo, ...prev.filter(t => t._id !== newTodo._id)]));
       
       setMessage('Todo added ✓ (syncing...)');
@@ -624,7 +624,7 @@ isOpen: boolean;
     }) as Todo;
     
     // Optimistic UI (decrypt)
-    const decryptedTodo = await decryptTodo(updatedTodo, userPassword, encryptionSalt);
+const decryptedTodo = await decryptTodo(updatedTodo, encryptionPassword, encryptionSalt);
     setTodos(prev => sortTodosByOrder(prev.map(t => t._id === todo._id ? decryptedTodo : t)));
     
     setMessage(todo.completed ? 'Task marked as pending ✓' : 'Task completed ✓');
