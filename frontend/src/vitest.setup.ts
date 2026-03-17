@@ -58,6 +58,55 @@ Object.defineProperty(window, 'localStorage', {
   writable: true,
 });
 
+// Global mocks for decryption/tests compatibility
+vi.mock('../src/utils/crypto', () => ({
+  ...vi.importActual('../src/utils/crypto'),
+  encrypt: vi.fn((text) => text),
+  decrypt: vi.fn((text, _, __) => text), 
+  clearKeyCache: vi.fn(),
+}));
+
+vi.mock('../src/hooks/useAuth', () => ({
+  useLocalTodoDecryption: vi.fn(() => ({
+    needsUnlock: false,
+    unlock: vi.fn(),
+    decryptedTodos: [],
+    isReady: true,
+    decryptAllTodos: vi.fn((todos) => Promise.resolve(todos)),
+  })),
+}));
+
+vi.mock('../src/hooks/useTodoFilters', () => ({
+  useTodoFilters: vi.fn((todos) => ({
+    categoryFilter: 'all',
+    priorityFilter: 'all',
+    showCompleted: 'all',
+    searchQuery: '',
+    showFilters: false,
+    filteredTodos: todos,
+    hasActiveFilters: false,
+    stats: {
+      total: todos.length,
+      filtered: todos.length,
+      pending: todos.filter((t: any) => !t.completed).length,
+      completed: todos.filter((t: any) => t.completed).length,
+    },
+    setCategoryFilter: vi.fn(),
+    setPriorityFilter: vi.fn(),
+    setShowCompleted: vi.fn(),
+    setSearchQuery: vi.fn(),
+    setShowFilters: vi.fn(),
+    clearFilters: vi.fn(),
+  })),
+}));
+
+// Mock ThemeContext - default light theme for CSS vars
+vi.mock('../src/theme/ThemeContext', () => ({
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
+  useTheme: vi.fn(() => ({ theme: 'light', toggleTheme: vi.fn() })),
+}));
+
+
 // Mock matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

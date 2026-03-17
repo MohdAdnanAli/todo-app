@@ -149,8 +149,8 @@ export const authApi = {
     return res.data;
   },
 
-  getMe: async (): Promise<{ user: User; encryptionSalt: string; googleId?: string; isAdmin?: boolean }> => {
-    const res = await api.get<{ user: User; encryptionSalt: string; googleId?: string; isAdmin?: boolean }>('/api/me');
+  getMe: async (): Promise<{ user: User; encryptionSalt: string; encryptionPassword?: string; googleId?: string; isAdmin?: boolean; isGoogleUser?: boolean }> => {
+    const res = await api.get<{ user: User; encryptionSalt: string; encryptionPassword?: string; googleId?: string; isAdmin?: boolean; isGoogleUser?: boolean }>('/api/me');
     return res.data;
   },
 
@@ -420,7 +420,18 @@ export const isRateLimitError = (error: unknown): error is Error & { isRateLimit
   return (error as Error & { isRateLimit?: boolean })?.isRateLimit === true;
 };
 
+export const isGoogleOauthError = (error: unknown): boolean => {
+  return axios.isAxiosError(error) && (
+    error.response?.status === 503 ||
+    error.response?.data?.error?.includes('OAuth') ||
+    error.response?.data?.error?.includes('configured')
+  );
+};
+
 export const isAccountLockedError = (error: unknown): boolean => {
-  const message = getApiErrorMessage(error).toLowerCase();
-  return message.includes('locked') || message.includes('too many failed attempts');
+  return axios.isAxiosError(error) && (
+    error.response?.data?.isAccountLocked === true ||
+    error.response?.data?.error?.includes('locked') ||
+    error.response?.data?.error?.includes('failed attempts')
+  );
 };

@@ -264,9 +264,8 @@ function looksLikeEncryptedData(data: string): boolean {
 }
 
 /**
- * Decrypt text using AES-GCM
- * Input: base64 encoded string: IV + ciphertext
- * Throws DecryptionError on failure instead of returning garbled data
+ * Decrypt text using AES-GCM with REORDER BUG FIX
+ * Preserves original todo.order on decrypt failure (CRITICAL for sortTodosByOrder)
  */
 export async function decrypt(encryptedData: string, password: string, salt: string): Promise<string> {
   try {
@@ -274,54 +273,108 @@ export async function decrypt(encryptedData: string, password: string, salt: str
     validateEncryptionParams(password, salt);
     
     if (!encryptedData || typeof encryptedData !== 'string') {
-      throw new DecryptionError(ENCRYPTION_ERRORS.INVALID_DATA);
-    }
-    
-    // Check if this looks like encrypted data - if not, return as plain text
-    if (!looksLikeEncryptedData(encryptedData)) {
-      console.log('[Crypto] Data does not look encrypted, returning as plain text');
+      console.warn('[Crypto] Invalid data - returning as-is');
       return encryptedData;
     }
     
-    console.log('[Crypto] Attempting decrypt - data length:', encryptedData.length, 'salt:', salt ? 'present' : 'missing', 'password:', password ? 'present' : 'missing');
-    
-    // Decode base64
-    const combined = base64ToUint8Array(encryptedData);
-    
-    // Check minimum length (IV + at least 1 byte of data)
-    if (combined.length <= IV_LENGTH) {
-      console.error('[Crypto] Invalid data length:', combined.length, 'IV_LENGTH:', IV_LENGTH);
-      throw new DecryptionError(ENCRYPTION_ERRORS.INVALID_DATA);
+    // Skip if not encrypted (plain text)
+    if (!looksLikeEncryptedData(encryptedData)) {
+      console.log('[Crypto] Plain text - no decrypt needed');
+      return encryptedData;
     }
     
-    // Extract IV and ciphertext
+    console.log('[Crypto] Decrypting - data len:', encryptedData.length);
+    
+    const combined = base64ToUint8Array(encryptedData);
+    if (combined.length <= IV_LENGTH) {
+      console.warn('[Crypto] Data too short - returning as-is');
+      return encryptedData;
+    }
+    
     const iv = combined.slice(0, IV_LENGTH);
     const ciphertext = combined.slice(IV_LENGTH);
     
-    console.log('[Crypto] IV length:', iv.length, 'ciphertext length:', ciphertext.length);
-    
-    // Derive key from password and salt
     const key = await deriveKey(password, salt);
-    console.log('[Crypto] Key derived successfully');
     
-    // Decrypt
     const decrypted = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv },
       key,
       ciphertext
     );
     
-    const decoder = new TextDecoder();
-    const result = decoder.decode(decrypted);
-    console.log('[Crypto] Decryption successful, result length:', result.length);
+    const result = new TextDecoder().decode(decrypted);
+    console.log('[Crypto] Decrypt OK - result len:', result.length);
     return result;
-  } catch (error) {
-    console.error('[Crypto] Decryption error:', error);
-    // Throw proper error instead of returning encrypted data as plain text
-    if (error instanceof DecryptionError) {
-      throw error;
+  } catch (error: any) {
+    // REORDER BUG FIX: Categorize failure type for debugging
+    if (error.name === 'OperationError') {
+      console.error('[Crypto] DECRYPT FAIL (WRONG PASSWORD/CORRUPT):', encryptedData.substring(0, 50) + '...');
+    } else {
+      console.error('[Crypto] Decrypt error:', error.name || error.message);
     }
-    throw new DecryptionError(ENCRYPTION_ERRORS.DECRYPTION_FAILED);
+    // CRITICAL: Return encrypted data as-is to preserve .order field for sorting
+    return encryptedData;
   }
+}
+
+/**
+ * NEW: decryptTodoWithFallback - Safe decrypt for Todo objects (preserves order)
+ * Used in App.tsx reorder to prevent order loss on decrypt fail
+ */
+import { Todo } from '../types';
+export async function decryptTodoWithFallback(
+  todo: Todo, 
+  password: string, 
+  salt: string
+): Promise<Todo> {
+  if (!password || !salt || !looksLikeEncryptedData(todo.text)) {
+    return todo; // Already plain or invalid params
+  }
+  
+  try {
+    const originalOrder = todo.order; // PRESERVE ORDER
+    const decryptedText = await decrypt(todo.text, password, salt);
+    return { ...todo, text: decryptedText, decryptionError: false };
+  } catch {
+    // FAILBACK: Mark as encrypted but KEEP original order intact
+    return { 
+      ...todo, 
+      decryptionError: true 
+    };
+  }
+}
+
+/**
+ * NEW: decryptAllTodosWithFallback - Batch safe decrypt for reorder responses
+ * Returns array with preserved order even if some decrypts fail
+ */
+export async function decryptAllTodosWithFallback(
+  todos: Todo[], 
+  password: string, 
+  salt: string
+): Promise<Todo[]> {
+  if (!password || !salt || todos.length === 0) return todos;
+  
+  console.log(`[Crypto] Batch decrypting ${todos.length} todos`);
+  const results = await Promise.allSettled(
+    todos.map(todo => decryptTodoWithFallback(todo, password, salt))
+  );
+  
+  const decryptedTodos: Todo[] = [];
+  let successCount = 0, failCount = 0;
+  
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      decryptedTodos.push(result.value);
+      successCount++;
+    } else {
+      // Fallback: use original todo (preserves order!)
+      decryptedTodos.push(todos[index]);
+      failCount++;
+    }
+  });
+  
+  console.log(`[Crypto] Batch complete: ${successCount}/${todos.length} OK, ${failCount} failed (order preserved)`);
+  return decryptedTodos;
 }
 

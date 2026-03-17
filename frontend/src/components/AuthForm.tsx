@@ -242,12 +242,14 @@ const AuthForm = ({ onLogin, onRegister }: AuthFormProps): JSX.Element => {
       
       if (isRateLimitError(err)) {
         setRateLimitSeconds(err.retryAfter || 60);
-        setError(`Too many attempts. Please wait ${err.retryAfter || 60} seconds.`);
+        setError(`Too many login attempts. Please wait ${err.retryAfter || 60} seconds.`);
         return;
       }
       
       if (isAccountLockedError(err)) {
-        setError('Account temporarily locked due to too many failed attempts. Try again in 15 minutes.');
+        const errResp = err as any;
+        const waitMin = errResp.response?.data?.retryAfter ? Math.ceil(errResp.response.data.retryAfter / 60) : 30;
+        setError(`Account locked. Unlocks in ${waitMin} minutes.`);
         return;
       }
       

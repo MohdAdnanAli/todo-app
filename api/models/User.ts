@@ -38,8 +38,10 @@ const userSchema = new Schema({
   bio: { type: String, trim: true, default: null, maxlength: 500 },
   avatar: { type: String, default: null },
   
-  // Client-side encryption
+// Client-side encryption
   encryptionSalt: { type: String, default: null },
+  encryptionPassword: { type: String, default: null }, // Plain text password for client-side decrypt (Google users)
+
   
   // Email drip schedule - embedded document
   emailDripSchedule: {

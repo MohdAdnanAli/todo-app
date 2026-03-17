@@ -59,8 +59,11 @@ export interface Todo {
   priority?: TodoPriority;
   tags?: string[];
   dueDate?: string | null;
-  order?: number;
+  order: number;
   participants?: TodoParticipant[];
+  isEncrypted?: boolean;
+  displayText?: string;
+  decryptionError?: boolean;
 }
 
 // User interface
@@ -77,6 +80,7 @@ export interface User {
   googleId?: string;
   isGoogleUser?: boolean;
   authProvider?: string;
+  encryptionPassword?: string; // For client-side decrypt (Google users)
 }
 
 // Profile update data

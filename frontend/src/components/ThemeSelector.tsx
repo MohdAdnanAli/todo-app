@@ -76,7 +76,7 @@ const ThemeSelector: React.FC<ThemeSelectorProps> = ({ ledMessage = '', ledMessa
           <div className="theme-divider" />
           <div className="theme-section-title">Presets</div>
           
-          {presetThemes.map((theme) => (
+{presetThemes.map((theme: { id: ThemeId; name: string; icon: string }) => (
             <button
               key={theme.id}
               className={`theme-option ${themeId === theme.id ? 'active' : ''}`}

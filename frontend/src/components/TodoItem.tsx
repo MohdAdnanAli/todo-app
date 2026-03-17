@@ -123,9 +123,15 @@ const TodoItemCore: React.FC<TodoItemProps> = memo(({
               textDecoration: todo.completed ? 'line-through' : 'none',
               color: todo.completed ? 'var(--text-muted)' : 'var(--text-primary)',
             }}
-            dangerouslySetInnerHTML={{ __html: sanitizeText(todo.text) }}
+            dangerouslySetInnerHTML={{ __html: sanitizeText(todo.displayText || todo.text) }}
           />
 
+        {todo.decryptionError && (
+          <div className="text-xs text-red-400 mt-1 flex items-center gap-1">
+            <AlertCircle size={12} />
+            <span>🔒 Encrypted - check password</span>
+          </div>
+        )}
         </div>
         
         {/* Timestamp - small grey text */}

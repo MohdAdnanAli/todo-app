@@ -1,6 +1,6 @@
 import rateLimit from 'express-rate-limit';
 
-// Custom keyGenerator that handles proxy headers properly
+// Custom keyGenerator that handles proxy headers properly (IP only - used by other limiters)
 const createKeyGenerator = () => {
   return (req: any) => {
     // If trust proxy is enabled, use req.ip which Express will derive from x-forwarded-for
@@ -13,6 +13,7 @@ const createKeyGenerator = () => {
            'unknown';
   };
 };
+
 
 // General API rate limiter
 export const apiLimiter = rateLimit({
@@ -27,13 +28,17 @@ export const apiLimiter = rateLimit({
 
 // Login attempt limiter
 export const loginLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 5,
-  message: 'Too many login attempts, please try again later.',
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  message: 'Too many login attempts from this device. Please wait 15 minutes or try a different browser.',
   skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: createKeyGenerator(),
+  keyGenerator: (req) => {
+    const ip = createKeyGenerator()(req);
+    const ua = (req.headers['user-agent'] || '').slice(0, 100); // Truncate UA
+    return `${ip}:${ua}`;
+  },
   validate: false,
 });
 

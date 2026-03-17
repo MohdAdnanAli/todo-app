@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useTheme } from './theme';
 import type { Todo, User, MessageType, TodoCategory, TodoPriority } from './types';
 import { API_URL } from './types';
-import { encrypt, decrypt } from './utils/crypto';
+import { encrypt, decrypt, decryptAllTodosWithFallback, decryptTodoWithFallback } from './utils/crypto';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { 
   AuthForm, 
@@ -83,7 +83,7 @@ function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [encryptionSalt, setEncryptionSalt] = useState<string>('');
-  const [userPassword, setUserPassword] = useState<string>('');
+  const [encryptionPassword, setEncryptionPassword] = useState<string>('');
   const [showWelcomeTour, setShowWelcomeTour] = useState(false);
   const [showQuickStart, setShowQuickStart] = useState(false);
   const [quickStartChecked, setQuickStartChecked] = useState(false);
@@ -93,15 +93,15 @@ function App() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [syncMessageType, setSyncMessageType] = useState<MessageType>('idle');
   
-  // Clean decryption state - single declaration
-  const [rawTodos, setRawTodos] = useState<Todo[]>([]);
+  // Clean decryption state - single declaration (unused)
+  const [, /* setRawTodos */] = useState<Todo[]>([]);
   
   // Decryption hook (after state - SINGLE instance)
   const { needsUnlock, unlock } = useLocalTodoDecryption(
-    rawTodos, 
-    userPassword, 
+    [] as any,
+    encryptionPassword, 
     encryptionSalt, 
-    setUserPassword,
+    setEncryptionPassword,
     setTodos
   );
   
@@ -123,22 +123,30 @@ isOpen: boolean;
   const initialAuthCheckDone = useRef(false);
 
   // Memoized/decrypt functions - always call in same order
-  // DEPRECATED: Use decryption hook instead - kept for legacy
-  const decryptTodo = useCallback(async (todo: Todo, password: string, salt: string): Promise<Todo> => {
+// ENHANCED: Graceful decryption with 🔒 Encrypted fallback
+    const decryptTodo = useCallback(async (todo: Todo, password: string, salt: string): Promise<Todo> => {
     if (!password || !salt) return todo;
     try {
       const decryptedText = await decrypt(todo.text, password, salt);
       return { ...todo, text: decryptedText };
-    } catch (err) {
-      console.warn('Decryption issue for todo:', todo._id, err);
+    } catch (err: any) {
+      console.error('[DECRYPT FAIL] Todo:', todo._id, 'Password len:', password?.length || 0, 'Salt:', !!salt);
       return todo;
     }
   }, []);
 
-  // DEPRECATED: Use decryption hook - appDecryptAllTodos
+// ENHANCED: Batch decryption with graceful fallbacks
   const decryptAllTodos = useCallback(async (todosToDecrypt: Todo[], password: string, salt: string): Promise<Todo[]> => {
     if (!password || !salt || todosToDecrypt.length === 0) return todosToDecrypt;
-    return Promise.all(todosToDecrypt.map(todo => decryptTodo(todo, password, salt)));
+    return Promise.all(
+      todosToDecrypt.map(async (todo) => {
+        try {
+          return await decryptTodo(todo, password, salt);
+        } catch {
+          return todo; // Keep encrypted text
+        }
+      })
+    );
   }, [decryptTodo]);
 
   const sortTodosByOrder = useCallback((todos: Todo[]): Todo[] => [...todos].sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity)), []);
@@ -156,10 +164,10 @@ isOpen: boolean;
       const todosData = Array.isArray(todosRes.data) ? todosRes.data : [];
       
       // If no password is set, just load the todos as-is (encrypted)
-      if (!userPassword) {
+      if (!encryptionPassword) {
         setTodos(sortTodosByOrder(todosData));
       } else {
-        const decryptedTodos = await decryptAllTodos(todosData, userPassword, encryptionSalt);
+        const decryptedTodos = await decryptAllTodos(todosData, encryptionPassword, encryptionSalt);
         setTodos(sortTodosByOrder(decryptedTodos));
       }
       await offlineStorage.saveTodos(sortTodosByOrder(todosData));
@@ -185,34 +193,13 @@ isOpen: boolean;
         const storedSalt = await offlineStorage.getEncryptionSalt();
         
         if (storedPassword) {
-          setUserPassword(storedPassword);
+          setEncryptionPassword(storedPassword);
         }
         if (storedSalt) {
           setEncryptionSalt(storedSalt);
         }
         
-        // If we have todos AND password/salt, decrypt them
-        if (offlineTodos.length > 0 && storedPassword && storedSalt) {
-          try {
-            const decryptedTodos = await Promise.all(
-              offlineTodos.map(async (todo: Todo) => {
-                try {
-                  const decryptedText = await decrypt(todo.text, storedPassword, storedSalt);
-                  return { ...todo, text: decryptedText };
-                } catch {
-                  return todo;
-                }
-              })
-            );
-            setTodos(sortTodosByOrder(decryptedTodos));
-          } catch (err) {
-            console.warn('Decryption of offline todos failed:', err);
-            setTodos(offlineTodos);
-          }
-        } else if (offlineTodos.length > 0) {
-          // No password - show as-is (they might be plain text)
-          setTodos(offlineTodos);
-        }
+        // Skip offline decrypt - wait for auth check to ensure correct password
       } catch (error) {
         console.error('Error loading offline todos:', error);
       }
@@ -238,10 +225,11 @@ isOpen: boolean;
           setEncryptionSalt(encryptionSaltParam);
         }
         
+        // FIXED: Don't set googleId as password - use server-provided encryptionPassword
         // Save googleId as password for Google users - this is used for encryption
         if (googleIdParam) {
           await offlineStorage.savePassword(googleIdParam);
-          setUserPassword(googleIdParam);
+          setEncryptionPassword(googleIdParam); // Fallback until /api/me loads
         }
         
         // Clear URL params immediately
@@ -267,15 +255,11 @@ isOpen: boolean;
           
           const todosData = Array.isArray(todosRes.data) ? todosRes.data : [];
           
-          // Use the googleIdParam (which is now in userPassword state)
-          if (googleIdParam) {
-            const decryptedTodos = await decryptAllTodos(todosData, googleIdParam, encryptionSaltParam || '');
-            setTodos(decryptedTodos);
-            await offlineStorage.saveTodos(decryptedTodos);
-          } else {
-            setTodos(todosData);
-            await offlineStorage.saveTodos(todosData);
-          }
+          // Use encryptionPassword from /api/me
+          const encPassword = res.data.encryptionPassword || encryptionPassword || googleIdParam || '';
+          const decryptedTodos = await decryptAllTodos(todosData, encPassword, encryptionSalt || encryptionSaltParam || '');
+          setTodos(decryptedTodos);
+          await offlineStorage.saveTodos(decryptedTodos);
           
           setIsLoading(false);
           setMessage('Welcome back!');
@@ -325,14 +309,14 @@ isOpen: boolean;
           const todosData = Array.isArray(todosRes.data) ? todosRes.data : [];
           
           // Get current password/salt from state (should be loaded from storage by now)
-          const currentPassword = userPassword;
+          const currentPassword = encryptionPassword || res.data.encryptionPassword;
           const currentSalt = encryptionSalt || serverSalt;
           
           // Use password from storage OR from server response to decrypt
       if (currentPassword && currentSalt) {
         const decryptedTodos = await decryptAllTodos(todosData, currentPassword, currentSalt);
-        setTodos(decryptedTodos);
-        await offlineStorage.saveTodos(todosData); // Save encrypted server version
+            setTodos(decryptedTodos);
+            await offlineStorage.saveTodos(todosData); // Save raw encrypted todos
       } else {
         setTodos(todosData);
         await offlineStorage.saveTodos(todosData);
@@ -403,7 +387,7 @@ isOpen: boolean;
       setUser(userData);
       setIsAdmin(loginIsAdmin || false);
       setEncryptionSalt(salt || '');
-      setUserPassword(loginPassword);
+      setEncryptionPassword(loginPassword);
 
       // Save password for future reloads
       await offlineStorage.savePassword(loginPassword);
@@ -490,7 +474,7 @@ isOpen: boolean;
       setUser(userData);
       setIsAdmin(regIsAdmin || false);
       setEncryptionSalt(salt || '');
-      setUserPassword(regPassword);
+      setEncryptionPassword(regPassword);
 
       // Save password for future reloads
       await offlineStorage.savePassword(regPassword);
@@ -554,7 +538,7 @@ isOpen: boolean;
     setShowAdminDashboard(false);
     setTodos([]);
     setEncryptionSalt('');
-    setUserPassword('');
+    setEncryptionPassword('');
     setShowWelcomeBackModal(false);
     
     // Clear stored password on logout
@@ -592,9 +576,9 @@ isOpen: boolean;
 
     // Encrypt BEFORE local action
     let encryptedText = text;
-    if (userPassword && encryptionSalt) {
+    if (encryptionPassword && encryptionSalt) {
       try {
-        encryptedText = await encrypt(text, userPassword, encryptionSalt);
+        encryptedText = await encrypt(text, encryptionPassword, encryptionSalt);
       } catch (encryptErr) {
         console.warn('Encryption failed, saving as plain text:', encryptErr);
       }
@@ -675,22 +659,65 @@ isOpen: boolean;
 
     const handleReorder = async (reorderedTodos: Todo[]) => {
       try {
-        // 1. Local update (no storage - server only)
-        setTodos(sortTodosByOrder(reorderedTodos));
+        console.log('[REORDER] Starting - optimistic update');
+        // 1. Optimistic UI (with order preservation)
+        const optimisticTodos = sortTodosByOrder([...reorderedTodos]);
+        setTodos(optimisticTodos);
         
-        // 2. Server sync - authoritative order from backend
+        // REORDER BUG FIX: Validate crypto state before API
+        if (!encryptionPassword || !encryptionSalt) {
+          console.warn('[REORDER] No password/salt - using optimistic only');
+          setMessage('Local reorder saved (no encryption)');
+          setMessageType('warning');
+          return;
+        }
+        
+        // 2. Server sync (authoritative but with fallback)
         const reorderData = {
           todos: reorderedTodos.map(t => ({ id: t._id.toString(), order: t.order ?? 0 }))
         };
-        const response = await todoApi.reorderTodos(reorderData);
-        const serverTodos = response; // Encrypted server version
-        const decryptedResponse = await decryptAllTodos(serverTodos, userPassword, encryptionSalt);
-        setTodos(sortTodosByOrder(decryptedResponse));
+        console.log('[REORDER] Sending to server:', reorderData.todos.length, 'todos');
         
-        setMessage('Reordered ✓');
+        const response = await todoApi.reorderTodos(reorderData);
+        const serverTodosRaw: Todo[] = Array.isArray(response) ? response : (response as any)?.data || [];
+        
+        if (serverTodosRaw.length === 0) {
+          console.warn('[REORDER] Empty server response - keeping optimistic');
+          setMessage('Local reorder saved (server empty)');
+          setMessageType('warning');
+          return;
+        }
+        
+        // REORDER BUG FIX: Use NEW safe batch decrypt (preserves order on fail)
+        console.log('[REORDER] Decrypting server response...');
+        const serverTodos = await decryptAllTodosWithFallback(serverTodosRaw, encryptionPassword, encryptionSalt);
+        
+        // REORDER BUG FIX: Validate server order vs client expectation
+        const clientOrderSum = optimisticTodos.reduce((sum, t) => sum + (t.order ?? Infinity), 0);
+        const serverOrderSum = serverTodos.reduce((sum, t) => sum + (t.order ?? Infinity), 0);
+        const orderMatch = Math.abs(clientOrderSum - serverOrderSum) < 10; // Tolerance for small diffs
+        
+        if (orderMatch) {
+          console.log('[REORDER] Server order OK - using server todos');
+          setTodos(sortTodosByOrder(serverTodos));
+          setMessage('✅ Reorder synced');
+        } else {
+          console.warn('[REORDER] Server order mismatch! Client sum:', clientOrderSum, 'Server sum:', serverOrderSum, '- keeping optimistic');
+          // HYBRID FALLBACK: Use server data but optimistic order
+          const hybridTodos = serverTodos.map((serverTodo, i) => {
+            const optimisticTodo = optimisticTodos.find(t => t._id === serverTodo._id);
+            return {
+              ...serverTodo,
+              order: optimisticTodo?.order ?? serverTodo.order ?? i,
+            };
+          });
+          setTodos(sortTodosByOrder(hybridTodos));
+          setMessage('🔧 Reorder fixed (server order issue)');
+        }
         setMessageType('success');
+        
       } catch (err: any) {
-        console.error('Reorder failed:', err);
+        console.error('[REORDER] Failed:', err);
         setMessage('Local reorder saved');
         setMessageType('warning');
       }

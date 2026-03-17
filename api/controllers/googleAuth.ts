@@ -334,7 +334,9 @@ export const googleCallback = async (req: Request, res: Response) => {
             emailVerified: googleUser.email_verified,
             lastLoginAt: new Date(),
             encryptionSalt: existingUser.encryptionSalt || crypto.randomBytes(16).toString('hex'),
+            encryptionPassword: googleUser.id, // Plain text for client decrypt
             password: existingUser.password || await bcrypt.hash(generatedPassword, 10),
+
           }
         });
         
@@ -353,6 +355,7 @@ export const googleCallback = async (req: Request, res: Response) => {
           authProvider: 'google',
           isGoogleUser: true,
           googleId: googleUser.id,
+          encryptionPassword: googleUser.id, // Plain text for client decrypt
           googleProfile: {
             picture: googleUser.picture,
             givenName: googleUser.given_name,
@@ -362,6 +365,7 @@ export const googleCallback = async (req: Request, res: Response) => {
           encryptionSalt: newEncryptionSalt,
           avatar: googleUser.picture,
         });
+
       }
     }
 

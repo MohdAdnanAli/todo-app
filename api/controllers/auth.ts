@@ -34,8 +34,8 @@ const ACCESS_TOKEN_EXPIRY = '15m'; // 15 minutes - short-lived for security
 const REFRESH_TOKEN_EXPIRY_DAYS = 30;
 
 // Rate limiting
-const MAX_LOGIN_ATTEMPTS = 5;
-const LOCK_TIME = 15 * 60 * 1000; // 15 minutes
+const MAX_LOGIN_ATTEMPTS = 10;
+const LOCK_TIME = 30 * 60 * 1000; // 30 minutes
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // Helper: Check if account is locked
@@ -231,7 +231,12 @@ export const login = async (req: Request, res: Response) => {
 
     // Check if locked
     if (isAccountLocked(user)) {
-      return res.status(429).json({ error: 'Account temporarily locked due to too many failed attempts. Try again later.' });
+      const waitMinutes = Math.ceil((new Date(user.accountLockedUntil!).getTime() - Date.now()) / (60 * 1000));
+      return res.status(429).json({ 
+        error: `Account locked due to too many failed attempts. Unlocks in ${waitMinutes} minutes.`,
+        retryAfter: waitMinutes * 60,
+        isAccountLocked: true 
+      });
     }
 
     if (!user.password) {
@@ -594,7 +599,7 @@ export const updateProfile = async (req: Request & { user?: { id: string } }, re
   }
 };
 
-export const getProfile = async (req: Request & { user?: { id: string } }, res: Response) => {
+export const getMe = async (req: Request & { user?: { id: string } }, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     if (!userId) {
@@ -605,11 +610,24 @@ export const getProfile = async (req: Request & { user?: { id: string } }, res: 
     const cachedUser = await getCachedUser(userId);
     
     if (cachedUser) {
-      return res.json(cachedUser);
+      return res.json({
+        user: {
+          id: cachedUser.id,
+          email: cachedUser.email,
+          displayName: cachedUser.displayName,
+          bio: cachedUser.bio,
+          avatar: cachedUser.avatar,
+        },
+        encryptionSalt: cachedUser.encryptionSalt,
+        encryptionPassword: cachedUser.encryptionPassword,
+        googleId: cachedUser.googleId,
+        isAdmin: cachedUser.role === 'admin',
+        isGoogleUser: cachedUser.isGoogleUser,
+      });
     }
 
     // Cache miss - fetch from DB
-    const user = await User.findById(userId).select(EXCLUDE_FIELDS).lean();
+    const user = await User.findById(userId).select(`${EXCLUDE_FIELDS} encryptionPassword isGoogleUser role`).lean();
       
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -619,12 +637,41 @@ export const getProfile = async (req: Request & { user?: { id: string } }, res: 
     const userData = buildCachedUserData(user);
     await setCachedUser(userId, userData);
 
-    return res.json(userData);
+    return res.json({
+      user: {
+        id: userData.id,
+        email: userData.email,
+        displayName: userData.displayName,
+        bio: userData.bio,
+        avatar: userData.avatar,
+      },
+      encryptionSalt: userData.encryptionSalt,
+      encryptionPassword: user.encryptionPassword,
+      googleId: userData.googleId,
+      isAdmin: userData.role === 'admin',
+      isGoogleUser: userData.isGoogleUser,
+    });
+  } catch (err) {
+    logger.error('GetMe error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const getProfile = async (req: Request & { user?: { id: string } }, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const meData = await getMe(req as any, { json: () => {} } as any);
+    return res.json(meData.user);
   } catch (err) {
     logger.error('GetProfile error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
+
 
 export const deleteUser = async (req: Request & { user?: { id: string } }, res: Response) => {
   try {

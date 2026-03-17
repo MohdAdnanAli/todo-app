@@ -133,6 +133,28 @@ app.post('/api/auth/reset-password', resetPassword);
 // Email availability check
 app.get('/api/auth/check-email', checkEmailAvailability);
 
+// NEW: Environment status endpoint (for debugging Google OAuth issues)
+app.get('/api/auth/env-status', (req, res) => {
+  const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+  const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+  const JWT_SECRET = process.env.JWT_SECRET;
+  const MONGODB_URI = !!process.env.MONGODB_URI;
+
+  const missing = [];
+  if (!GOOGLE_CLIENT_ID) missing.push('GOOGLE_CLIENT_ID');
+  if (!GOOGLE_CLIENT_SECRET) missing.push('GOOGLE_CLIENT_SECRET');  
+  if (!JWT_SECRET) missing.push('JWT_SECRET');
+  if (!MONGODB_URI) missing.push('MONGODB_URI');
+
+  res.json({
+    googleOauthConfigured: !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET),
+    jwtConfigured: !!JWT_SECRET,
+    mongodbConfigured: MONGODB_URI,
+    missingVars: missing,
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
 // Google OAuth routes
 app.get('/api/auth/google/url', getGoogleAuthUrlHandler);
 app.get('/api/auth/google/callback', googleCallback);

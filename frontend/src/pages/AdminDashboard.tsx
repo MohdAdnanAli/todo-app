@@ -326,8 +326,20 @@ export function AdminDashboard({ onClose }: AdminDashboardProps) {
                           <Button
                             onClick={() => handleDeleteUser(user.id)}
                             className="bg-red-600 hover:bg-red-700 text-sm py-1 px-3"
+                            size="sm"
                           >
-                            Delete
+                            Delete User
+                          </Button>
+                          <Button
+                            onClick={async () => {
+                              if (!window.confirm(`Delete user ${user.email}?`)) return;
+                              await adminApi.deleteUser(user.id);
+                              fetchUsers();
+                            }}
+                            className="ml-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-xs py-1 px-2"
+                            size="sm"
+                          >
+                            Quick Delete
                           </Button>
                         </td>
                       </tr>
@@ -388,6 +400,60 @@ export function AdminDashboard({ onClose }: AdminDashboardProps) {
               </Button>
             </div>
 
+            {/* Bulk Actions */}
+            <div className="flex gap-4 mb-4">
+              <Button
+                onClick={async () => {
+                  if (!window.confirm('⚠️ Delete ALL todos? IRREVERSIBLE!')) return;
+                  try {
+                    // Delete ALL todos across ALL pages/users
+                    const allTodosIds = [];
+                    let page = 1;
+                    while (true) {
+                      const data = await adminApi.getTodos({ page, limit: 100, completed: 'all' });
+                      allTodosIds.push(...data.todos.map(t => t._id));
+                      if (data.pagination.page >= data.pagination.pages) break;
+                      page++;
+                    }
+                    await adminApi.deleteMultipleTodos(allTodosIds);
+                    fetchTodos();
+                    alert(`✅ Deleted ${allTodosIds.length} todos!`);
+                  } catch (err: any) {
+                    console.error('Delete error:', err);
+                    alert(`❌ Delete failed: ${err.response?.data?.error || err.message}`);
+                  }
+                }}
+                className="bg-red-600 hover:bg-red-700 flex items-center gap-2"
+              >
+                🗑️ Delete ALL Todos (All Users)
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!window.confirm('💀 Delete ALL users & data? TOTAL WIPE!')) return;
+                  try {
+                    const allUsers = [];
+                    let page = 1;
+                    while (true) {
+                      const data = await adminApi.getUsers({ page, limit: 100 });
+                      allUsers.push(...data.users);
+                      if (data.pagination.page >= data.pagination.pages) break;
+                      page++;
+                    }
+                    for (const user of allUsers) {
+                      await adminApi.deleteUser(user.id);
+                    }
+                    fetchUsers();
+                    alert('✅ All users deleted!');
+                  } catch (err) {
+                    alert('❌ User wipe failed');
+                  }
+                }}
+                className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 flex items-center gap-2"
+              >
+                ☠️ Wipe All Users
+              </Button>
+            </div>
+
             {/* Todos Table */}
             <Card className="p-6 bg-gray-800 overflow-hidden">
               <div className="overflow-x-auto">
@@ -439,8 +505,9 @@ export function AdminDashboard({ onClose }: AdminDashboardProps) {
                           <Button
                             onClick={() => handleDeleteTodo(todo._id)}
                             className="bg-red-600 hover:bg-red-700 text-sm py-1 px-3"
+                            size="sm"
                           >
-                            Delete
+                            Delete Todo
                           </Button>
                         </td>
                       </tr>
