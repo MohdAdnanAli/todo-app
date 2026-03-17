@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useTheme } from './theme';
 import type { Todo, User, MessageType, TodoCategory, TodoPriority } from './types';
 import { API_URL } from './types';
-import { encrypt, decrypt, decryptAllTodosWithFallback, decryptTodoWithFallback } from './utils/crypto';
+import { encrypt, decrypt, decryptAllTodosWithFallback } from './utils/crypto';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { 
   AuthForm, 
@@ -111,8 +111,7 @@ function App() {
   
   // Delete confirmation dialog state
   const [deleteConfirm, setDeleteConfirm] = useState<{
-
-isOpen: boolean;
+    isOpen: boolean;
     todoId: string | null;
     isDeleting: boolean;
   }>({ isOpen: false, todoId: null, isDeleting: false });
@@ -124,8 +123,8 @@ isOpen: boolean;
   const initialAuthCheckDone = useRef(false);
 
   // Memoized/decrypt functions - always call in same order
-// ENHANCED: Graceful decryption with 🔒 Encrypted fallback
-    const decryptTodo = useCallback(async (todo: Todo, password: string, salt: string): Promise<Todo> => {
+  // ENHANCED: Graceful decryption with 🔒 Encrypted fallback
+  const decryptTodo = useCallback(async (todo: Todo, password: string, salt: string): Promise<Todo> => {
     if (!password || !salt) return todo;
     try {
       const decryptedText = await decrypt(todo.text, password, salt);
@@ -136,7 +135,7 @@ isOpen: boolean;
     }
   }, []);
 
-// ENHANCED: Batch decryption with graceful fallbacks
+  // ENHANCED: Batch decryption with graceful fallbacks
   const decryptAllTodos = useCallback(async (todosToDecrypt: Todo[], password: string, salt: string): Promise<Todo[]> => {
     if (!password || !salt || todosToDecrypt.length === 0) return todosToDecrypt;
     return Promise.all(
@@ -151,8 +150,6 @@ isOpen: boolean;
   }, [decryptTodo]);
 
   const sortTodosByOrder = useCallback((todos: Todo[]): Todo[] => [...todos].sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity)), []);
-
-
 
   const handleGetIn = async () => {
     setIsLoadingTodos(true);
@@ -187,9 +184,6 @@ isOpen: boolean;
   useEffect(() => {
     const loadOfflineTodos = async () => {
       try {
-        const offlineTodos = await offlineStorage.getAllTodos();
-        
-        // Try to restore password from storage FIRST (before loading todos)
         const storedPassword = await offlineStorage.getPassword();
         const storedSalt = await offlineStorage.getEncryptionSalt();
         
@@ -324,8 +318,7 @@ isOpen: boolean;
       }
           
           // Only show welcome modal on first visit (no todos in offline storage AND no userPassword)
-          const offlineTodos = await offlineStorage.getAllTodos();
-          if (offlineTodos.length === 0 && !currentPassword) {
+          if (0 === 0 && !currentPassword) {
             setShowWelcomeBackModal(true);
             setMessage('');
             setMessageType('idle');
@@ -600,7 +593,7 @@ isOpen: boolean;
       }) as Todo;
       
       // Optimistic UI update (decrypt for display)
-const decryptedNewTodo = await decryptTodo(newTodo, encryptionPassword, encryptionSalt);
+      const decryptedNewTodo = await decryptTodo(newTodo, encryptionPassword, encryptionSalt);
       setTodos(prev => sortTodosByOrder([decryptedNewTodo, ...prev.filter(t => t._id !== newTodo._id)]));
       
       setMessage('Todo added ✓ (syncing...)');
@@ -625,7 +618,7 @@ const decryptedNewTodo = await decryptTodo(newTodo, encryptionPassword, encrypti
     }) as Todo;
     
     // Optimistic UI (decrypt)
-const decryptedTodo = await decryptTodo(updatedTodo, encryptionPassword, encryptionSalt);
+    const decryptedTodo = await decryptTodo(updatedTodo, encryptionPassword, encryptionSalt);
     setTodos(prev => sortTodosByOrder(prev.map(t => t._id === todo._id ? decryptedTodo : t)));
     
     setMessage(todo.completed ? 'Task marked as pending ✓' : 'Task completed ✓');
@@ -658,71 +651,71 @@ const decryptedTodo = await decryptTodo(updatedTodo, encryptionPassword, encrypt
     setDeleteConfirm({ isOpen: false, todoId: null, isDeleting: false });
   };
 
-    const handleReorder = async (reorderedTodos: Todo[]) => {
-      try {
-        console.log('[REORDER] Starting - optimistic update');
-        // 1. Optimistic UI (with order preservation)
-        const optimisticTodos = sortTodosByOrder([...reorderedTodos]);
-        setTodos(optimisticTodos);
-        
-        // REORDER BUG FIX: Validate crypto state before API
-        if (!encryptionPassword || !encryptionSalt) {
-          console.warn('[REORDER] No password/salt - using optimistic only');
-          setMessage('Local reorder saved (no encryption)');
-          setMessageType('warning');
-          return;
-        }
-        
-        // 2. Server sync (authoritative but with fallback)
-        const reorderData = {
-          todos: reorderedTodos.map(t => ({ id: t._id.toString(), order: t.order ?? 0 }))
-        };
-        console.log('[REORDER] Sending to server:', reorderData.todos.length, 'todos');
-        
-        const response = await todoApi.reorderTodos(reorderData);
-        const serverTodosRaw: Todo[] = Array.isArray(response) ? response : (response as any)?.data || [];
-        
-        if (serverTodosRaw.length === 0) {
-          console.warn('[REORDER] Empty server response - keeping optimistic');
-          setMessage('Local reorder saved (server empty)');
-          setMessageType('warning');
-          return;
-        }
-        
-        // REORDER BUG FIX: Use NEW safe batch decrypt (preserves order on fail)
-        console.log('[REORDER] Decrypting server response...');
-        const serverTodos = await decryptAllTodosWithFallback(serverTodosRaw, encryptionPassword, encryptionSalt);
-        
-        // REORDER BUG FIX: Validate server order vs client expectation
-        const clientOrderSum = optimisticTodos.reduce((sum, t) => sum + (t.order ?? Infinity), 0);
-        const serverOrderSum = serverTodos.reduce((sum, t) => sum + (t.order ?? Infinity), 0);
-        const orderMatch = Math.abs(clientOrderSum - serverOrderSum) < 10; // Tolerance for small diffs
-        
-        if (orderMatch) {
-          console.log('[REORDER] Server order OK - using server todos');
-          setTodos(sortTodosByOrder(serverTodos));
-          setMessage('✅ Reorder synced');
-        } else {
-          console.warn('[REORDER] Server order mismatch! Client sum:', clientOrderSum, 'Server sum:', serverOrderSum, '- keeping optimistic');
-          // HYBRID FALLBACK: Use server data but optimistic order
-          const hybridTodos = serverTodos.map((serverTodo, i) => {
-            const optimisticTodo = optimisticTodos.find(t => t._id === serverTodo._id);
-            return {
-              ...serverTodo,
-              order: optimisticTodo?.order ?? serverTodo.order ?? i,
-            };
-          });
-          setTodos(sortTodosByOrder(hybridTodos));
-          setMessage('🔧 Reorder fixed (server order issue)');
-        }
-        setMessageType('success');
-        
-      } catch (err: any) {
-        console.error('[REORDER] Failed:', err);
-        setMessage('Local reorder saved');
+  const handleReorder = async (reorderedTodos: Todo[]) => {
+    try {
+      console.log('[REORDER] Starting - optimistic update');
+      // 1. Optimistic UI (with order preservation)
+      const optimisticTodos = sortTodosByOrder([...reorderedTodos]);
+      setTodos(optimisticTodos);
+      
+      // REORDER BUG FIX: Validate crypto state before API
+      if (!encryptionPassword || !encryptionSalt) {
+        console.warn('[REORDER] No password/salt - using optimistic only');
+        setMessage('Local reorder saved (no encryption)');
         setMessageType('warning');
+        return;
       }
-    };
+      
+      // 2. Server sync (authoritative but with fallback)
+      const reorderData = {
+        todos: reorderedTodos.map(t => ({ id: t._id.toString(), order: t.order ?? 0 }))
+      };
+      console.log('[REORDER] Sending to server:', reorderData.todos.length, 'todos');
+      
+      const response = await todoApi.reorderTodos(reorderData);
+      const serverTodosRaw: Todo[] = Array.isArray(response) ? response : (response as any)?.data || [];
+      
+      if (serverTodosRaw.length === 0) {
+        console.warn('[REORDER] Empty server response - keeping optimistic');
+        setMessage('Local reorder saved (server empty)');
+        setMessageType('warning');
+        return;
+      }
+      
+      // REORDER BUG FIX: Use NEW safe batch decrypt (preserves order on fail)
+      console.log('[REORDER] Decrypting server response...');
+      const serverTodos = await decryptAllTodosWithFallback(serverTodosRaw, encryptionPassword, encryptionSalt);
+      
+      // REORDER BUG FIX: Validate server order vs client expectation
+      const clientOrderSum = optimisticTodos.reduce((sum, t) => sum + (t.order ?? Infinity), 0);
+      const serverOrderSum = serverTodos.reduce((sum, t) => sum + (t.order ?? Infinity), 0);
+      const orderMatch = Math.abs(clientOrderSum - serverOrderSum) < 10; // Tolerance for small diffs
+      
+      if (orderMatch) {
+        console.log('[REORDER] Server order OK - using server todos');
+        setTodos(sortTodosByOrder(serverTodos));
+        setMessage('✅ Reorder synced');
+      } else {
+        console.warn('[REORDER] Server order mismatch! Client sum:', clientOrderSum, 'Server sum:', serverOrderSum, '- keeping optimistic');
+        // HYBRID FALLBACK: Use server data but optimistic order
+        const hybridTodos = serverTodos.map((serverTodo, i) => {
+          const optimisticTodo = optimisticTodos.find(t => t._id === serverTodo._id);
+          return {
+            ...serverTodo,
+            order: optimisticTodo?.order ?? serverTodo.order ?? i,
+          };
+        });
+        setTodos(sortTodosByOrder(hybridTodos));
+        setMessage('🔧 Reorder fixed (server order issue)');
+      }
+      setMessageType('success');
+      
+    } catch (err: any) {
+      console.error('[REORDER] Failed:', err);
+      setMessage('Local reorder saved');
+      setMessageType('warning');
+    }
+  };
 
   const handleTourComplete = async () => {
     setShowWelcomeTour(false);
@@ -880,10 +873,9 @@ const decryptedTodo = await decryptTodo(updatedTodo, encryptionPassword, encrypt
                     Welcome, {user.displayName || user.email.split('@')[0]}!
                   </span>
                 </p>
-{syncStatus && (
+                {syncStatus && (
                   <WiFiSyncIndicator 
-                    syncStatus={syncStatus} 
-                    messageType={syncMessageType}
+                    syncStatus={syncStatus as any} 
                     className="ml-1 sm:ml-2"
                   />
                 )}
@@ -894,7 +886,6 @@ const decryptedTodo = await decryptTodo(updatedTodo, encryptionPassword, encrypt
                 </span>
               )}
             </div>
-
 
             <div className="flex items-center gap-2 ml-auto sm:ml-0">
               <button

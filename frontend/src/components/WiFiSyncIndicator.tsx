@@ -1,6 +1,6 @@
 import React from 'react';
 import { Wifi, WifiOff, AlertTriangle } from 'lucide-react';
-// import type { SyncStatus, MessageType } from '../../types';
+
 interface SyncStatus {
   isOnline?: boolean;
   syncInProgress?: boolean;
@@ -8,24 +8,19 @@ interface SyncStatus {
   lastError?: string | null;
   lastSyncAt?: string;
 }
-type MessageType = 'idle' | 'success' | 'error' | 'loading' | 'pending' | 'warning' | 'accent' | 'primary';
-
 
 interface WiFiSyncIndicatorProps {
   syncStatus?: SyncStatus | null;
-  messageType: MessageType;
   className?: string;
 }
 
 const WiFiSyncIndicator: React.FC<WiFiSyncIndicatorProps> = ({
   syncStatus,
-  messageType,
   className = 'w-3 h-3 flex-shrink-0'
 }) => {
   let icon: React.ReactNode;
   let animation = '';
   let color = '';
-  let bars = 3;
   let tooltipText = 'Sync status';
 
   const isOnline = syncStatus?.isOnline ?? true;
@@ -43,7 +38,6 @@ const WiFiSyncIndicator: React.FC<WiFiSyncIndicatorProps> = ({
     icon = <Wifi className={`${className} animate-pulse`} strokeWidth={2} />;
     animation = 'animate-pulse [animation-duration:0.8s]';
     color = 'text-amber-400';
-    bars = 3;
     tooltipText = 'Syncing...';
   } else if (pending) {
     // Pending: slow pulse, yellow
@@ -80,7 +74,7 @@ const WiFiSyncIndicator: React.FC<WiFiSyncIndicatorProps> = ({
 
   return (
     <div
-    className={`cursor-default ${animation} ${color} ${className}`}
+      className={`cursor-default ${animation} ${color} ${className}`}
       title={tooltipText}
       onClick={handleClick}
       aria-label={tooltipText}
