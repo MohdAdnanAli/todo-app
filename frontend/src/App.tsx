@@ -322,7 +322,7 @@ isOpen: boolean;
         await offlineStorage.saveTodos(todosData);
       }
           
-          // Only show welcome modal on first visit (no todos in offline storage AND no encryptionPassword)
+          // Only show welcome modal on first visit (no todos in offline storage AND no userPassword)
           const offlineTodos = await offlineStorage.getAllTodos();
           if (offlineTodos.length === 0 && !currentPassword) {
             setShowWelcomeBackModal(true);
@@ -346,7 +346,10 @@ isOpen: boolean;
             setUser(null);
             setTodos([]);
             setEncryptionSalt('');
-            setEncryptionPassword('');\n            setMessage('');\n            setMessageType('idle');\n            setIsLoading(false);
+            setEncryptionPassword('');
+            setMessage('');
+            setMessageType('idle');
+            setIsLoading(false);
             return;
           }
           
@@ -355,7 +358,10 @@ isOpen: boolean;
             // API unavailable - stop loading and show login form
             // Don't show error message, just let user log in
             setIsLoading(false);
-            setMessage('Backend unavailable - start server with: cd api && bun dev');\n            setMessageType('warning');\n          } else {\n            await new Promise(r => setTimeout(r, 1000 * attempt));\n          }\n        }
+          } else {
+            await new Promise(r => setTimeout(r, 1000 * attempt));
+          }
+        }
       }
     };
     
@@ -593,7 +599,7 @@ isOpen: boolean;
       }) as Todo;
       
       // Optimistic UI update (decrypt for display)
-      const decryptedNewTodo = await decryptTodo(newTodo, encryptionPassword, encryptionSalt);
+      const decryptedNewTodo = await decryptTodo(newTodo, userPassword, encryptionSalt);
       setTodos(prev => sortTodosByOrder([decryptedNewTodo, ...prev.filter(t => t._id !== newTodo._id)]));
       
       setMessage('Todo added ✓ (syncing...)');
@@ -618,7 +624,7 @@ isOpen: boolean;
     }) as Todo;
     
     // Optimistic UI (decrypt)
-    const decryptedTodo = await decryptTodo(updatedTodo, encryptionPassword, encryptionSalt);
+    const decryptedTodo = await decryptTodo(updatedTodo, userPassword, encryptionSalt);
     setTodos(prev => sortTodosByOrder(prev.map(t => t._id === todo._id ? decryptedTodo : t)));
     
     setMessage(todo.completed ? 'Task marked as pending ✓' : 'Task completed ✓');
