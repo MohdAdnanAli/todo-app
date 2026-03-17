@@ -21,6 +21,7 @@ import {
   Footer,
   PremiumFeaturesModal,
   ErrorBoundary,
+  WiFiSyncIndicator,
 } from './components';
 import { useLocalTodoDecryption } from './hooks/useAuth';
 import SmartTodoList from './components/SmartTodoList';
@@ -880,10 +881,10 @@ const decryptedTodo = await decryptTodo(updatedTodo, encryptionPassword, encrypt
                   </span>
                 </p>
 {syncStatus && (
-                  <LEDIndicator 
-                    message="" 
-                    messageType={syncMessageType} 
-                    variant="small-screen-header" 
+                  <WiFiSyncIndicator 
+                    syncStatus={syncStatus} 
+                    messageType={syncMessageType}
+                    className="ml-1 sm:ml-2"
                   />
                 )}
               </div>

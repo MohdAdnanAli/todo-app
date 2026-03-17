@@ -21,3 +21,4 @@ export { GoogleAuthHandler } from './GoogleAuthHandler';
 export { ConfirmDialog } from './ConfirmDialog';
 export { PremiumFeaturesModal, default } from './PremiumFeaturesModal';
 export { default as ErrorBoundary } from './ErrorBoundary';
+export { default as WiFiSyncIndicator } from './WiFiSyncIndicator';
