@@ -345,7 +345,8 @@ isOpen: boolean;
           if (status === 401) {
             setUser(null);
             setTodos([]);
-            setEncryptionSalt('');\n            setEncryptionPassword('');\n            setMessage('');\n            setMessageType('idle');\n            setIsLoading(false);
+            setEncryptionSalt('');
+            setEncryptionPassword('');\n            setMessage('');\n            setMessageType('idle');\n            setIsLoading(false);
             return;
           }
           
@@ -353,7 +354,8 @@ isOpen: boolean;
           if (attempt === retries) {
             // API unavailable - stop loading and show login form
             // Don't show error message, just let user log in
-            setIsLoading(false);\n            setMessage('Backend unavailable - start server with: cd api && bun dev');\n            setMessageType('warning');\n          } else {\n            await new Promise(r => setTimeout(r, 1000 * attempt));\n          }\n        }
+            setIsLoading(false);
+            setMessage('Backend unavailable - start server with: cd api && bun dev');\n            setMessageType('warning');\n          } else {\n            await new Promise(r => setTimeout(r, 1000 * attempt));\n          }\n        }
       }
     };
     
