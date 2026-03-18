@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // Environment detection
 const isProduction = process.env.NODE_ENV === 'production'
@@ -7,18 +8,39 @@ const isProduction = process.env.NODE_ENV === 'production'
 export default defineConfig({
   plugins: [
     react(),
-    // PWA disabled for now to fix deployment issues
+    VitePWA({
+      registerType: 'autoUpdate',
+      devOptions: { enabled: true },
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg', '512x512.png'],
+      manifest: {
+        name: 'METB Todo',
+        short_name: 'METB Todo',
+        description: 'Lightning-fast offline-first todo app',
+        theme_color: '#ffffff',
+        background_color: '#ffffff',
+        display: 'standalone',
+        icons: [
+          {
+            src: '512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable any'
+          }
+        ]
+      }
+    }),
   ],
   
   // Base path
   base: '/',
   
-  // Build configuration - DISABLED minify to see real errors
+  // Build configuration
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: true,
-    minify: false,  // Disabled for debugging
+    sourcemap: false,
+    minify: 'esbuild',
+    reportCompressedSize: true,
   },
   
   // Development server configuration
