@@ -23,3 +23,9 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
+# Misc
+*.txt
+*.log
+dist/
+.vite/
+

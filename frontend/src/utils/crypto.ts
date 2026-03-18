@@ -332,10 +332,10 @@ export async function decryptTodoWithFallback(
   }
   
   try {
-    const originalOrder = todo.order; // PRESERVE ORDER
     const decryptedText = await decrypt(todo.text, password, salt);
     return { ...todo, text: decryptedText, decryptionError: false };
   } catch {
+
     // FAILBACK: Mark as encrypted but KEEP original order intact
     return { 
       ...todo, 

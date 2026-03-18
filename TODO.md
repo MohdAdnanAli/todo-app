@@ -1,0 +1,1 @@
+# PR #1: Licensing, cleanup & repo hygiene\n\n- [ ] Create LICENSE (MIT)\n- [ ] Update .gitignore (add *.txt, .vite/, etc.)\n- [ ] Remove junk files (cookies*.txt, dev PNGs, etc.)\n- [ ] Commit and create PR #1\n\n# Next: PR #2, PR #3\n

@@ -92,7 +92,7 @@ function App() {
   const [isLoadingTodos, setIsLoadingTodos] = useState(false);
   const [showPremiumFeatures, setShowPremiumFeatures] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
-  const [syncMessageType, setSyncMessageType] = useState<MessageType>('idle');
+  // Removed unused setSyncMessageType
   
   // Clean decryption state - single declaration (unused)
   const [, /* setRawTodos */] = useState<Todo[]>([]);
@@ -798,15 +798,15 @@ function App() {
 
   const updateSyncLED = (status: SyncStatus) => {
     if (status.syncInProgress) {
-      setSyncMessageType('loading'); // green-grey flicker
+      setMessageType('loading'); // green-grey flicker
     } else if (status.pendingCount > 0) {
-      setSyncMessageType('pending'); // grey pulse/stuck
+      setMessageType('pending'); // grey pulse/stuck
     } else if (status.lastError || !status.isOnline) {
-      setSyncMessageType('error'); // red pulse
+      setMessageType('error'); // red pulse
     } else if (status.lastSyncAt) {
-      setSyncMessageType('success'); // green static
+      setMessageType('success'); // green static
     } else {
-      setSyncMessageType('idle'); // grey static
+      setMessageType('idle'); // grey static
     }
   };
 
