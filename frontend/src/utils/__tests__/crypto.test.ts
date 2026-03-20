@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { encrypt, decrypt, clearKeyCache, CryptoError, DecryptionError } from '../crypto';
+import { encrypt, decrypt, clearKeyCache, CryptoError } from '../crypto';
 
 describe('crypto utilities', () => {
   const testPassword = 'testPassword123';

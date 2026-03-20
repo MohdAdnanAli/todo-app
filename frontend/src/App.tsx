@@ -92,7 +92,6 @@ function App() {
   const [isLoadingTodos, setIsLoadingTodos] = useState(false);
   const [showPremiumFeatures, setShowPremiumFeatures] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
-  const [syncMessageType, setSyncMessageType] = useState<MessageType>('idle');
   
   // Clean decryption state - single declaration (unused)
   const [, /* setRawTodos */] = useState<Todo[]>([]);
@@ -797,17 +796,7 @@ function App() {
   }, [user]);
 
   const updateSyncLED = (status: SyncStatus) => {
-    if (status.syncInProgress) {
-      setSyncMessageType('loading'); // green-grey flicker
-    } else if (status.pendingCount > 0) {
-      setSyncMessageType('pending'); // grey pulse/stuck
-    } else if (status.lastError || !status.isOnline) {
-      setSyncMessageType('error'); // red pulse
-    } else if (status.lastSyncAt) {
-      setSyncMessageType('success'); // green static
-    } else {
-      setSyncMessageType('idle'); // grey static
-    }
+    // Sync LED uses LEDIndicator with syncStatus directly - no messageType needed
   };
 
   // Render loading state - ensures hooks are always called in same order
