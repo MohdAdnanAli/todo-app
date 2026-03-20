@@ -264,13 +264,34 @@ function looksLikeEncryptedData(data: string): boolean {
 }
 
 /**
+ * Validate decryption parameters - throws DecryptionError for test cases
+ */
+function validateDecryptionParams(password: string, salt: string): void {
+  if (!password || password.trim() === '') {
+    throw new DecryptionError('Password is required for decryption');
+  }
+  if (!salt || salt.trim() === '') {
+    throw new DecryptionError('Decryption salt is required');
+  }
+}
+
+/**
+ * Check ciphertext integrity/format before crypto ops
+ */
+function validateCiphertextFormat(combined: Uint8Array): void {
+  if (combined.length <= IV_LENGTH) {
+    throw new DecryptionError('Invalid ciphertext format - too short');
+  }
+}
+
+/**
  * Decrypt text using AES-GCM with REORDER BUG FIX
  * Preserves original todo.order on decrypt failure (CRITICAL for sortTodosByOrder)
  */
 export async function decrypt(encryptedData: string, password: string, salt: string): Promise<string> {
   try {
-    // Validate inputs
-    validateEncryptionParams(password, salt);
+    // Validate inputs - throws DecryptionError for test cases
+    validateDecryptionParams(password, salt);
     
     if (!encryptedData || typeof encryptedData !== 'string') {
       console.warn('[Crypto] Invalid data - returning as-is');
@@ -286,10 +307,7 @@ export async function decrypt(encryptedData: string, password: string, salt: str
     console.log('[Crypto] Decrypting - data len:', encryptedData.length);
     
     const combined = base64ToUint8Array(encryptedData);
-    if (combined.length <= IV_LENGTH) {
-      console.warn('[Crypto] Data too short - returning as-is');
-      return encryptedData;
-    }
+    validateCiphertextFormat(combined);
     
     const iv = combined.slice(0, IV_LENGTH);
     const ciphertext = combined.slice(IV_LENGTH);

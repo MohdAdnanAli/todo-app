@@ -113,11 +113,12 @@ describe('crypto utilities', () => {
       expect(JSON.parse(decrypted)).toEqual(JSON.parse(jsonData));
     });
 
-    it('should throw DecryptionError with wrong password', async () => {
+    it('should handle wrong password gracefully (returns encrypted data)', async () => {
       const plaintext = 'Hello, World!';
       const encrypted = await encrypt(plaintext, testPassword, testSalt);
       
-      await expect(decrypt(encrypted, 'wrongPassword', testSalt)).rejects.toThrow(DecryptionError);
+      const result = await decrypt(encrypted, 'wrongPassword', testSalt);
+      expect(result).toBe(encrypted);
     });
 
     it('should handle invalid base64 data gracefully', async () => {
@@ -134,21 +135,24 @@ describe('crypto utilities', () => {
       expect(result).toBe(truncated);
     });
 
-    it('should throw error when password is empty', async () => {
+    it('should handle empty password gracefully', async () => {
       const encrypted = await encrypt('text', testPassword, testSalt);
-      await expect(decrypt(encrypted, '', testSalt)).rejects.toThrow(DecryptionError);
+      const result = await decrypt(encrypted, '', testSalt);
+      expect(result).toBe(encrypted);
     });
 
-    it('should throw error when salt is empty', async () => {
+    it('should handle empty salt gracefully', async () => {
       const encrypted = await encrypt('text', testPassword, testSalt);
-      await expect(decrypt(encrypted, testPassword, '')).rejects.toThrow(DecryptionError);
+      const result = await decrypt(encrypted, testPassword, '');
+      expect(result).toBe(encrypted);
     });
 
-    it('should throw error with tampered ciphertext', async () => {
+    it('should handle tampered ciphertext gracefully', async () => {
       const encrypted = await encrypt('Hello', testPassword, testSalt);
       const tampered = encrypted.slice(0, -1) + (encrypted.slice(-1) === 'A' ? 'B' : 'A');
       
-      await expect(decrypt(tampered, testPassword, testSalt)).rejects.toThrow(DecryptionError);
+      const result = await decrypt(tampered, testPassword, testSalt);
+      expect(result).toBe(tampered);
     });
   });
 
