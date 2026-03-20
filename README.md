@@ -45,6 +45,18 @@
 - 📈 **Time Tracking**: Duration estimates, finish-time predictor, habit streaks
 - 📱 **Mobile-First**: iOS/Android responsive polish + safe-area support
 
+## 🙌 Help & Support This Project
+
+This is a solo passion project — every star, fork, issue, PR, or coffee genuinely helps me keep shipping.
+
+- **⭐ Star** if you'd use this daily  
+- **🐛 Report bugs** or suggest features in Issues  
+- **🔧 Code contributions** — especially around sync edge cases, mobile polish, tests  
+- **🛡️ Moderation/help** — triage issues, review PRs, community moderation if we grow  
+- **☕ Monetary support** (optional) — [Ko-fi](https://ko-fi.com/geralt_of_rivia) — keeps the server running & me caffeinated
+
+No pressure — just happy to build something useful together!
+
 ## Contributing
 Pull requests welcome! For major changes, please open an issue first to discuss desired changes.
 
