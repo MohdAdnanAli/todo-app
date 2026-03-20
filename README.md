@@ -25,7 +25,10 @@
 
 ## 🔗 Get Started
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/vercel-labs/bun-template-next) [![Live Demo](https://img.shields.io/badge/Live_Demo-%23metb--todo-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://metb-todo.vercel.app)
+[![Deploy Frontend (Vercel)](https://vercel.com/new/clone?repository-url=https://github.com/MohdAdnanAli/todo-app/tree/main/frontend)](https://metb-todo.vercel.app) [![Deploy Backend (Render)](https://render.com/deploy-btn)](https://render.com)
+
+**Frontend:** Deploy to Vercel (drag-drop public/ folder or git connect this repo).
+**Backend:** Deploy to Render (Bun runtime) or self-host: `cd api && bun run start`.
 
 1. Clone/fork → `bun install` (root + api/ + frontend/)
 2. Backend: `cd api && bun run start`
@@ -40,10 +43,13 @@
 - 📈 **Time Tracking**: Duration estimates, finish-time predictor, habit streaks
 - 📱 **Mobile-First**: iOS/Android responsive polish + safe-area support
 
+## Contributing
+Pull requests welcome! For major changes, please open an issue first to discuss desired changes.
+
 ## 📝 Topics
 todo-app, productivity, pwa, offline-first, bunjs, task-manager, full-stack, react, vite, drag-drop, typescript
 
 ---
 
-**Support my work ☕** [ko-fi.com/geralt_of_rivia](https://ko-fi.com/geralt_of_rivia)
+**Support my work ☕** [Ko-fi](https://ko-fi.com/geralt_of_rivia)
 
