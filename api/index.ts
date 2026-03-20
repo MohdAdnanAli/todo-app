@@ -37,9 +37,11 @@ const API_URL = process.env.API_URL;
 const corsOrigins = [
   'http://localhost:5173',
   'https://metb-todo.vercel.app',
+  'https://todo-mk83lbp8o-adnanaliaa863gmailcoms-projects.vercel.app',
   'https://*.vercel.app',
+  'https://.*\\.vercel\\.app',
   'https://todo-app-srbx.onrender.com',
-  /\.onrender\.com$/,
+  'https://.*\\.onrender\\.com',
 ];
 
 // Add dynamic production URLs
@@ -53,6 +55,9 @@ if (API_URL && API_URL.startsWith('http')) {
   corsOrigins.push(API_URL);
 }
 
+// DEBUG: Log CORS origins at startup
+logger.info('CORS Origins configured:', corsOrigins);
+
 
 // ────────────────────────────────────────────────
 // Middleware – ORDER IS CRITICAL
@@ -62,7 +67,8 @@ app.use(cors({
   origin: corsOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+  optionsSuccessStatus: 200  // For legacy browser support (IE11, etc.)
 }));
 
 // Compression middleware for faster responses

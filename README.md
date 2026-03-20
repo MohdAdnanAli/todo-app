@@ -1,6 +1,8 @@
 # 🚀 METB Todo – Lightning-fast Offline-First Todo App
 
-[![Bun](https://img.shields.io/badge/Bun-%23EAB308?style=for-the-badge&logo=bunjs&logoColor=white)](https://bun.sh) [![TypeScript](https://img.shields.io/badge/TypeScript-%23007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Vite](https://img.shields.io/badge/Vite-%23646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vite.dev/) [![PWA](https://img.shields.io/badge/PWA-offline--first-3AB7F9?style=for-the-badge&logo=webapp&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps) [![Vercel](https://img.shields.io/badge/Vercel-%23000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
+[![Vercel](https://img.shields.io/badge/Vercel-%23000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Deployed on Vercel](https://therealsujitk-vercel-badge.vercel.app/?app=metb-todo)](https://metb-todo.vercel.app)
 
 ## ✨ Hero
 
