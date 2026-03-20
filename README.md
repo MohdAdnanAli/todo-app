@@ -1,6 +1,8 @@
 # 🚀 METB Todo – Lightning-fast Offline-First Todo App
 
-[![Bun](https://img.shields.io/badge/Bun-%23EAB308?style=for-the-badge&logo=bunjs&logoColor=white)](https://bun.sh) [![TypeScript](https://img.shields.io/badge/TypeScript-%23007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Vite](https://img.shields.io/badge/Vite-%23646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vite.dev/) [![PWA](https://img.shields.io/badge/PWA-offline--first-3AB7F9?style=for-the-badge&logo=webapp&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps) [![Vercel](https://img.shields.io/badge/Vercel-%23000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
+[![Vercel](https://img.shields.io/badge/Vercel-%23000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Deployed on Vercel](https://therealsujitk-vercel-badge.vercel.app/?app=metb-todo)](https://metb-todo.vercel.app)
 
 ## ✨ Hero
 
@@ -25,7 +27,10 @@
 
 ## 🔗 Get Started
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/vercel-labs/bun-template-next) [![Live Demo](https://img.shields.io/badge/Live_Demo-%23metb--todo-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://metb-todo.vercel.app)
+[![Deploy Frontend (Vercel)](https://vercel.com/new/clone?repository-url=https://github.com/MohdAdnanAli/todo-app/tree/main/frontend)](https://metb-todo.vercel.app) [![Deploy Backend (Render)](https://render.com/deploy-btn)](https://render.com)
+
+**Frontend:** Deploy to Vercel (drag-drop public/ folder or git connect this repo).
+**Backend:** Deploy to Render (Bun runtime) or self-host: `cd api && bun run start`.
 
 1. Clone/fork → `bun install` (root + api/ + frontend/)
 2. Backend: `cd api && bun run start`
@@ -40,10 +45,13 @@
 - 📈 **Time Tracking**: Duration estimates, finish-time predictor, habit streaks
 - 📱 **Mobile-First**: iOS/Android responsive polish + safe-area support
 
+## Contributing
+Pull requests welcome! For major changes, please open an issue first to discuss desired changes.
+
 ## 📝 Topics
 todo-app, productivity, pwa, offline-first, bunjs, task-manager, full-stack, react, vite, drag-drop, typescript
 
 ---
 
-**Support my work ☕** [ko-fi.com/geralt_of_rivia](https://ko-fi.com/geralt_of_rivia)
+**Support my work ☕** [Ko-fi](https://ko-fi.com/geralt_of_rivia)
 
