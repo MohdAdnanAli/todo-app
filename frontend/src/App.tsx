@@ -777,27 +777,19 @@ function App() {
     if (!user) return;
     
     // Initial status
-    offlineStorage.getSyncStatus().then(status => {
-      setSyncStatus(status);
-      updateSyncLED(status);
-    });
+    offlineStorage.getSyncStatus().then(setSyncStatus);
     
-    const cleanup = addSyncListener((status: SyncStatus) => {
-      setSyncStatus(status);
-      updateSyncLED(status);
-    });
+    const cleanup = addSyncListener(setSyncStatus);
     
     syncListenerCleanup.current = cleanup;
     
     return () => {
-      cleanup();
+      cleanup?.();
       offlineStorage.cleanup();
     };
   }, [user]);
 
-  const updateSyncLED = (status: SyncStatus) => {
-    // Sync LED uses LEDIndicator with syncStatus directly - no messageType needed
-  };
+  // Sync LED uses LEDIndicator with syncStatus directly - no updateSyncLED needed
 
   // Render loading state - ensures hooks are always called in same order
   if (isLoading) {
