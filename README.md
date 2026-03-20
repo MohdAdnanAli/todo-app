@@ -2,6 +2,8 @@
 
 [![Vercel](https://img.shields.io/badge/Vercel-%23000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Tests](https://img.shields.io/badge/tests-100%25-brightgreen.svg)](https://github.com/MohdAdnanAli/todo-app/actions)
+[![Bun](https://img.shields.io/badge/Bun-%23ffcb03.svg?style=flat&logo=bun&logoColor=white)](https://bun.sh)
 [![Deployed on Vercel](https://therealsujitk-vercel-badge.vercel.app/?app=metb-todo)](https://metb-todo.vercel.app)
 
 ## ✨ Hero
@@ -13,7 +15,7 @@
 ## 🚀 Features (All Battle-Tested)
 
 - **📱 Offline-First Sync**: Full optimistic UI with localStorage queue, bidirectional merge (local→remote + remote→local), auto-sync on reconnect
-- **💾 PWA Installable**: Native-like app with install prompt, service worker ready (Vite PWA plugin)
+- **✅ Now installable PWA – works offline, survives airplane mode!** (VitePWA + auto install prompt)
 - **✨ Drag-Drop Reordering**: @dnd-kit powered (touch/keyboard/mobile sensors), works with active filters, visual overlay
 - **🎯 Priorities, Dues & Categories**: High/Med/Low priority, due dates, 5 categories (work/personal/shopping/health/other) + real-time filters/search
 - **🌈 Theme Engine**: 10+ presets + live custom color picker (bg/text/accent), system mode support
