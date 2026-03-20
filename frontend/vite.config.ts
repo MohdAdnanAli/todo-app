@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // Environment detection
 const isProduction = process.env.NODE_ENV === 'production'
@@ -7,7 +8,35 @@ const isProduction = process.env.NODE_ENV === 'production'
 export default defineConfig({
   plugins: [
     react(),
-    // PWA disabled for now to fix deployment issues
+    VitePWA({
+      registerType: 'autoUpdate',
+      devOptions: { enabled: true },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}']
+      },
+      manifest: {
+        name: 'Advanced Todo App',
+        short_name: 'TodoAdva',
+        description: 'Advanced Progressive Web App for Todo Management',
+        theme_color: '#3b82f6',
+        background_color: '#ffffff',
+        display: 'standalone',
+        icons: [
+          {
+            src: '512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: '512x512.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'maskable'
+          }
+        ]
+      }
+    })
   ],
   
   // Base path
@@ -17,8 +46,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: true,
-    minify: false,  // Disabled for debugging
+    sourcemap: !isProduction,
+    minify: isProduction,
   },
   
   // Development server configuration
