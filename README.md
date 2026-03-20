@@ -1,5 +1,7 @@
 # 🚀 METB Todo – Lightning-fast Offline-First Todo App
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)\n[![Deployed on Vercel](https://therealsujitk-vercel-badge.vercel.app/?app=metb-todo)](https://metb-todo.vercel.app)\n[![Bun](https://img.shields.io/badge/Bun-%23EAB308?style=for-the-badge&logo=bunjs&logoColor=white)](https://bun.sh)
+
 [![Bun](https://img.shields.io/badge/Bun-%23EAB308?style=for-the-badge&logo=bunjs&logoColor=white)](https://bun.sh) [![TypeScript](https://img.shields.io/badge/TypeScript-%23007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Vite](https://img.shields.io/badge/Vite-%23646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vite.dev/) [![PWA](https://img.shields.io/badge/PWA-offline--first-3AB7F9?style=for-the-badge&logo=webapp&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps) [![Vercel](https://img.shields.io/badge/Vercel-%23000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
 
 ## ✨ Hero
@@ -40,10 +42,5 @@
 - 📈 **Time Tracking**: Duration estimates, finish-time predictor, habit streaks
 - 📱 **Mobile-First**: iOS/Android responsive polish + safe-area support
 
-## 📝 Topics
-todo-app, productivity, pwa, offline-first, bunjs, task-manager, full-stack, react, vite, drag-drop, typescript
-
----
-
-**Support my work ☕** [ko-fi.com/geralt_of_rivia](https://ko-fi.com/geralt_of_rivia)
+## 📝 Topics\ntodo-app, productivity, pwa, offline-first, bunjs, task-manager, full-stack, react, vite, drag-drop, typescript\n\n## Contributing\n\nPull requests welcome! For major changes please open an issue first.\n\n---\n\n**Support my work ☕** [ko-fi.com/geralt_of_rivia](https://ko-fi.com/geralt_of_rivia)
 
