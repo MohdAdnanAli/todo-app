@@ -1,10 +1,14 @@
 # 🚀 METB Todo – Lightning-fast Offline-First Todo App
 
+[![GitHub Repo stars](https://img.shields.io/github/stars/MohdAdnanAli/todo-app?style=social)](https://github.com/MohdAdnanAli/todo-app)
+[![GitHub forks](https://img.shields.io/github/forks/MohdAdnanAli/todo-app?style=social)](https://github.com/MohdAdnanAli/todo-app)
+[![GitHub license](https://img.shields.io/github/license/MohdAdnanAli/todo-app)](https://github.com/MohdAdnanAli/todo-app)
+
 [![Vercel](https://img.shields.io/badge/Vercel-%23000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://img.shields.io/badge/tests-100%25-brightgreen.svg)](https://github.com/MohdAdnanAli/todo-app/actions)
 [![Bun](https://img.shields.io/badge/Bun-%23ffcb03.svg?style=flat&logo=bun&logoColor=white)](https://bun.sh)
-[![Deployed on Vercel](https://therealsujitk-vercel-badge.vercel.app/?app=metb-todo)](https://metb-todo.vercel.app)
+[![Vercel](https://img.shields.io/badge/Deployed-Vercel-brightgreen)](https://metb-todo.vercel.app)
 
 ## ✨ Hero
 
