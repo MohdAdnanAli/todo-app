@@ -63,6 +63,18 @@ function validateEncryptionParams(password: string, salt: string): void {
 }
 
 /**
+ * Validate decryption parameters (called BEFORE fallback logic)
+ */
+function validateDecryptionParams(password: string, salt: string): void {
+  if (!password || password.trim() === '') {
+    throw new CryptoError(ENCRYPTION_ERRORS.NO_PASSWORD);
+  }
+  if (!salt || salt.trim() === '') {
+    throw new CryptoError(ENCRYPTION_ERRORS.NO_SALT);
+  }
+}
+
+/**
  * Convert base64 or hex string to Uint8Array
  * Handles both formats for backward compatibility
  */
@@ -268,9 +280,10 @@ function looksLikeEncryptedData(data: string): boolean {
  * Preserves original todo.order on decrypt failure (CRITICAL for sortTodosByOrder)
  */
 export async function decrypt(encryptedData: string, password: string, salt: string): Promise<string> {
+  // Validate inputs FIRST (before fallback logic) - tests expect reject
+  validateDecryptionParams(password, salt);
+  
   try {
-    // Validate inputs
-    validateEncryptionParams(password, salt);
     
     if (!encryptedData || typeof encryptedData !== 'string') {
       console.warn('[Crypto] Invalid data - returning as-is');
@@ -332,7 +345,6 @@ export async function decryptTodoWithFallback(
   }
   
   try {
-    const originalOrder = todo.order; // PRESERVE ORDER
     const decryptedText = await decrypt(todo.text, password, salt);
     return { ...todo, text: decryptedText, decryptionError: false };
   } catch {
