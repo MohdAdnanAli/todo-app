@@ -92,7 +92,7 @@ function App() {
   const [isLoadingTodos, setIsLoadingTodos] = useState(false);
   const [showPremiumFeatures, setShowPremiumFeatures] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
-  const [syncMessageType, setSyncMessageType] = useState<MessageType>('idle');
+  const [, setSyncMessageType] = useState<MessageType>('idle');
   
   // Clean decryption state - single declaration (unused)
   const [, /* setRawTodos */] = useState<Todo[]>([]);
