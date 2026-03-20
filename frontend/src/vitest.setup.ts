@@ -58,13 +58,7 @@ Object.defineProperty(window, 'localStorage', {
   writable: true,
 });
 
-// Global mocks for decryption/tests compatibility
-vi.mock('../src/utils/crypto', () => ({
-  ...vi.importActual('../src/utils/crypto'),
-  encrypt: vi.fn((text) => text),
-  decrypt: vi.fn((text, _, __) => text), 
-  clearKeyCache: vi.fn(),
-}));
+
 
 vi.mock('../src/hooks/useAuth', () => ({
   useLocalTodoDecryption: vi.fn(() => ({
