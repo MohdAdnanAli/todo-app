@@ -517,30 +517,31 @@ function App() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await axios.post(`${API_URL}/api/auth/logout`, {}, {
-        withCredentials: true,
-      });
-    } catch (err: any) {
-      console.error('Logout failed:', err);
-    }
-  
-    setUser(null);
-    setIsAdmin(false);
-    setShowAdminDashboard(false);
-    setTodos([]);
-    setEncryptionSalt('');
-    setEncryptionPassword('');
-    setShowWelcomeBackModal(false);
+    const handleLogout = async () => {
+      try {
+        await axios.post(`${API_URL}/api/auth/logout`, {}, {
+          withCredentials: true,
+        });
+      } catch (err: any) {
+        console.error('Logout failed:', err);
+      }
     
-    // Clear stored password on logout
-    await offlineStorage.clearPassword();
-    await offlineStorage.clearEncryptionSalt();
-    
-    // Redirect directly to login page (home)
-    window.location.href = '/';
-  };
+      setUser(null);
+      setIsAdmin(false);
+      setShowAdminDashboard(false);
+      setTodos([]);
+      setEncryptionSalt('');
+      setEncryptionPassword('');
+      setShowWelcomeBackModal(false);
+      
+      // Clear ALL local storage on logout
+      await offlineStorage.clearPassword();
+      await offlineStorage.clearEncryptionSalt();
+      await offlineStorage.clearAllTodos();
+      
+      // Redirect directly to login page (home)
+      window.location.href = '/';
+    };
 
   const handleProfileUpdate = (updatedUser: User) => {
     setUser(updatedUser);
