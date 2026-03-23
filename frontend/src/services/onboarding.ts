@@ -1,5 +1,6 @@
 import { offlineStorage } from './offlineStorage';
 import { onboardingApi } from './api';
+import { safeConsole } from '../utils/safeConsole';
 import type { Todo } from '../types';
 
 export interface OnboardingStep {
@@ -136,7 +137,7 @@ export const onboardingService = {
       // Database says not completed, return false
       return false;
     } catch (error) {
-      console.warn('Failed to get onboarding status from API, falling back to localStorage:', error);
+      safeConsole.warn('Failed to get onboarding status from API, falling back to localStorage:', error);
     }
     
     // Fallback to localStorage (for offline support)
@@ -150,7 +151,7 @@ export const onboardingService = {
       // Save to database
       await onboardingApi.complete();
     } catch (error) {
-      console.warn('Failed to save onboarding completion to API, saving to localStorage:', error);
+      safeConsole.warn('Failed to save onboarding completion to API, saving to localStorage:', error);
     }
     
     // Always save to localStorage as backup
@@ -189,7 +190,7 @@ export const onboardingService = {
         { id: 'set-priority', text: 'Set task priorities', completed: dbProgress.setPriority, hint: 'Create a High priority task to see it highlighted' },
       ];
     } catch (error) {
-      console.warn('Failed to get quick start progress from API, falling back to localStorage:', error);
+      safeConsole.warn('Failed to get quick start progress from API, falling back to localStorage:', error);
     }
     
     // Fallback to localStorage
@@ -217,7 +218,7 @@ export const onboardingService = {
       try {
         await onboardingApi.updateQuickStart({ [dbField]: completed });
       } catch (error) {
-        console.warn('Failed to save quick start progress to API, saving to localStorage:', error);
+        safeConsole.warn('Failed to save quick start progress to API, saving to localStorage:', error);
       }
     }
     
@@ -270,7 +271,7 @@ export const onboardingService = {
     try {
       await onboardingApi.reset();
     } catch (error) {
-      console.warn('Failed to reset onboarding via API, clearing localStorage only:', error);
+      safeConsole.warn('Failed to reset onboarding via API, clearing localStorage only:', error);
     }
     
     // Clear localStorage

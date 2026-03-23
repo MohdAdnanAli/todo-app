@@ -5,6 +5,8 @@
 
 const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
 
+import type { SanitizedArg } from './types.js';
+
 // Helper to sanitize sensitive data from logs
 const sanitizeForLog = (data: unknown): unknown => {
   if (data === null || data === undefined) return data;
@@ -38,31 +40,31 @@ const sanitizeForLog = (data: unknown): unknown => {
 
 export const logger = {
   info: (message: string, ...args: unknown[]) => {
-    const sanitizedArgs = isProduction ? args.map(arg => sanitizeForLog(arg)) : args;
-    console.log(`[INFO] ${new Date().toISOString()} - ${message}`, ...sanitizedArgs);
+    if (!isProduction) {
+      const sanitizedArgs = args.map((arg: unknown) => sanitizeForLog(arg));
+      console.log(`[INFO] ${new Date().toISOString()} - ${message}`, ...sanitizedArgs);
+    }
   },
 
   warn: (message: string, ...args: unknown[]) => {
-    const sanitizedArgs = isProduction ? args.map(arg => sanitizeForLog(arg)) : args;
+    const sanitizedArgs = isProduction ? args.map((arg: unknown) => sanitizeForLog(arg)) : args;
     console.warn(`[WARN] ${new Date().toISOString()} - ${message}`, ...sanitizedArgs);
   },
 
   error: (message: string, ...args: unknown[]) => {
-    // Always log errors in both development and production
-    // Sanitize sensitive data while preserving error stack traces
-    const sanitizedArgs = isProduction ? args.map(arg => {
+    // Always log errors
+    const sanitizedArgs = args.map((arg: unknown) => {
       if (arg instanceof Error) {
         return { message: arg.message, stack: arg.stack };
       }
       return sanitizeForLog(arg);
-    }) : args;
-    
+    });
     console.error(`[ERROR] ${new Date().toISOString()} - ${message}`, ...sanitizedArgs);
   },
 
   debug: (message: string, ...args: unknown[]) => {
     if (!isProduction) {
-      const sanitizedArgs = args.map(arg => sanitizeForLog(arg));
+      const sanitizedArgs = args.map((arg: unknown) => sanitizeForLog(arg));
       console.debug(`[DEBUG] ${new Date().toISOString()} - ${message}`, ...sanitizedArgs);
     }
   },

@@ -88,6 +88,7 @@ export default defineConfig({
       '@services': '/src/services',
       '@hooks': '/src/hooks',
       '@utils': '/src/utils',
+      '@/utils/safeConsole': '/src/utils/safeConsole.ts',
     },
   },
   

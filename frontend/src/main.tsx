@@ -4,18 +4,19 @@ import { ThemeProvider } from './theme'
 import './index.css'
 import App from './App.tsx'
 import EmailAuthPage from './pages/EmailAuthPage.tsx'
-import { safeConsole } from './utils/console'
+import { safeConsole } from './utils/safeConsole'
+
 
 // Global error handler for unhandled promise rejections
 window.addEventListener('unhandledrejection', (event) => {
-  console.error('[Global Handler] Unhandled promise rejection:', event.reason);
+  safeConsole.error('[Global Handler] Unhandled promise rejection:', event.reason);
   // Prevent the default browser error
   event.preventDefault();
 });
 
 // Global error handler for uncaught errors
 window.addEventListener('error', (event) => {
-  console.error('[Global Handler] Uncaught error:', event.error);
+  safeConsole.error('[Global Handler] Uncaught error:', event.error);
 });
 
 // Show production warning once

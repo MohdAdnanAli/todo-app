@@ -1,3 +1,4 @@
+import { safeConsole } from './safeConsole';
 /**
  * Client-side encryption utilities using Web Crypto API
  * Uses AES-GCM with a key derived from password + salt via PBKDF2
@@ -197,7 +198,7 @@ export async function encrypt(text: string, password: string, salt: string): Pro
       throw new CryptoError('Text is required for encryption');
     }
     
-    console.log('[Crypto] Encrypting - text length:', text.length, 'salt:', salt ? 'present' : 'missing');
+    safeConsole.log('[Crypto] Encrypting - text length:', text.length, 'salt:', salt ? 'present' : 'missing');
     
     const encoder = new TextEncoder();
     const data = encoder.encode(text);
@@ -207,7 +208,7 @@ export async function encrypt(text: string, password: string, salt: string): Pro
     
     // Derive key from password and salt
     const key = await deriveKey(password, salt);
-    console.log('[Crypto] Key derived for encryption');
+    safeConsole.log('[Crypto] Key derived for encryption');
     
     // Encrypt
     const ciphertext = await crypto.subtle.encrypt(
@@ -227,10 +228,10 @@ export async function encrypt(text: string, password: string, salt: string): Pro
       binary += String.fromCharCode(combined[i]);
     }
     const result = btoa(binary);
-    console.log('[Crypto] Encryption successful, result length:', result.length);
+    safeConsole.log('[Crypto] Encryption successful, result length:', result.length);
     return result;
   } catch (error) {
-    console.error('[Crypto] Encryption error:', error);
+    safeConsole.error('[Crypto] Encryption error:', error);
     if (error instanceof CryptoError) {
       throw error;
     }
@@ -294,17 +295,17 @@ export async function decrypt(encryptedData: string, password: string, salt: str
     validateDecryptionParams(password, salt);
     
     if (!encryptedData || typeof encryptedData !== 'string') {
-      console.warn('[Crypto] Invalid data - returning as-is');
+      safeConsole.warn('[Crypto] Invalid data - returning as-is');
       return encryptedData;
     }
     
     // Skip if not encrypted (plain text)
     if (!looksLikeEncryptedData(encryptedData)) {
-      console.log('[Crypto] Plain text - no decrypt needed');
+    safeConsole.log('[Crypto] Plain text - no decrypt needed');
       return encryptedData;
     }
     
-    console.log('[Crypto] Decrypting - data len:', encryptedData.length);
+    safeConsole.log('[Crypto] Decrypting - data len:', encryptedData.length);
     
     const combined = base64ToUint8Array(encryptedData);
     validateCiphertextFormat(combined);
@@ -321,14 +322,14 @@ export async function decrypt(encryptedData: string, password: string, salt: str
     );
     
     const result = new TextDecoder().decode(decrypted);
-    console.log('[Crypto] Decrypt OK - result len:', result.length);
+    safeConsole.log('[Crypto] Decrypt OK - result len:', result.length);
     return result;
   } catch (error: any) {
     // REORDER BUG FIX: Categorize failure type for debugging
     if (error.name === 'OperationError') {
-      console.error('[Crypto] DECRYPT FAIL (WRONG PASSWORD/CORRUPT):', encryptedData.substring(0, 50) + '...');
+      safeConsole.error('[Crypto] DECRYPT FAIL (WRONG PASSWORD/CORRUPT):', encryptedData.substring(0, 50) + '...');
     } else {
-      console.error('[Crypto] Decrypt error:', error.name || error.message);
+      safeConsole.error('[Crypto] Decrypt error:', error.name || error.message);
     }
     // CRITICAL: Return encrypted data as-is to preserve .order field for sorting
     return encryptedData;
@@ -372,7 +373,7 @@ export async function decryptAllTodosWithFallback(
 ): Promise<Todo[]> {
   if (!password || !salt || todos.length === 0) return todos;
   
-  console.log(`[Crypto] Batch decrypting ${todos.length} todos`);
+  safeConsole.log(`[Crypto] Batch decrypting ${todos.length} todos`);
   const results = await Promise.allSettled(
     todos.map(todo => decryptTodoWithFallback(todo, password, salt))
   );
@@ -391,7 +392,7 @@ export async function decryptAllTodosWithFallback(
     }
   });
   
-  console.log(`[Crypto] Batch complete: ${successCount}/${todos.length} OK, ${failCount} failed (order preserved)`);
+  safeConsole.log(`[Crypto] Batch complete: ${successCount}/${todos.length} OK, ${failCount} failed (order preserved)`);
   return decryptedTodos;
 }
 

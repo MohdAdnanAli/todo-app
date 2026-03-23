@@ -14,6 +14,7 @@ import type {
   AdminUser,
 } from '../types';
 import { API_URL } from '../types';
+import { safeConsole } from '../utils/safeConsole';
 
 // Create axios instance with credentials
 const api = axios.create({
@@ -47,7 +48,7 @@ api.interceptors.response.use(
     if (!error.response) {
       const networkError = new Error('Unable to connect to server. Please check your internet connection.') as Error & { isNetworkError?: boolean };
       networkError.isNetworkError = true;
-      console.warn('Network error:', error.message);
+      safeConsole.warn('Network error:', error.message);
       throw networkError;
     }
 
@@ -91,7 +92,7 @@ api.interceptors.response.use(
         try {
           window.dispatchEvent(new CustomEvent('auth:logout', { detail: { reason: 'token_expired' } }));
         } catch (e) {
-          console.warn('Failed to dispatch logout event:', e);
+          safeConsole.warn('Failed to dispatch logout event:', e);
         }
         return Promise.reject(refreshError);
       }
@@ -106,7 +107,7 @@ api.interceptors.response.use(
     }
 
     // Log other errors for debugging but don't crash
-    console.warn('API Error:', error.response?.status, error.response?.data);
+    safeConsole.warn('API Error:', error.response?.status, error.response?.data);
     throw error;
   }
 );
