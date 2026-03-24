@@ -1,1 +1,0 @@
-✅ README hero updated (banner ready .github/banner.png, GIF via ffmpeg), good-first-issues added, template created. Topics keep 14. Run `git add . && git commit -m "Polish GitHub: hero banner/GIF/buttons, good-first-issues" && git push` then user handles PR/topics/issues.
