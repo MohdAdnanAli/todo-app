@@ -1,0 +1,1 @@
+---&#10;name: Good First Issue&#10;about: Quick wins for new contributors&#10;title: ''&#10;labels: good-first-issue,help-wanted&#10;assignees: ''&#10;&#10;---&#10;&#10;## Description&#10;&#10;Good first issue for contributors.&#10;&#10;## Tasks&#10;&#10;- [ ] Implement the feature&#10;&#10;## Resources&#10;&#10;<!-- add links -->&#10;

@@ -10,11 +10,17 @@
 [![Bun](https://img.shields.io/badge/Bun-%23ffcb03.svg?style=flat&logo=bun&logoColor=white)](https://bun.sh)
 [![Vercel](https://img.shields.io/badge/Deployed-Vercel-brightgreen)](https://metb-todo.vercel.app)
 
-## ✨ Hero
+## ✨ Hero - Bun × Offline × PWA
 
-**Lightning-fast offline-first todo app with drag-drop reordering, smart filters, custom themes, and seamless sync – powered by Bun for ultimate speed!**
+**Lightning-fast offline-first todo app** | Drag-drop | Themes | PWA Install | Offline Sync 🚀
 
-![Hero Demo](./public/demo.gif)
+![Banner](.github/banner.png)
+
+![Hero Demo 45s GIF](./public/demo.gif)
+
+| Live Demo | Install PWA | ⭐ Star |
+|-----------|-------------|---------|
+| [![Demo](https://metb-todo.vercel.app)](https://metb-todo.vercel.app) | [Install](#pwa) | [![Star](https://github.com/MohdAdnanAli/todo-app)](https://github.com/MohdAdnanAli/todo-app/stargazers) |
 
 ## 🚀 Features (All Battle-Tested)
 
@@ -50,6 +56,12 @@
 - 🤖 **AI Assist**: Mail summarization, auto-scheduling, promptfoo integration
 - 📈 **Time Tracking**: Duration estimates, finish-time predictor, habit streaks
 - 📱 **Mobile-First**: iOS/Android responsive polish + safe-area support
+
+## 🤝 Good First Issues
+
+1. [Implement recurring tasks logic](#) - Flex scheduling ("every Mon").
+2. [Pomodoro timer UI](#) - 25-min focus sessions.
+3. [AI scheduling prototype](#) - Auto-scheduling.
 
 ## Contributing
 Pull requests welcome! For major changes, please open an issue first to discuss desired changes.
