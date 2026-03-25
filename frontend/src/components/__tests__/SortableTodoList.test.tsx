@@ -2,7 +2,24 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import SortableTodoList from '../SortableTodoList';
 import type { Todo } from '../../types';
-import { useTodoFilters } from '../../hooks/useTodoFilters';
+vi.mock('../../hooks/useTodoFilters', () => ({
+  useTodoFilters: vi.fn(() => ({
+    filteredTodos: [],
+    stats: { total: 0, filtered: 0, pending: 0, completed: 0 },
+    categoryFilter: 'all' as any,
+    priorityFilter: 'all' as any,
+    showCompleted: 'all' as any,
+    searchQuery: '',
+    showFilters: false,
+    hasActiveFilters: false,
+    setCategoryFilter: vi.fn(),
+    setPriorityFilter: vi.fn(),
+    setShowCompleted: vi.fn(),
+    setSearchQuery: vi.fn(),
+    setShowFilters: vi.fn(),
+    clearFilters: vi.fn(),
+  })),
+}));
 
 describe('SortableTodoList', () => {
   const mockTodos: Todo[] = [
@@ -119,7 +136,7 @@ describe('SortableTodoList', () => {
     });
 
     it('renders todos based on useTodoFilters output', () => {
-      vi.mocked(useTodoFilters).mockReturnValue({
+      useTodoFilters.mockReturnValue({
         filteredTodos: [mockTodos[0]],
         stats: { total: 3, filtered: 1, pending: 1, completed: 0 },
         categoryFilter: 'work' as any,
@@ -147,7 +164,7 @@ describe('SortableTodoList', () => {
     });
 
     it('renders filtered pending todos', () => {
-      vi.mocked(useTodoFilters).mockReturnValue({
+      useTodoFilters.mockReturnValue({
         filteredTodos: mockTodos.slice(0, 2), 
         stats: { total: 3, filtered: 2, pending: 2, completed: 0 },
         showCompleted: false as any,
@@ -176,7 +193,7 @@ describe('SortableTodoList', () => {
     });
 
     it('renders search filtered todos', () => {
-      vi.mocked(useTodoFilters).mockReturnValue({
+      useTodoFilters.mockReturnValue({
         filteredTodos: [mockTodos[0]], 
         searchQuery: 'First',
         categoryFilter: 'all' as any,
@@ -204,7 +221,7 @@ describe('SortableTodoList', () => {
     });
 
     it('should render without active filters', () => {
-      vi.mocked(useTodoFilters).mockReturnValue({
+      useTodoFilters.mockReturnValue({
         filteredTodos: mockTodos,
         stats: { total: 3, filtered: 3, pending: 2, completed: 1 },
         categoryFilter: 'all' as any,
@@ -271,7 +288,7 @@ describe('SortableTodoList', () => {
 
   describe('display stats', () => {
     it('shows stats from useTodoFilters', () => {
-      vi.mocked(useTodoFilters).mockReturnValue({
+      useTodoFilters.mockReturnValue({
         filteredTodos: mockTodos,
         stats: { total: 3, filtered: 3, pending: 2, completed: 1 },
         categoryFilter: 'all' as any,

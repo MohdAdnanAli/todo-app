@@ -2,8 +2,17 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { offlineStorage } from '../offlineStorage';
 import type { Todo } from '../../types';
 
-vi.mock('../../api');
-vi.mock('../../utils/crypto');
+vi.mock('../../api', () => ({
+  todoApi: {
+    batchSync: vi.fn(() => ({ success: true, total: 0 })),
+    getTodosDelta: vi.fn(() => []),
+  },
+}));
+vi.mock('../../utils/crypto', () => ({
+  encrypt: vi.fn(),
+  decrypt: vi.fn(),
+  clearKeyCache: vi.fn(),
+}));
 
 describe('offlineStorage - Offline-First Full Sync', () => {
   const mockTodo: Todo = {
@@ -18,8 +27,7 @@ describe('offlineStorage - Offline-First Full Sync', () => {
     order: 0,
   };
 
-  beforeEach(() => {
-    localStorage.clear();
+
     vi.clearAllMocks();
     
     // Mock navigator.onLine
@@ -29,13 +37,12 @@ describe('offlineStorage - Offline-First Full Sync', () => {
     });
     
     // Mock crypto.randomUUID
-    vi.stubGlobal('crypto', {
+    global.crypto = {
       randomUUID: vi.fn(() => 'mock-uuid'),
-    });
+    } as any;
   });
 
   afterEach(() => {
-    localStorage.clear();
     vi.restoreAllMocks();
   });
 

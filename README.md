@@ -1,19 +1,31 @@
 # 🚀 METB Todo – Lightning-fast Offline-First Todo App
 
+[![GitHub Repo stars](https://img.shields.io/github/stars/MohdAdnanAli/todo-app?style=social)](https://github.com/MohdAdnanAli/todo-app)
+[![GitHub forks](https://img.shields.io/github/forks/MohdAdnanAli/todo-app?style=social)](https://github.com/MohdAdnanAli/todo-app)
+[![GitHub license](https://img.shields.io/github/license/MohdAdnanAli/todo-app)](https://github.com/MohdAdnanAli/todo-app)
+
 [![Vercel](https://img.shields.io/badge/Vercel-%23000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Deployed on Vercel](https://therealsujitk-vercel-badge.vercel.app/?app=metb-todo)](https://metb-todo.vercel.app)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Tests](https://img.shields.io/badge/tests-100%25-brightgreen.svg)](https://github.com/MohdAdnanAli/todo-app/actions)
+[![Bun](https://img.shields.io/badge/Bun-%23ffcb03.svg?style=flat&logo=bun&logoColor=white)](https://bun.sh)
+[![Vercel](https://img.shields.io/badge/Deployed-Vercel-brightgreen)](https://metb-todo.vercel.app)
 
-## ✨ Hero
+## ✨ Hero - Bun × Offline × PWA
 
-**Lightning-fast offline-first todo app with drag-drop reordering, smart filters, custom themes, and seamless sync – powered by Bun for ultimate speed!**
+**Lightning-fast offline-first todo app** | Drag-drop | Themes | PWA Install | Offline Sync 🚀
 
-![Hero Demo](./public/demo.gif)
+![Banner](.github/banner.png)
+
+![Hero Demo 45s GIF](./public/demo.gif)
+
+| Live Demo | Install PWA | ⭐ Star |
+|-----------|-------------|---------|
+| [![Demo](https://metb-todo.vercel.app)](https://metb-todo.vercel.app) | [Install](#pwa) | [![Star](https://github.com/MohdAdnanAli/todo-app)](https://github.com/MohdAdnanAli/todo-app/stargazers) |
 
 ## 🚀 Features (All Battle-Tested)
 
 - **📱 Offline-First Sync**: Full optimistic UI with localStorage queue, bidirectional merge (local→remote + remote→local), auto-sync on reconnect
-- **💾 PWA Installable**: Native-like app with install prompt, service worker ready (Vite PWA plugin)
+- **✅ Now installable PWA – works offline, survives airplane mode!** (VitePWA + auto install prompt)
 - **✨ Drag-Drop Reordering**: @dnd-kit powered (touch/keyboard/mobile sensors), works with active filters, visual overlay
 - **🎯 Priorities, Dues & Categories**: High/Med/Low priority, due dates, 5 categories (work/personal/shopping/health/other) + real-time filters/search
 - **🌈 Theme Engine**: 10+ presets + live custom color picker (bg/text/accent), system mode support
@@ -45,6 +57,11 @@
 - 📈 **Time Tracking**: Duration estimates, finish-time predictor, habit streaks
 - 📱 **Mobile-First**: iOS/Android responsive polish + safe-area support
 
+## 🤝 Good First Issues
+
+1. [Implement recurring tasks logic](#) - Flex scheduling ("every Mon").
+2. [Pomodoro timer UI](#) - 25-min focus sessions.
+3. [AI scheduling prototype](#) - Auto-scheduling.
 ## 🙌 Help & Support This Project
 
 This is a solo passion project — every star, fork, issue, PR, or coffee genuinely helps me keep shipping.

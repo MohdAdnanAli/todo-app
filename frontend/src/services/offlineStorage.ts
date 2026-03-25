@@ -5,15 +5,16 @@
 
 import type { Todo, BatchSyncInput } from '../types';
 import { todoApi } from './api.js';
+import { safeConsole } from '../utils/safeConsole';
 
 // ============================================
 // Console wrapper
 // ============================================
 
 const logger = {
-  error: (msg: string, ...args: unknown[]) => console.error(`[OfflineStorage] ERROR: ${msg}`, ...args),
-  warn: (msg: string, ...args: unknown[]) => console.warn(`[OfflineStorage] WARN: ${msg}`, ...args),
-  info: (msg: string, ...args: unknown[]) => console.info(`[OfflineStorage] INFO: ${msg}`, ...args),
+  error: (msg: string, ...args: unknown[]) => safeConsole.error(`[OfflineStorage] ERROR: ${msg}`, ...args),
+  warn: (msg: string, ...args: unknown[]) => safeConsole.warn(`[OfflineStorage] WARN: ${msg}`, ...args),
+  info: (msg: string, ...args: unknown[]) => safeConsole.info(`[OfflineStorage] INFO: ${msg}`, ...args),
 };
 
 // ============================================
@@ -68,7 +69,7 @@ const STORAGE_KEYS = {
 
 let isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 let syncInProgress = false;
-let syncStatus: SyncStatus = {
+const syncStatus: SyncStatus = {
   pendingCount: 0,
   isOnline,
   syncInProgress: false,
@@ -201,7 +202,7 @@ async getAllTodos(decryptFn?: (todos: Todo[]) => Promise<Todo[]>): Promise<Todo[
       try {
         todos = await decryptFn(rawTodos);
       } catch (error) {
-        console.warn('[OfflineStorage] Decryption failed, returning raw:', error);
+        logger.warn('[OfflineStorage] Decryption failed, returning raw:', error);
         todos = rawTodos.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       }
     }
@@ -634,7 +635,7 @@ async getStorageQuota(): Promise<StorageQuota> {
     // Synchronously save to localStorage
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.TODOS);
-      let todos: Todo[] = stored ? JSON.parse(stored) : [];
+      const todos: Todo[] = stored ? JSON.parse(stored) : [];
       const index = todos.findIndex(t => t._id === todo._id);
       if (index >= 0) {
         todos[index] = todo;

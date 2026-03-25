@@ -28,6 +28,7 @@ import SmartTodoList from './components/SmartTodoList';
 import { onboardingService } from './services/onboarding';
 import { offlineStorage, addSyncListener, type SyncStatus } from './services/offlineStorage';
 import { todoApi } from './services/api';
+import { safeConsole } from './utils/safeConsole';
 import { ArrowRight } from 'lucide-react';
 
 // Known temporary/disposable email domains
@@ -129,7 +130,7 @@ function App() {
       const decryptedText = await decrypt(todo.text, password, salt);
       return { ...todo, text: decryptedText };
     } catch (err: any) {
-      console.error('[DECRYPT FAIL] Todo:', todo._id, 'Password len:', password?.length || 0, 'Salt:', !!salt);
+      safeConsole.error('[DECRYPT FAIL] Todo:', todo._id, 'Password len:', password?.length || 0, 'Salt:', !!salt);
       return todo;
     }
   }, []);
@@ -195,7 +196,7 @@ function App() {
         
         // Skip offline decrypt - wait for auth check to ensure correct password
       } catch (error) {
-        console.error('Error loading offline todos:', error);
+        safeConsole.error('Error loading offline todos:', error);
       }
     };
     loadOfflineTodos();
@@ -259,7 +260,7 @@ function App() {
           setMessage('Welcome back!');
           setMessageType('success');
         } catch (err) {
-          console.error('Google OAuth auth check failed:', err);
+          safeConsole.error('Google OAuth auth check failed:', err);
           // If auth fails, still stop loading to show the page
           setIsLoading(false);
         }
@@ -346,7 +347,7 @@ function App() {
             return;
           }
           
-          console.warn(`Attempt ${attempt} failed:`, err.message);
+          safeConsole.warn(`Attempt ${attempt} failed:`, err.message);
           if (attempt === retries) {
             // API unavailable - stop loading and show login form
             // Don't show error message, just let user log in
@@ -407,14 +408,14 @@ function App() {
               })
             );
           } catch (decryptErr) {
-            console.warn('Decryption failed, showing encrypted todos:', decryptErr);
+            safeConsole.warn('Decryption failed, showing encrypted todos:', decryptErr);
           }
         }
         
         setTodos(decryptedTodos);
         await offlineStorage.saveTodos(decryptedTodos);
       } catch (todoErr) {
-        console.warn('Failed to fetch todos after login:', todoErr);
+        safeConsole.warn('Failed to fetch todos after login:', todoErr);
         setTodos([]);
       }
       
@@ -501,7 +502,7 @@ function App() {
         setTodos(decryptedTodos);
         await offlineStorage.saveTodos(decryptedTodos);
       } catch (todoErr) {
-        console.warn('Failed to fetch todos after registration:', todoErr);
+        safeConsole.warn('Failed to fetch todos after registration:', todoErr);
         setTodos([]);
       }
       
@@ -517,30 +518,31 @@ function App() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await axios.post(`${API_URL}/api/auth/logout`, {}, {
-        withCredentials: true,
-      });
-    } catch (err: any) {
-      console.error('Logout failed:', err);
-    }
-  
-    setUser(null);
-    setIsAdmin(false);
-    setShowAdminDashboard(false);
-    setTodos([]);
-    setEncryptionSalt('');
-    setEncryptionPassword('');
-    setShowWelcomeBackModal(false);
+    const handleLogout = async () => {
+      try {
+        await axios.post(`${API_URL}/api/auth/logout`, {}, {
+          withCredentials: true,
+        });
+      } catch (err: any) {
+        safeConsole.error('Logout failed:', err);
+      }
     
-    // Clear stored password on logout
-    await offlineStorage.clearPassword();
-    await offlineStorage.clearEncryptionSalt();
-    
-    // Redirect directly to login page (home)
-    window.location.href = '/';
-  };
+      setUser(null);
+      setIsAdmin(false);
+      setShowAdminDashboard(false);
+      setTodos([]);
+      setEncryptionSalt('');
+      setEncryptionPassword('');
+      setShowWelcomeBackModal(false);
+      
+      // Clear ALL local storage on logout
+      await offlineStorage.clearPassword();
+      await offlineStorage.clearEncryptionSalt();
+      await offlineStorage.clearAllTodos();
+      
+      // Redirect directly to login page (home)
+      window.location.href = '/';
+    };
 
   const handleProfileUpdate = (updatedUser: User) => {
     setUser(updatedUser);
@@ -556,8 +558,8 @@ function App() {
     setMessageType('idle');
     
     // Clear stored password on account deletion
-    offlineStorage.clearPassword().catch(err => console.error('Error clearing password:', err));
-    offlineStorage.clearEncryptionSalt().catch(err => console.error('Error clearing encryption salt:', err));
+    offlineStorage.clearPassword().catch(err => safeConsole.error('Error clearing password:', err));
+    offlineStorage.clearEncryptionSalt().catch(err => safeConsole.error('Error clearing encryption salt:', err));
   };
 
   const handleAddTodo = async (text: string, category?: TodoCategory, priority?: TodoPriority, tags?: string[], dueDate?: string) => {
@@ -652,14 +654,14 @@ function App() {
 
   const handleReorder = async (reorderedTodos: Todo[]) => {
     try {
-      console.log('[REORDER] Starting - optimistic update');
+      safeConsole.log('[REORDER] Starting - optimistic update');
       // 1. Optimistic UI (with order preservation)
       const optimisticTodos = sortTodosByOrder([...reorderedTodos]);
       setTodos(optimisticTodos);
       
       // REORDER BUG FIX: Validate crypto state before API
       if (!encryptionPassword || !encryptionSalt) {
-        console.warn('[REORDER] No password/salt - using optimistic only');
+        safeConsole.warn('[REORDER] No password/salt - using optimistic only');
         setMessage('Local reorder saved (no encryption)');
         setMessageType('warning');
         return;
@@ -669,20 +671,19 @@ function App() {
       const reorderData = {
         todos: reorderedTodos.map(t => ({ id: t._id.toString(), order: t.order ?? 0 }))
       };
-      console.log('[REORDER] Sending to server:', reorderData.todos.length, 'todos');
       
       const response = await todoApi.reorderTodos(reorderData);
       const serverTodosRaw: Todo[] = Array.isArray(response) ? response : (response as any)?.data || [];
       
       if (serverTodosRaw.length === 0) {
-        console.warn('[REORDER] Empty server response - keeping optimistic');
+        safeConsole.warn('[REORDER] Empty server response - keeping optimistic');
         setMessage('Local reorder saved (server empty)');
         setMessageType('warning');
         return;
       }
       
       // REORDER BUG FIX: Use NEW safe batch decrypt (preserves order on fail)
-      console.log('[REORDER] Decrypting server response...');
+      safeConsole.log('[REORDER] Decrypting server response...');
       const serverTodos = await decryptAllTodosWithFallback(serverTodosRaw, encryptionPassword, encryptionSalt);
       
       // REORDER BUG FIX: Validate server order vs client expectation
@@ -691,11 +692,11 @@ function App() {
       const orderMatch = Math.abs(clientOrderSum - serverOrderSum) < 10; // Tolerance for small diffs
       
       if (orderMatch) {
-        console.log('[REORDER] Server order OK - using server todos');
+        safeConsole.log('[REORDER] Server order OK - using server todos');
         setTodos(sortTodosByOrder(serverTodos));
         setMessage('✅ Reorder synced');
       } else {
-        console.warn('[REORDER] Server order mismatch! Client sum:', clientOrderSum, 'Server sum:', serverOrderSum, '- keeping optimistic');
+        safeConsole.warn('[REORDER] Server order mismatch! Client sum:', clientOrderSum, 'Server sum:', serverOrderSum, '- keeping optimistic');
         // HYBRID FALLBACK: Use server data but optimistic order
         const hybridTodos = serverTodos.map((serverTodo, i) => {
           const optimisticTodo = optimisticTodos.find(t => t._id === serverTodo._id);
@@ -710,7 +711,7 @@ function App() {
       setMessageType('success');
       
     } catch (err: any) {
-      console.error('[REORDER] Failed:', err);
+      safeConsole.error('[REORDER] Failed:', err);
       setMessage('Local reorder saved');
       setMessageType('warning');
     }
@@ -735,7 +736,7 @@ function App() {
         await onboardingService.updateQuickStartTask(taskId, true);
       }
     } catch (error) {
-      console.error('Error auto-completing task:', error);
+      safeConsole.error('Error auto-completing task:', error);
     }
   };
 
@@ -764,7 +765,7 @@ function App() {
         
         setQuickStartChecked(true);
       } catch (error) {
-        console.error('Error checking onboarding status:', error);
+        safeConsole.error('Error checking onboarding status:', error);
         setQuickStartChecked(true);
       }
     };

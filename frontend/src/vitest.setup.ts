@@ -149,3 +149,64 @@ globalThis.IntersectionObserver = class IntersectionObserver implements Intersec
   takeRecords() { return []; }
 } as unknown as typeof IntersectionObserver;
 
+// ===== DND-KIT MOCKS for CI =====
+vi.mock('@dnd-kit/core', () => ({
+  DndContext: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  closestCenter: () => ({}),
+  KeyboardSensor: vi.fn(),
+  PointerSensor: vi.fn(),
+  TouchSensor: vi.fn(),
+  useSensor: vi.fn(() => ({})),
+  useSensors: vi.fn(() => ([])),
+  DragEndEvent: {},
+  DragStartEvent: {},
+  DragOverlay: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+
+vi.mock('@dnd-kit/sortable', () => ({
+  arrayMove: vi.fn((arr, from, to) => arr),
+  SortableContext: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  sortableKeyboardCoordinates: vi.fn(),
+  verticalListSortingStrategy: vi.fn(),
+}));
+
+vi.mock('@dnd-kit/utilities', () => ({
+  CSS: {
+    Transform: { toString: vi.fn(() => 'translate3d(0,0,0)') },
+  },
+}));
+
+// ===== LUCIDE-REACT ICONS MOCK =====
+const LucideIcons = {};
+Object.keys({ 
+  SlidersHorizontal: true, ChevronDown: true, ChevronUp: true, Search: true, FilterX: true,
+  GripVertical: true, Trash2: true, Tag: true, AlertCircle: true
+}).forEach(icon => {
+  LucideIcons[icon] = ({ size = 16, color = 'currentColor', ...props }) => (
+    <div data-testid={`mock-${icon}`} style={{ width: size, height: size, color }} {...props}>
+      {icon}
+    </div>
+  );
+});
+
+vi.mock('lucide-react', () => LucideIcons);
+
+// ===== UTILS MOCKS =====
+vi.mock('../utils/todoIcons', () => ({
+  getSmartIcon: vi.fn(() => ({ size: 18, color: '#818cf8' })),
+}));
+
+// ===== CRYPTO POLYFILL for CI (optional - if slow) =====
+if (typeof globalThis.crypto === 'undefined' || !globalThis.crypto.subtle) {
+  globalThis.crypto = {
+    subtle: {
+      importKey: vi.fn(),
+      deriveKey: vi.fn(),
+      encrypt: vi.fn(),
+      decrypt: vi.fn(),
+    } as any,
+    getRandomValues: vi.fn(() => new Uint8Array(16)),
+    randomUUID: vi.fn(() => 'mock-uuid'),
+  } as any;
+}
+
