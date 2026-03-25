@@ -7,7 +7,7 @@
     "node": "20.x"
   },
   "scripts": {
-    "start": "bun run api/index.ts",
+    "start": "bun index.ts",
     "build": "bun build",
     "test": "bun test",
     "test:watch": "bun test --watch"

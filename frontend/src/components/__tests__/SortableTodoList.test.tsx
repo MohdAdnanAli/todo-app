@@ -45,7 +45,26 @@ describe('SortableTodoList', () => {
     vi.clearAllMocks();
   });
 
-  const renderComponent = (props: any) => {
+vi.mock('../../hooks/useTodoFilters', () => ({
+  useTodoFilters: vi.fn(() => ({
+    categoryFilter: 'all',
+    priorityFilter: 'all',
+    showCompleted: 'all',
+    searchQuery: '',
+    showFilters: false,
+    filteredTodos: [],
+    hasActiveFilters: false,
+    stats: { total: 0, filtered: 0, pending: 0, completed: 0 },
+    setCategoryFilter: vi.fn(),
+    setPriorityFilter: vi.fn(),
+    setShowCompleted: vi.fn(),
+    setSearchQuery: vi.fn(),
+    setShowFilters: vi.fn(),
+    clearFilters: vi.fn(),
+  })),
+}));
+
+const renderComponent = (props: any) => {
     return render(
       <SortableTodoList
         {...props}

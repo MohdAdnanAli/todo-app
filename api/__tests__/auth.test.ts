@@ -16,7 +16,7 @@ beforeAll(async () => {
   agent = request(app);
 });
 
-import { teardownTestDB } from './test-setup';
+import { setupTestDB, teardownTestDB } from './test-setup';
 
   afterAll(async () => {
     await teardownTestDB();

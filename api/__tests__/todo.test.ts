@@ -5,7 +5,7 @@ import { User } from '../models/User';
 import { Todo } from '../models/Todo';
 import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
-import type { setupTestDB, teardownTestDB } from './test-setup';
+import { setupTestDB, teardownTestDB } from './test-setup';
 
 // Test configuration
 const TEST_DB_URI = process.env.TEST_DB_URI || 'mongodb://localhost:27017/todo-app-test';
