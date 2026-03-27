@@ -1,14 +1,30 @@
-# 🚀 METB Todo – Lightning-fast Offline-First Todo App
+# 🚀 METB Todo – The Rock-Solid Offline-First PWA
 
-[![Vercel](https://img.shields.io/badge/Vercel-%23000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
+[![Vercel](https://img.shields.io/badge/Vercel-%23000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://metb-todo.vercel.app)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Deployed on Vercel](https://therealsujitk-vercel-badge.vercel.app/?app=metb-todo)](https://metb-todo.vercel.app)
+
+**Solo dev grind. Zero support. No procrastination. 5+ weeks of pure grind.**  
+
+I built the unbreakable foundation:  
+Lightning-fast offline-first Todo powered by **Bun** runtime.  
+Drag & drop reordering • 7-step onboarding tour • 10+ themes • true bidirectional sync • priorities, dues, categories, smart filters.
+
+**This is the solid rock.**  
+Now help carve the mountain:  
+→ AI task breakdown  
+→ Shared team lists + collab  
+→ Gamification + Pomodoro + recurring tasks  
+→ Focus mode + time tracking  
+
+**Live Demo** → [https://metb-todo.vercel.app](https://metb-todo.vercel.app)  
+**GitHub** → [https://github.com/mohdadnanali/todo-app](https://github.com/mohdadnanali/todo-app)
 
 ## ✨ Hero
 
 **Lightning-fast offline-first todo app with drag-drop reordering, smart filters, custom themes, and seamless sync – powered by Bun for ultimate speed!**
 
-![Hero Demo](./public/demo.gif)
+![Hero Demo](./frontend/public/demo.gif)
 
 ## 🚀 Features (All Battle-Tested)
 
@@ -27,7 +43,7 @@
 
 ## 🔗 Get Started
 
-[![Deploy Frontend (Vercel)](https://vercel.com/new/clone?repository-url=https://github.com/MohdAdnanAli/todo-app/tree/main/frontend)](https://metb-todo.vercel.app) [![Deploy Backend (Render)](https://render.com/deploy-btn)](https://render.com)
+[![Deploy Frontend (Vercel)](https://vercel.com/new/clone?repository-url=https://github.com/mohdadnanali/todo-app/tree/main/frontend)](https://metb-todo.vercel.app) [![Deploy Backend (Render)](https://render.com/deploy-btn)](https://render.com)
 
 **Frontend:** Deploy to Vercel (drag-drop public/ folder or git connect this repo).
 **Backend:** Deploy to Render (Bun runtime) or self-host: `cd api && bun run start`.
@@ -39,31 +55,35 @@
 
 ## 🗺️ Roadmap
 
+**Next Layers (Help Wanted!):**
+→ AI task breakdown  
+→ Shared team lists + collab  
+→ Gamification + Pomodoro + recurring tasks  
+→ Focus mode + time tracking  
+
+**Technical Roadmap:**
 - 🔄 **Recurring Tasks**: Flex scheduling ("every Mon" or "every 3 workdays")
 - ⏱️ **Pomodoro Timer**: Built-in 25-min focus sessions + breaks
 - 🤖 **AI Assist**: Mail summarization, auto-scheduling, promptfoo integration
 - 📈 **Time Tracking**: Duration estimates, finish-time predictor, habit streaks
 - 📱 **Mobile-First**: iOS/Android responsive polish + safe-area support
 
-## 🙌 Help & Support This Project
+## 🙌 Support the Solo Build
 
-This is a solo passion project — every star, fork, issue, PR, or coffee genuinely helps me keep shipping.
+**GitHub Sponsors coming this week – every rupee fuels the next layer**
 
-- **⭐ Star** if you'd use this daily  
-- **🐛 Report bugs** or suggest features in Issues  
-- **🔧 Code contributions** — especially around sync edge cases, mobile polish, tests  
-- **🛡️ Moderation/help** — triage issues, review PRs, community moderation if we grow  
-- **☕ Monetary support** (optional) — [Ko-fi](https://ko-fi.com/geralt_of_rivia) — keeps the server running & me caffeinated
+[☕ Buy me a coffee on Ko-fi](https://ko-fi.com/geralt_of_rivia)
 
-No pressure — just happy to build something useful together!
+This is a solo passion project — every star/PR/coffee helps!
 
 ## Contributing
-Pull requests welcome! For major changes, please open an issue first to discuss desired changes.
+Pull requests welcome! For major changes, please open an issue first.
 
 ## 📝 Topics
 todo-app, productivity, pwa, offline-first, bunjs, task-manager, full-stack, react, vite, drag-drop, typescript
 
 ---
 
+Built with ❤️ in Bun • Vite • React • TypeScript • PWA • IndexedDB
 **Support my work ☕** [Ko-fi](https://ko-fi.com/geralt_of_rivia)
 
