@@ -73,8 +73,9 @@ export const createTodo = async (req: Request & { user?: { id: string } }, res: 
       });
     }
 
+    // Recent-first: new todos get lowest order (top after sort order:1)
     const minOrderDoc = await Todo.findOne({ user: userId }).sort({ order: 1 }).select('order').lean();
-    const newOrder = minOrderDoc ? minOrderDoc.order - 1 : 0;
+    const newOrder = minOrderDoc ? (minOrderDoc.order ?? 0) - 1 : 0;
 
     const todo = new Todo({
       text,
@@ -200,7 +201,7 @@ export const reorderTodos = async (req: Request & { user?: { id: string } }, res
 
     const reorderedTodos = await Todo.find({ user: userId })
       .select(EXCLUDE_FIELDS)
-      .sort({ order: 1, createdAt: -1 })
+      .sort({ order: 1 })  // order first (manual changes), then recent-first
       .lean();
 
     return res.json(serializeTodos(reorderedTodos));
