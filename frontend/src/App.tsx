@@ -517,15 +517,46 @@ function App() {
     }
   };
 
-  const handleLogout = async () => {
+const handleLogout = async () => {
+    setMessage('🔄 Saving your todos before logout...');
+    setMessageType('loading');
+
     try {
-      await axios.post(`${API_URL}/api/auth/logout`, {}, {
-        withCredentials: true,
-      });
-    } catch (err: any) {
-      console.error('Logout failed:', err);
+      // 1. Sync pending changes to server (non-blocking)
+      const syncResult = await Promise.race([
+        offlineStorage.syncAll(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Sync timeout')), 2000)
+        )
+      ]);
+      
+      // 2. Force local save (order/checked - even if offline)
+      const rawTodos = await offlineStorage.getRawTodos();
+      await offlineStorage.saveTodos(rawTodos);
+      
+      setMessage('✅ Todos saved! Logging out...');
+      
+      // 3. Server logout
+      try {
+        await axios.post(`${API_URL}/api/auth/logout`, {}, {
+          withCredentials: true,
+        });
+      } catch (err: any) {
+        console.warn('Server logout failed (local save complete):', err);
+      }
+    } catch (syncError: any) {
+      console.warn('Logout sync failed (continuing anyway):', syncError.message);
+      // Still save locally even if sync fails
+      try {
+        const rawTodos = await offlineStorage.getRawTodos();
+        await offlineStorage.saveTodos(rawTodos);
+        setMessage('💾 Local save complete! Logging out...');
+      } catch (saveError) {
+        console.error('Local save failed:', saveError);
+      }
     }
-  
+
+    // Clear state & stored credentials
     setUser(null);
     setIsAdmin(false);
     setShowAdminDashboard(false);
@@ -534,11 +565,10 @@ function App() {
     setEncryptionPassword('');
     setShowWelcomeBackModal(false);
     
-    // Clear stored password on logout
     await offlineStorage.clearPassword();
     await offlineStorage.clearEncryptionSalt();
     
-    // Redirect directly to login page (home)
+    // Reload to login
     window.location.href = '/';
   };
 

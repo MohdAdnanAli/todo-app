@@ -242,6 +242,11 @@ async getAllTodos(decryptFn?: (todos: Todo[]) => Promise<Todo[]>): Promise<Todo[
           order: 0,
           ...data, // category, priority, etc.
         };
+        // Most recent at top: unshift preserves create order (newest first)
+        // DB/server authoritative for final order
+        todos.unshift(newTodo);
+        // Most recent at top: unshift preserves create order (newest first)
+        // DB/server authoritative for final order
         todos.unshift(newTodo);
         await this.saveTodos(todos);
         await this.addToSyncQueue('create', newTodo._id, newTodo);
