@@ -826,6 +826,7 @@ const handleLogout = async () => {
     return (
       <ErrorBoundary>
         <div 
+          data-testid="loader-container"
           className="rounded-2xl sm:p-12 p-6 max-w-[560px] w-full mx-auto text-center"
           style={{ 
             background: 'var(--bg-primary)', 

@@ -1,27 +1,35 @@
 import { render, screen, waitFor } from '@testing-library/react'
+import React from 'react'
 import { expect, test, describe, vi, beforeEach } from 'vitest'
 import App from './App'
 
-// Mock useTheme to prevent ThemeProvider dependency
-vi.mock('../theme/ThemeContext', () => ({
-  useTheme: vi.fn(() => ({ 
-    currentTheme: { isDark: false }, 
-    themeId: 'system' as any, 
-    setThemeId: vi.fn(), 
-    customColors: {} as any, 
+// Mock theme and other deps to bypass useTheme error
+vi.mock('../theme', () => ({
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  useTheme: vi.fn(() => ({
+    currentTheme: { isDark: false },
+    themeId: 'system',
+    setThemeId: vi.fn(),
+    customColors: {},
     setCustomColors: vi.fn(),
     isCustomizing: false,
     setIsCustomizing: vi.fn()
   }))
 }))
 
-// Reset modules
-beforeEach(() => {
-  vi.resetAllMocks()
-  vi.resetModules()
-})
+vi.mock('../components/ErrorBoundary', () => ({
+  ErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>
+}))
 
-// Mocks for App dependencies
+vi.mock('../components', () => ({
+  AuthForm: () => <input data-testid="email-input" aria-label="email" role="textbox" />,
+  // Add other components as needed
+}))
+
+vi.mock('../pages/AdminDashboard', () => ({
+  AdminDashboard: () => null
+}))
+
 vi.mock('axios', () => ({
   __esModule: true,
   default: {
@@ -30,6 +38,11 @@ vi.mock('axios', () => ({
         .mockResolvedValueOnce({ data: { user: null, isAdmin: false, encryptionSalt: '' } })
         .mockResolvedValueOnce({ data: [] }),
       post: vi.fn(),
+      interceptors: {
+        response: {
+          use: vi.fn()
+        }
+      }
     })),
     isAxiosError: vi.fn(() => false)
   }
@@ -52,27 +65,36 @@ vi.mock('../services/onboarding', () => ({
     hasCompletedOnboarding: vi.fn(() => Promise.resolve(true)),
     isQuickStartComplete: vi.fn(() => Promise.resolve(true)),
   },
-  WELCOME_TOUR_STEPS: [
-    { id: 'welcome', title: 'Welcome', description: 'Test', icon: '👋' }
-  ]
+  WELCOME_TOUR_STEPS: []
 }))
 
 vi.mock('../services/api', () => ({
   todoApi: { reorderTodos: vi.fn(() => Promise.resolve([])) }
 }))
 
+vi.mock('../utils/crypto', () => ({
+  encrypt: vi.fn(),
+  decrypt: vi.fn(),
+  decryptAllTodosWithFallback: vi.fn(id => id)
+}))
+
+vi.mock('../hooks/useAuth', () => ({
+  useLocalTodoDecryption: vi.fn(() => ({ needsUnlock: false, unlock: vi.fn() }))
+}))
+
 describe('App', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.resetModules()
+  })
+
   test('renders loader during initial load', async () => {
     render(<App />)
-    
-    // Loader shows during isLoading=true
-    const loader = screen.queryByText('Preparing your workspace...')
-    expect(loader).toBeTruthy()
+    expect(screen.getByTestId('loader-container')).toBeInTheDocument()
   })
 
   test('renders Todo App title after loading', async () => {
     render(<App />)
-    
     await waitFor(() => {
       expect(screen.getByText(/Todo App/i)).toBeInTheDocument()
     })
@@ -80,7 +102,6 @@ describe('App', () => {
 
   test('renders AuthForm when not authenticated', async () => {
     render(<App />)
-    
     await waitFor(() => {
       expect(screen.getByRole('textbox', { name: /email/i })).toBeInTheDocument()
     })
