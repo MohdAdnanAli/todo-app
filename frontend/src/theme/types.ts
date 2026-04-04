@@ -1,5 +1,5 @@
 // Theme type definitions
-export type ThemeId = 'system' | 'day' | 'night' | 'tiled' | 'dark' | 'rose' | 'emerald' | 'amber' | 'sunset' | 'ocean' | 'custom';
+export type ThemeId = 'system' | 'day' | 'night' | 'arctic' | 'dark' | 'rose' | 'emerald' | 'amber' | 'sunset' | 'ocean' | 'tiled' | 'violet' | 'forest' | 'custom';
 
 export interface ThemeColors {
   // Background colors

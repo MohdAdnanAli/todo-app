@@ -852,7 +852,7 @@ const handleLogout = async () => {
         <ThemeSelector ledMessage={message} ledMessageType={messageType} />
       
       <div className="flex items-center justify-center mb-[2rem] relative">
-        <h1 className="text-center bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent text-[2rem] font-semibold m-0">
+        <h1 className="text-center bg-gradient-to-r bg-clip-text text-transparent text-[2rem] font-semibold m-0" style={{ backgroundImage: 'var(--accent-gradient)' }}>
           Todo App
         </h1>
         <div className="header-led-container">
@@ -876,7 +876,7 @@ const handleLogout = async () => {
                       className="w-8 h-8 rounded-full object-cover flex-shrink-0 relative z-0"
                     />
                   ) : (
-                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm flex-shrink-0 relative z-0">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[var(--accent-gradient)] text-white text-sm flex-shrink-0 relative z-0">
                       {(user.displayName || user.email.split('@')[0]).charAt(0).toUpperCase()}
                     </span>
                   )}
@@ -902,9 +902,9 @@ const handleLogout = async () => {
               <button
                 onClick={() => setShowPremiumFeatures(true)}
                 title="Premium Features (Beta)"
-                className="px-4 py-2 rounded-lg font-medium text-sm bg-gradient-to-r from-indigo-500 to-purple-500 text-white
+                className="px-4 py-2 rounded-lg font-medium text-sm text-white
                   shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap flex items-center gap-1.5"
-                style={{ boxShadow: 'var(--glow)' }}
+                style={{ backgroundImage: 'var(--accent-gradient)', boxShadow: 'var(--glow)' }}
               >
                 <ArrowRight size={16} className="transform -rotate-45" />
                 Go Premium
@@ -912,8 +912,8 @@ const handleLogout = async () => {
               {isAdmin && (
                 <button
                   onClick={() => setShowAdminDashboard(prev => !prev)}
-                  className="px-3 py-2 rounded-lg font-medium text-sm bg-gradient-to-r from-cyan-500 to-blue-500 text-white
-                    shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
+                  className="px-3 py-2 rounded-lg font-medium text-sm text-[var(--success)] bg-[var(--success)]/10
+                    shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap border border-[var(--success)]/30"
                   style={{ boxShadow: 'var(--glow)' }}
                 >
                   {showAdminDashboard ? '✕ Close' : '⚙️ Admin'}
@@ -948,10 +948,9 @@ const handleLogout = async () => {
               <div className="flex gap-3 mt-[2rem]">
                 <button
                   onClick={handleLogout}
-                  className="flex-1 py-3.5 rounded-lg font-medium text-sm
-                    bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-md
-                    hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
-                  style={{ boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)' }}
+                  className="flex-1 py-3.5 rounded-lg font-medium text-sm text-[var(--error)] bg-[var(--error)]/10
+                    shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 border border-[var(--error)]/30"
+                  style={{ boxShadow: '0 2px 4px var(--error, #ef4444)20' }}
                 >
                   Logout
                 </button>
