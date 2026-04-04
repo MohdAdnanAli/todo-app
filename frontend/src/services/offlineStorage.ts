@@ -68,7 +68,7 @@ const STORAGE_KEYS = {
 
 let isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 let syncInProgress = false;
-let syncStatus: SyncStatus = {
+const syncStatus: SyncStatus = {
   pendingCount: 0,
   isOnline,
   syncInProgress: false,
@@ -639,7 +639,7 @@ async getStorageQuota(): Promise<StorageQuota> {
     // Synchronously save to localStorage
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.TODOS);
-      let todos: Todo[] = stored ? JSON.parse(stored) : [];
+      const todos: Todo[] = stored ? JSON.parse(stored) : [];
       const index = todos.findIndex(t => t._id === todo._id);
       if (index >= 0) {
         todos[index] = todo;
