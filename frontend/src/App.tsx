@@ -523,7 +523,7 @@ const handleLogout = async () => {
 
     try {
       // 1. Sync pending changes to server (non-blocking)
-      const syncResult = await Promise.race([
+      await Promise.race([
         offlineStorage.syncAll(),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Sync timeout')), 2000)
