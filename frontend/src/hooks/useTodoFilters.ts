@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import type { Todo, TodoCategory, TodoPriority } from '../types';
+import useIndexedFilters from './useIndexedFilters';
 
 export interface UseTodoFiltersOptions {
   /** Initial category filter */
@@ -70,44 +71,38 @@ export function useTodoFilters(
   }, [categoryFilter, priorityFilter, showCompleted, searchQuery]);
 
   // Optimized filter function with early returns
+const indexedFilters = useIndexedFilters(todos);
   const filteredTodos = useMemo(() => {
-    // Fast path: no filters = return all
-    if (!hasActiveFilters) {
-      return todos;
+    if (!hasActiveFilters) return todos;
+
+    let result = todos;
+
+    // Indexed category filter
+    if (categoryFilter !== 'all') {
+      result = indexedFilters.byCategory.get(categoryFilter) || [];
     }
 
-    return todos.filter(todo => {
-      // Category filter
-      if (categoryFilter !== 'all' && todo.category !== categoryFilter) {
-        return false;
-      }
+    // Indexed priority filter
+    if (priorityFilter !== 'all') {
+      result = result.length ? result.filter(t => indexedFilters.byPriority.get(priorityFilter)?.includes(t)) : indexedFilters.byPriority.get(priorityFilter) || [];
+    }
 
-      // Priority filter
-      if (priorityFilter !== 'all' && todo.priority !== priorityFilter) {
-        return false;
-      }
+    // Completed filter
+    if (showCompleted !== 'all') {
+      result = result.filter(t => t.completed === showCompleted);
+    }
 
-      // Completed filter
-      if (showCompleted !== 'all' && todo.completed !== showCompleted) {
-        return false;
-      }
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(t => 
+        t.text.toLowerCase().includes(query) || t.tags?.some(tag => tag.toLowerCase().includes(query))
+      );
+    }
 
-      // Search filter - only run if there's a query
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        
-        // Check text
-        if (!todo.text.toLowerCase().includes(query)) {
-          // Check tags if text doesn't match
-          if (!todo.tags?.some(tag => tag.toLowerCase().includes(query))) {
-            return false;
-          }
-        }
-      }
+    return result;
+  }, [todos, hasActiveFilters, categoryFilter, priorityFilter, showCompleted, searchQuery, indexedFilters]);
 
-      return true;
-    });
-  }, [todos, hasActiveFilters, categoryFilter, priorityFilter, showCompleted, searchQuery]);
 
   // Memoized stats - only recalculate when base data changes
   const stats = useMemo(() => {

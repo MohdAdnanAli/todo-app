@@ -11,7 +11,7 @@ interface LEDIndicatorProps {
 const LEDIndicator: React.FC<LEDIndicatorProps> = memo(({ message, messageType, variant = 'default' }) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const [showAutoMessage, setShowAutoMessage] = useState(false);
-  const colors = LED_COLORS[messageType];
+const colors = LED_COLORS[messageType] || { bg: '#6b7280', glow: '#9ca3af', border: '#6b7280' };
 
   useEffect(() => {
     if (message) {

@@ -1,71 +1,38 @@
 /**
- * Production-safe Console Utility
- * In production, shows a warning to discourage console usage.
- * This helps prevent leaking sensitive information through console.
+ * Timestamped console logging utility - DEBUGGING PHASE ONLY
+ * Usage: import { timestamp, log, warn, error } from './console';
+ *        timestamp('[REORDER] Starting');
  */
 
-const isProduction = import.meta.env.PROD || 
-  (typeof window !== 'undefined' && window.location.hostname !== 'localhost');
-
-const PRODUCTION_WARNING = '%c⚠️ WARNING: Using console in production may leak sensitive information! Consider removing console logs for better security and performance.';
-
-// Giant red warning style
-const warningStyle = 'font-size: 16px; font-weight: bold; color: #ff0000; background: #ffeeee; padding: 10px; border: 2px solid #ff0000; border-radius: 5px;';
-
-// Only show the warning once
-let warningShown = false;
-
-const showProductionWarning = () => {
-  if (isProduction && !warningShown) {
-    console.warn(PRODUCTION_WARNING, warningStyle);
-    warningShown = true;
-  }
+const padZero = (num: number, size: number): string => {
+  let s = num + '';
+  while (s.length < size) s = '0' + s;
+  return s;
 };
 
-// Create a proxy console that shows warning in production
-export const safeConsole = {
-  log: (...args: unknown[]) => {
-    showProductionWarning();
-    console.log(...args);
-  },
-  
-  warn: (...args: unknown[]) => {
-    showProductionWarning();
-    console.warn(...args);
-  },
-  
-  error: (...args: unknown[]) => {
-    // Errors are more important - show with warning but allow in dev for debugging
-    if (!isProduction) {
-      console.error(...args);
-    } else {
-      showProductionWarning();
-      // In production, still show but with warning style
-      console.warn('%c[ERROR]', 'color: red; font-weight: bold;', ...args);
-    }
-  },
-  
-  info: (...args: unknown[]) => {
-    showProductionWarning();
-    console.info(...args);
-  },
-  
-  debug: (...args: unknown[]) => {
-    showProductionWarning();
-    console.debug(...args);
-  },
-  
-  // Expose original console for cases where we really need it
-  _original: console,
+const getTimestamp = (): string => {
+  const now = new Date();
+  const h = padZero(now.getHours(), 2);
+  const m = padZero(now.getMinutes(), 2);
+  const s = padZero(now.getSeconds(), 2);
+  const ms = padZero(now.getMilliseconds(), 3);
+  return `[${h}:${m}:${s}.${ms}]`;
 };
 
-// Export individual functions for easier migration
-export const log = safeConsole.log;
-export const warn = safeConsole.warn;
-export const error = safeConsole.error;
-export const info = safeConsole.info;
-export const debug = safeConsole.debug;
+export const timestamp = (prefix: string, msg: string): void => {
+  console.log(`${getTimestamp()} ${prefix}: ${msg}`);
+};
 
-// Default export for convenience
-export default safeConsole;
+export const log = (prefix: string, msg: string): void => timestamp(prefix, msg);
+export const warn = (prefix: string, msg: string): void => console.warn(`${getTimestamp()} ${prefix}: ${msg}`);
+export const error = (prefix: string, msg: string): void => console.error(`${getTimestamp()} ${prefix}: ${msg}`);
+
+// Existing console wrappers (for backward compat)
+export const table = (prefix: string, data: any): void => {
+  console.group(`${getTimestamp()} ${prefix}`);
+  console.table(data);
+  console.groupEnd();
+};
+
+export default { timestamp, log, warn, error, table };
 

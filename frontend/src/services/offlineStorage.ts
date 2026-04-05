@@ -347,8 +347,10 @@ async getAllTodos(decryptFn?: (todos: Todo[]) => Promise<Todo[]>): Promise<Todo[
       syncStatus.lastError = null;
       notifySyncListeners();
       
-      logger.info(`Sync complete: ${synced} synced, ${merged} merged, ${conflicts} conflicts`);
+      logger.info(`[OfflineStorage] Sync DEBUG: synced=${synced}, merged=${merged}, conflicts=${conflicts}, local=${localTodos.length}, remote=${remoteTodos.length}`);
+      logger.info(`[OfflineStorage] Conflicts DEBUG: localIDs=${localTodos.slice(0,3).map(t=>t._id.slice(-4))}, remoteIDs=${remoteTodos.slice(0,3).map(t=>t._id.slice(-4))}`);
       return { success: true, synced, merged, conflicts };
+
     } catch (error: unknown) {
       logger.error('SyncAll failed:', error);
       syncStatus.lastError = (error as Error)?.message || 'Sync failed';

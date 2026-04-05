@@ -4,7 +4,8 @@ import { ThemeProvider } from './theme'
 import './index.css'
 import App from './App.tsx'
 import EmailAuthPage from './pages/EmailAuthPage.tsx'
-import { safeConsole } from './utils/console'
+// import { safeConsole } from './utils/console'
+
 
 // Global error handler for unhandled promise rejections
 window.addEventListener('unhandledrejection', (event) => {
@@ -18,10 +19,11 @@ window.addEventListener('error', (event) => {
   console.error('[Global Handler] Uncaught error:', event.error);
 });
 
-// Show production warning once
-if (import.meta.env.PROD) {
-  safeConsole.warn('⚠️ WARNING: Using console in production may leak sensitive information! Consider removing console logs for better security and performance.');
-}
+  // Show production warning once (disabled for debug)
+  // if (import.meta.env.PROD) {
+  //   safeConsole.warn('⚠️ WARNING: Using console in production...');
+  // }
+
 
 // Simple client-side routing based on URL path
 const path = window.location.pathname;

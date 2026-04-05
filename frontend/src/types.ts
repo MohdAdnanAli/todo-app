@@ -1,267 +1,47 @@
-// Shared types for the application
-
-// Message type for LED status and banners
-export type MessageType = 
-  | 'error' 
-  | 'success' 
-  | 'warning' 
-  | 'info' 
-  | 'loading' 
-  | 'idle'
-  | 'attention'
-  | 'primary'
-  | 'accent'
-  | 'system'
-  | 'personal'
-  | 'pending';
-
-// LED color configuration - VIBRANT COLORS
-export const LED_COLORS: Record<MessageType, { bg: string; glow: string; border: string }> = {
-  error:     { bg: '#f43f5e', glow: 'rgba(244, 63, 94, 0.5)', border: '#fda4af' },
-  success:   { bg: '#34d399', glow: 'rgba(52, 211, 153, 0.5)', border: '#6ee7b7' },
-  warning:   { bg: '#fbbf24', glow: 'rgba(251, 191, 36, 0.5)', border: '#fde68a' },
-  info:      { bg: '#60a5fa', glow: 'rgba(96, 165, 250, 0.5)', border: '#bfdbfe' },
-  loading:   { bg: '#a78bfa', glow: 'rgba(167, 139, 250, 0.5)', border: '#c4b5fd' },
-  idle:      { bg: '#9ca3af', glow: 'rgba(156, 163, 175, 0.3)', border: '#d1d5db' },
-  attention: { bg: '#fb923c', glow: 'rgba(251, 146, 60, 0.5)', border: '#fdba74' },
-  primary:   { bg: '#818cf8', glow: 'rgba(129, 140, 248, 0.5)', border: '#c7d2fe' },
-  accent:    { bg: '#c084fc', glow: 'rgba(192, 132, 252, 0.5)', border: '#ddd6fe' },
-  system:    { bg: '#22d3ee', glow: 'rgba(34, 211, 238, 0.5)', border: '#a5f3fc' },
-  personal:  { bg: '#f43f5e', glow: 'rgba(244, 63, 94, 0.5)', border: '#fda4af' },
-  pending:   { bg: '#fbbf24', glow: 'rgba(251, 191, 36, 0.5)', border: '#fde68a' },
-};
-
-// API URL - use empty string in development to use Vite proxy (same origin)
-export const API_URL = import.meta.env.VITE_API_URL ||
-  (import.meta.env.PROD ? 'https://todo-app-srbx.onrender.com' : 'http://localhost:5000');
-
-// Category type for todos
-export type TodoCategory = 'work' | 'personal' | 'shopping' | 'health' | 'other';
-
-// Priority type for todos
-export type TodoPriority = 'low' | 'medium' | 'high';
-
-// Participant interface for collaborative todos
-export interface TodoParticipant {
-  id: string;
-  name: string;
+export interface User {
+  _id: string;
+  email: string;
+  displayName?: string;
   avatar?: string;
+  bio?: string;
 }
 
-// Todo interface
+// Extend existing Todo type if needed
+export type TodoCategory = 'work' | 'personal' | 'shopping' | 'health' | 'other';
+export type TodoPriority = 'low' | 'medium' | 'high';
+
 export interface Todo {
   _id: string;
   text: string;
   completed: boolean;
-  createdAt: string;
-  updatedAt?: string;
-  category?: TodoCategory;
-  priority?: TodoPriority;
+  category: TodoCategory;
+  priority: TodoPriority;
   tags?: string[];
   dueDate?: string | null;
-  order: number;
-  participants?: TodoParticipant[];
-  isEncrypted?: boolean;
-  displayText?: string;
-  decryptionError?: boolean;
-}
-
-// User interface
-export interface User {
-  id?: string;
-  email: string;
-  displayName: string;
-  bio?: string;
-  avatar?: string;
-  emailVerified?: boolean;
-  lastLoginAt?: string;
-  role?: 'user' | 'admin';
-  isAdmin?: boolean;
-  googleId?: string;
-  isGoogleUser?: boolean;
-  authProvider?: string;
-  encryptionPassword?: string; // For client-side decrypt (Google users)
-}
-
-// Profile update data
-export interface ProfileUpdateData {
-  displayName?: string;
-  bio?: string;
-  avatar?: string;
-}
-
-// Password reset request
-export interface PasswordResetRequest {
-  email: string;
-}
-
-// Password reset with token
-export interface PasswordResetConfirm {
-  token: string;
-  password: string;
-}
-
-// Email verification
-export interface EmailVerification {
-  token: string;
-}
-
-// Auth response
-export interface AuthResponse {
-  message: string;
-  user?: User;
-  encryptionSalt?: string;
-}
-
-// API Error response
-export interface ApiError {
-  error: string;
-  message?: string;
-  retryAfter?: number; // For rate limiting
-}
-
-// Filter options for todos
-export interface TodoFilters {
-  category?: TodoCategory | 'all';
-  priority?: TodoPriority | 'all';
-  completed?: boolean | 'all';
-  search?: string;
-}
-
-// Admin stats
-export interface AdminStats {
-  totalUsers: number;
-  totalTodos: number;
-  completedTodos: number;
-  pendingTodos: number;
-}
-
-// Admin profile with todo count
-export interface AdminProfile {
-  id: string;
-  email: string;
-  displayName?: string;
-  bio?: string;
-  avatar?: string;
-  todoCount: number;
-  createdAt: string;
-}
-
-// Admin User (for API responses)
-export interface AdminUser {
-  id: string;
-  email: string;
-  displayName?: string;
-  bio?: string;
-  avatar?: string;
-  emailVerified?: boolean;
-  todoCount: number;
-  completedTodos?: number;
-  completionRate?: number;
-  lastLoginAt?: string;
+  order?: number;
   createdAt: string;
   updatedAt?: string;
+  participants?: Array<{
+    id: string;
+    name: string;
+    avatar?: string;
+  }>;
 }
 
-// Admin Dashboard Stats
-export interface AdminDashboardStats {
-  totalUsers: number;
-  totalTodos: number;
-  completedTodos: number;
-  pendingTodos: number;
-  activeUsers: number;
-  completionRate: number;
-}
+// Add other types as needed
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-// Admin User Info
-export interface AdminUserInfo {
-  id: string;
-  email: string;
-  displayName?: string;
-  bio?: string;
-  avatar?: string;
-  emailVerified: boolean;
-  todoCount: number;
-  completedTodos: number;
-  completionRate: number;
-  createdAt: string;
-  lastLoginAt?: string;
-}
+export type MessageType = 'success' | 'error' | 'warning' | 'info' | 'idle' | 'loading' | 'primary' | 'pending' | 'accent';
 
-// Admin Dashboard Data
-export interface AdminDashboardData {
-  stats: AdminDashboardStats;
-  recentUsers: AdminUserInfo[];
-}
+export const LED_COLORS: Partial<Record<MessageType, { bg: string; glow: string; border: string }>> = {
+  success: { bg: '#10b981', glow: '#34d399', border: '#059669' },
+  error: { bg: '#ef4444', glow: '#f87171', border: '#dc2626' },
+  warning: { bg: '#f59e0b', glow: '#fbbf24', border: '#d97706' },
+  info: { bg: '#3b82f6', glow: '#60a5fa', border: '#2563eb' },
+  idle: { bg: '#6b7280', glow: '#9ca3af', border: '#6b7280' },
+  loading: { bg: '#6b7280', glow: '#9ca3af', border: '#6b7280' },
+  primary: { bg: '#4f46e5', glow: '#6366f1', border: '#3730a3' },
+  pending: { bg: '#f59e0b', glow: '#fbbf24', border: '#d97706' },
+  accent: { bg: '#ec4899', glow: '#f472b6', border: '#be185d' },
+};
 
-// Admin Users Response
-export interface AdminUsersResponse {
-  users: AdminUserInfo[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-}
-
-// Admin Todo User
-export interface AdminTodoUser {
-  id: string;
-  email: string;
-  displayName?: string;
-}
-
-// Admin Todo
-export interface AdminTodo {
-  _id: string;
-  text: string;
-  completed: boolean;
-  category?: string;
-  priority?: string;
-  createdAt: string;
-  user?: AdminTodoUser;
-}
-
-// Admin Todos Response
-export interface AdminTodosResponse {
-  todos: AdminTodo[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-}
-
-// System Health
-export interface SystemHealth {
-  status: string;
-  timestamp: string;
-  database: {
-    state: string;
-    error?: string;
-  };
-  uptime: string;
-  environment: string;
-}
-
-// Auth mode for forms
-export type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password';
-
-// Batch sync types
-export interface BatchSyncInput {
-  creates: Partial<Todo>[];
-  updates: { id: string; data: Partial<Todo> }[];
-  deletes: string[];
-}
-
-export interface BatchSyncResult {
-  success: boolean;
-  processed: {
-    creates: number;
-    updates: number;
-    deletes: number;
-  };
-  total: number;
-}

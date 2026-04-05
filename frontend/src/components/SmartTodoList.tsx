@@ -268,9 +268,13 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
       if (sortable && hasActiveFilters && filteredTodos.length > 0) {
         return (
           <>
-            <p className="text-center p-2 text-xs text-[var(--text-muted)] bg-[var(--bg-secondary)] rounded-t-xl border border-[var(--border-secondary)] border-b-none">
-              ℹ️ Drag and drop is disabled while filters are active. Clear filters to reorder.
-            </p>
+            <div className="text-center p-3 text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)] rounded-t-xl border border-[var(--border-secondary)] border-b-none shadow-sm">
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <div className="w-3.5 h-3.5 rounded-full bg-[var(--info)]/20 border border-[var(--info)]/50 flex-shrink-0" />
+                Drag disabled during filters
+              </div>
+              <div className="text-[var(--text-muted)]">Clear filters to reorder</div>
+            </div>
             <ul className="list-none p-0 m-0">
               {filteredTodos.map((todo) => (
                 <TodoItemCore
@@ -374,12 +378,19 @@ const SmartTodoList: React.FC<SmartTodoListProps> = memo(
           {/* Drag Overlay for visual feedback */}
           <DragOverlay>
             {activeTodo ? (
-              <div className="p-4 mb-3 rounded-xl bg-[var(--accent-primary)] border border-[var(--border-primary)] shadow-lg scale-105 opacity-90">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-8 h-8 flex-shrink-0" />
-                  <span className="text-base text-[var(--text-primary)]">
-                    {activeTodo.text.length > 50 ? activeTodo.text.substring(0, 50) + '...' : activeTodo.text}
-                  </span>
+              <div className="p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] shadow-lg scale-105 opacity-95 border-2 border-[var(--accent-primary)]/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-lg bg-[var(--accent-primary)]/20 border border-[var(--accent-primary)]/30 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium text-[var(--text-primary)] line-clamp-2">
+                      {activeTodo.text.length > 60 ? activeTodo.text.substring(0, 60) + '...' : activeTodo.text}
+                    </span>
+                    {activeTodo.priority !== 'medium' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30 ml-2">
+                        {activeTodo.priority.toUpperCase()}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : null}

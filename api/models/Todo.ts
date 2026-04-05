@@ -44,6 +44,18 @@ const todoSchema = new Schema({
     default: null,
     index: true,
   },
+  nextTodoId: {
+    type: Types.ObjectId,
+    ref: 'Todo',
+    default: null,
+    index: true,
+  },
+  prevTodoId: {
+    type: Types.ObjectId,
+    ref: 'Todo',
+    default: null,
+    index: true,
+  },
   order: {
     type: Number,
     default: 0,
@@ -62,8 +74,10 @@ const todoSchema = new Schema({
 // Optimized Compound Indexes
 // ============================================
 
-// Primary compound index for most common queries
-todoSchema.index({ user: 1, order: 1 });
+// Primary compound index for most common queries (Linked List optimized)
+todoSchema.index({ user: 1, nextTodoId: 1 });
+todoSchema.index({ user: 1, prevTodoId: 1 });
+todoSchema.index({ user: 1, order: 1 }); // Legacy
 todoSchema.index({ user: 1, completed: 1 });
 todoSchema.index({ user: 1, category: 1 });
 todoSchema.index({ user: 1, dueDate: 1 });

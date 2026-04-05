@@ -211,7 +211,7 @@ const SortableTodoItem: React.FC<SortableTodoItemProps> = memo(({ todo, onToggle
                         className="w-5 h-5 rounded-full border-2 border-[var(--card-bg)]"
                       />
                     ) : (
-                      <div className="w-5 h-5 rounded-full bg-[var(--accent-primary)] border-2 border-[var(--card-bg)] flex items-center justify-center text-[8px] font-medium text-white">
+                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-secondary)] border-2 border-[var(--card-bg)] flex items-center justify-center text-[8px] font-bold text-[var(--bg-primary)]">
                         {participant.name.charAt(0).toUpperCase()}
                       </div>
                     )}

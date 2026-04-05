@@ -28,7 +28,10 @@ import SmartTodoList from './components/SmartTodoList';
 import { onboardingService } from './services/onboarding';
 import { offlineStorage, addSyncListener, type SyncStatus } from './services/offlineStorage';
 import { todoApi } from './services/api';
+import { timestamp } from './utils/console';
 import { ArrowRight } from 'lucide-react';
+import { Button } from './components/ui';
+
 
 // Known temporary/disposable email domains
 const TEMPORARY_EMAIL_DOMAINS = [
@@ -682,51 +685,65 @@ const handleLogout = async () => {
 
   const handleReorder = async (reorderedTodos: Todo[]) => {
     try {
-      console.log('[REORDER] Starting - optimistic update');
+// timestamp('[REORDER]', `Starting - auth=${!!user}, crypto=${!!(encryptionPassword && encryptionSalt)}, local=${todos.length}`);
+      
       // 1. Optimistic UI (with order preservation)
       const optimisticTodos = sortTodosByOrder([...reorderedTodos]);
       setTodos(optimisticTodos);
       
-      // REORDER BUG FIX: Validate crypto state before API
+      if (!user) {
+        timestamp('[REORDER]', 'SKIPPING SERVER - not authenticated (local save only)');
+        await offlineStorage.saveTodos(optimisticTodos);
+        setMessage('Local reorder saved (login to sync)');
+        setMessageType('warning');
+        return;
+      }
+      
       if (!encryptionPassword || !encryptionSalt) {
-        console.warn('[REORDER] No password/salt - using optimistic only');
+        timestamp('[REORDER]', 'No password/salt - using optimistic only');
         setMessage('Local reorder saved (no encryption)');
         setMessageType('warning');
         return;
       }
       
+// timestamp('[REORDER]', `Sending to server: ${reorderedTodos.length} todos (optimistic ready)`);
+      
       // 2. Server sync (authoritative but with fallback)
       const reorderData = {
         todos: reorderedTodos.map(t => ({ id: t._id.toString(), order: t.order ?? 0 }))
       };
-      console.log('[REORDER] Sending to server:', reorderData.todos.length, 'todos');
       
       const response = await todoApi.reorderTodos(reorderData);
+
       const serverTodosRaw: Todo[] = Array.isArray(response) ? response : (response as any)?.data || [];
+// timestamp('[REORDER]', `Server response: ${serverTodosRaw.length} todos (IDs: ${serverTodosRaw.map(t=>t._id.slice(-4)).join(', ')})`);
       
       if (serverTodosRaw.length === 0) {
-        console.warn('[REORDER] Empty server response - keeping optimistic');
+        timestamp('[REORDER]', 'Empty server response - keeping optimistic');
         setMessage('Local reorder saved (server empty)');
         setMessageType('warning');
         return;
       }
       
-      // REORDER BUG FIX: Use NEW safe batch decrypt (preserves order on fail)
-      console.log('[REORDER] Decrypting server response...');
+      // Batch decrypt (preserves order on fail)
       const serverTodos = await decryptAllTodosWithFallback(serverTodosRaw, encryptionPassword, encryptionSalt);
+
       
       // REORDER BUG FIX: Validate server order vs client expectation
       const clientOrderSum = optimisticTodos.reduce((sum, t) => sum + (t.order ?? Infinity), 0);
       const serverOrderSum = serverTodos.reduce((sum, t) => sum + (t.order ?? Infinity), 0);
-      const orderMatch = Math.abs(clientOrderSum - serverOrderSum) < 10; // Tolerance for small diffs
+      const idMatch = optimisticTodos.length === serverTodos.length && 
+                      optimisticTodos.every(t1 => serverTodos.some(t2 => t1._id === t2._id));
+      const orderMatch = Math.abs(clientOrderSum - serverOrderSum) < 10;
       
-      if (orderMatch) {
-        console.log('[REORDER] Server order OK - using server todos');
+// timestamp('[REORDER]', `Validation: IDs=${idMatch?'✓':'✗'} sums(client=${clientOrderSum} server=${serverOrderSum}) match=${orderMatch}`);
+      
+      if (orderMatch && idMatch) {
+// timestamp('[REORDER]', 'Server authoritative - applying');
         setTodos(sortTodosByOrder(serverTodos));
         setMessage('✅ Reorder synced');
       } else {
-        console.warn('[REORDER] Server order mismatch! Client sum:', clientOrderSum, 'Server sum:', serverOrderSum, '- keeping optimistic');
-        // HYBRID FALLBACK: Use server data but optimistic order
+// timestamp('[REORDER]', `Mismatch! Using hybrid fallback (IDs:${optimisticTodos.length}/${serverTodos.length})`);
         const hybridTodos = serverTodos.map((serverTodo, i) => {
           const optimisticTodo = optimisticTodos.find(t => t._id === serverTodo._id);
           return {
@@ -735,15 +752,18 @@ const handleLogout = async () => {
           };
         });
         setTodos(sortTodosByOrder(hybridTodos));
-        setMessage('🔧 Reorder fixed (server order issue)');
+setMessage('Reorder saved ✓');
       }
       setMessageType('success');
+
       
     } catch (err: any) {
-      console.error('[REORDER] Failed:', err);
+      timestamp('[REORDER]', `FAILED: ${err.message}`);
+      console.error('[REORDER ERROR]', err);
       setMessage('Local reorder saved');
       setMessageType('warning');
     }
+
   };
 
   const handleTourComplete = async () => {
@@ -874,10 +894,10 @@ const handleLogout = async () => {
                     <img 
                       src={user.avatar} 
                       alt={user.displayName || user.email}
-                      className="w-8 h-8 rounded-full object-cover flex-shrink-0 relative z-0"
+                      className="w-8 h-8 rounded-full object-cover flex-shrink-0 relative z-0 border-2 border-[var(--border-primary)] shadow-sm hover:shadow-md transition-all duration-200"
                     />
                   ) : (
-                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[var(--accent-gradient)] text-white text-sm flex-shrink-0 relative z-0">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-secondary)] text-[var(--bg-primary)] font-bold text-sm flex-shrink-0 relative z-0 border-2 border-[var(--border-primary)] shadow-sm hover:shadow-md transition-all duration-200">
                       {(user.displayName || user.email.split('@')[0]).charAt(0).toUpperCase()}
                     </span>
                   )}
@@ -900,25 +920,25 @@ const handleLogout = async () => {
             </div>
 
             <div className="flex items-center gap-2 ml-auto sm:ml-0">
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={() => setShowPremiumFeatures(true)}
                 title="Premium Features (Beta)"
-                className="px-4 py-2 rounded-lg font-medium text-sm text-white
-                  shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap flex items-center gap-1.5"
-                style={{ backgroundImage: 'var(--accent-gradient)', boxShadow: 'var(--glow)' }}
+                className="shadow-lg hover:shadow-xl whitespace-nowrap gap-1.5"
               >
                 <ArrowRight size={16} className="transform -rotate-45" />
                 Go Premium
-              </button>
+              </Button>
               {isAdmin && (
-                <button
+                <Button
+                  variant="success"
+                  size="sm"
                   onClick={() => setShowAdminDashboard(prev => !prev)}
-                  className="px-3 py-2 rounded-lg font-medium text-sm text-[var(--success)] bg-[var(--success)]/10
-                    shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap border border-[var(--success)]/30"
-                  style={{ boxShadow: 'var(--glow)' }}
+                  className="shadow-lg hover:shadow-xl whitespace-nowrap"
                 >
                   {showAdminDashboard ? '✕ Close' : '⚙️ Admin'}
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -947,14 +967,14 @@ const handleLogout = async () => {
               />
 
               <div className="flex gap-3 mt-[2rem]">
-                <button
+                <Button
+                  variant="danger"
+                  size="lg"
+                  className="flex-1 shadow-lg hover:shadow-xl"
                   onClick={handleLogout}
-                  className="flex-1 py-3.5 rounded-lg font-medium text-sm text-[var(--error)] bg-[var(--error)]/10
-                    shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 border border-[var(--error)]/30"
-                  style={{ boxShadow: '0 2px 4px var(--error, #ef4444)20' }}
                 >
                   Logout
-                </button>
+                </Button>
               </div>
             </>
           )}
