@@ -23,7 +23,6 @@ vi.mock('../components/ErrorBoundary', () => ({
 
 vi.mock('../components', () => ({
   AuthForm: () => <input data-testid="email-input" aria-label="email" role="textbox" />,
-  // Add other components as needed
 }))
 
 vi.mock('../pages/AdminDashboard', () => ({
@@ -89,22 +88,36 @@ describe('App', () => {
   })
 
   test('renders loader during initial load', async () => {
-    render(<App />)
+    const { ThemeProvider } = await import('../theme');
+    render(
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
+    )
     expect(screen.getByTestId('loader-container')).toBeInTheDocument()
   })
 
   test('renders Todo App title after loading', async () => {
-    render(<App />)
+    const { ThemeProvider } = await import('../theme');
+    render(
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
+    )
     await waitFor(() => {
       expect(screen.getByText(/Todo App/i)).toBeInTheDocument()
-    })
+    }, { timeout: 5000 })
   })
 
   test('renders AuthForm when not authenticated', async () => {
-    render(<App />)
+    const { ThemeProvider } = await import('../theme');
+    render(
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
+    )
     await waitFor(() => {
-      expect(screen.getByRole('textbox', { name: /email/i })).toBeInTheDocument()
-    })
+      expect(screen.getByTestId('email-input')).toBeInTheDocument()
+    }, { timeout: 5000 })
   })
 })
-

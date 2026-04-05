@@ -28,10 +28,63 @@ export interface Todo {
   }>;
 }
 
+// Admin types (basic interfaces to unblock build)
+export interface AdminUser {
+  _id: string;
+  email: string;
+  displayName?: string;
+  createdAt: string;
+  lastLogin?: string;
+}
+
+export interface AdminStats {
+  totalUsers: number;
+  activeUsers: number;
+  totalTodos: number;
+}
+
+export interface SystemHealth {
+  status: 'healthy' | 'warning' | 'error';
+  uptime: number;
+  memory: number;
+}
+
+export interface AdminDashboardData {
+  stats: AdminStats;
+  health: SystemHealth;
+}
+
+export interface AdminUsersResponse {
+  users: AdminUser[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface AdminTodosResponse {
+  todos: Todo[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 // Add other types as needed
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export type MessageType = 'success' | 'error' | 'warning' | 'info' | 'idle' | 'loading' | 'primary' | 'pending' | 'accent';
+
+export type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password';
+
+export interface ProfileUpdateData {
+  displayName?: string;
+  bio?: string;
+  avatar?: string;
+}
+
+export type TodoWithExtras = Todo & {
+  displayText?: string;
+  decryptionError?: boolean;
+};
 
 export const LED_COLORS: Partial<Record<MessageType, { bg: string; glow: string; border: string }>> = {
   success: { bg: '#10b981', glow: '#34d399', border: '#059669' },
@@ -44,4 +97,10 @@ export const LED_COLORS: Partial<Record<MessageType, { bg: string; glow: string;
   pending: { bg: '#f59e0b', glow: '#fbbf24', border: '#d97706' },
   accent: { bg: '#ec4899', glow: '#f472b6', border: '#be185d' },
 };
+
+export interface BatchSyncInput {
+  creates: Partial<Todo>[];
+  updates: Array<{ id: string; data: Partial<Todo> }>;
+  deletes: string[];
+}
 

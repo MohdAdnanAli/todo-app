@@ -452,11 +452,11 @@ async saveTodos(todos: Todo[]): Promise<void> {
       }
 
       // BATCH: Group by action
-      const batch = {
+      const batch: BatchSyncInput = {
         creates: [],
         updates: [],
         deletes: [],
-      } as BatchSyncInput;
+      };
 
       for (const item of queue) {
         if (item.action === 'create') {
