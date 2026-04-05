@@ -1,28 +1,48 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import React from 'react'
-import { expect, test, describe, vi, beforeEach } from 'vitest'
+import { vi, test, describe, expect, beforeEach } from 'vitest'
 import App from './App'
 
-// Mock theme and other deps to bypass useTheme error
+// Mock ALL dependencies before importing App
+vi.mock('../theme')
+vi.mock('../components/ErrorBoundary')
+vi.mock('../components')
+vi.mock('../pages/AdminDashboard')
+vi.mock('axios')
+vi.mock('../services/offlineStorage')
+vi.mock('../services/onboarding')
+vi.mock('../services/api')
+vi.mock('../utils/crypto')
+vi.mock('../hooks/useAuth')
+
+const mockUseTheme = vi.fn()
+vi.mocked(mockUseTheme).mockReturnValue({
+  currentTheme: { isDark: false },
+  themeId: 'system',
+  setThemeId: vi.fn(),
+  customColors: {},
+  setCustomColors: vi.fn(),
+  isCustomizing: false,
+  setIsCustomizing: vi.fn()
+})
+
 vi.mock('../theme', () => ({
-  ThemeProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  useTheme: vi.fn(() => ({
-    currentTheme: { isDark: false },
-    themeId: 'system',
-    setThemeId: vi.fn(),
-    customColors: {},
-    setCustomColors: vi.fn(),
-    isCustomizing: false,
-    setIsCustomizing: vi.fn()
-  }))
+  ThemeProvider: ({ children }) => <div>{children}</div>,
+  useTheme: mockUseTheme
 }))
 
 vi.mock('../components/ErrorBoundary', () => ({
-  ErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>
+  ErrorBoundary: ({ children }) => <>{children}</>
 }))
 
 vi.mock('../components', () => ({
   AuthForm: () => <input data-testid="email-input" aria-label="email" role="textbox" />,
+  PasswordUnlockModal: () => null,
+  LEDIndicator: () => null,
+  ProfileModal: () => null,
+  WelcomeBackModal: () => null,
+  ThemeSelector: () => null,
+  TodoForm: () => null,
+  SmartTodoList: () => null,
 }))
 
 vi.mock('../pages/AdminDashboard', () => ({
@@ -30,20 +50,10 @@ vi.mock('../pages/AdminDashboard', () => ({
 }))
 
 vi.mock('axios', () => ({
-  __esModule: true,
   default: {
-    create: vi.fn(() => ({
-      get: vi.fn()
-        .mockResolvedValueOnce({ data: { user: null, isAdmin: false, encryptionSalt: '' } })
-        .mockResolvedValueOnce({ data: [] }),
-      post: vi.fn(),
-      interceptors: {
-        response: {
-          use: vi.fn()
-        }
-      }
-    })),
-    isAxiosError: vi.fn(() => false)
+    get: vi.fn()
+      .mockResolvedValueOnce({ data: { user: null, isAdmin: false, encryptionSalt: '' } })
+      .mockResolvedValueOnce({ data: [] }),
   }
 }))
 
@@ -53,28 +63,7 @@ vi.mock('../services/offlineStorage', () => ({
     getEncryptionSalt: vi.fn(() => Promise.resolve('')),
     getRawTodos: vi.fn(() => Promise.resolve([])),
     saveTodos: vi.fn(),
-    savePassword: vi.fn(),
-    performLocalAction: vi.fn(),
   },
-  addSyncListener: vi.fn()
-}))
-
-vi.mock('../services/onboarding', () => ({
-  onboardingService: {
-    hasCompletedOnboarding: vi.fn(() => Promise.resolve(true)),
-    isQuickStartComplete: vi.fn(() => Promise.resolve(true)),
-  },
-  WELCOME_TOUR_STEPS: []
-}))
-
-vi.mock('../services/api', () => ({
-  todoApi: { reorderTodos: vi.fn(() => Promise.resolve([])) }
-}))
-
-vi.mock('../utils/crypto', () => ({
-  encrypt: vi.fn(),
-  decrypt: vi.fn(),
-  decryptAllTodosWithFallback: vi.fn(id => id)
 }))
 
 vi.mock('../hooks/useAuth', () => ({
@@ -88,34 +77,19 @@ describe('App', () => {
   })
 
   test('renders loader during initial load', async () => {
-    const { ThemeProvider } = await import('../theme');
-    render(
-      <ThemeProvider>
-        <App />
-      </ThemeProvider>
-    )
+    render(<App />)
     expect(screen.getByTestId('loader-container')).toBeInTheDocument()
   })
 
   test('renders Todo App title after loading', async () => {
-    const { ThemeProvider } = await import('../theme');
-    render(
-      <ThemeProvider>
-        <App />
-      </ThemeProvider>
-    )
+    render(<App />)
     await waitFor(() => {
       expect(screen.getByText(/Todo App/i)).toBeInTheDocument()
     }, { timeout: 5000 })
   })
 
   test('renders AuthForm when not authenticated', async () => {
-    const { ThemeProvider } = await import('../theme');
-    render(
-      <ThemeProvider>
-        <App />
-      </ThemeProvider>
-    )
+    render(<App />)
     await waitFor(() => {
       expect(screen.getByTestId('email-input')).toBeInTheDocument()
     }, { timeout: 5000 })

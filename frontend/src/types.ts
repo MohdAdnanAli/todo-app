@@ -31,8 +31,14 @@ export interface Todo {
 // Admin types (basic interfaces to unblock build)
 export interface AdminUser {
   _id: string;
+  id: string;
   email: string;
   displayName?: string;
+  bio?: string;
+  avatar?: string;
+  emailVerified: boolean;
+  todoCount: number;
+  completionRate: number;
   createdAt: string;
   lastLogin?: string;
 }
@@ -41,30 +47,45 @@ export interface AdminStats {
   totalUsers: number;
   activeUsers: number;
   totalTodos: number;
+  completedTodos: number;
+  pendingTodos: number;
+  completionRate: number;
 }
 
 export interface SystemHealth {
   status: 'healthy' | 'warning' | 'error';
   uptime: number;
   memory: number;
+  database: {
+    state: 'connected' | 'disconnected' | 'error';
+  };
+  environment: string;
+  timestamp: number;
 }
 
 export interface AdminDashboardData {
   stats: AdminStats;
   health: SystemHealth;
+  recentUsers: AdminUser[];
 }
 
 export interface AdminUsersResponse {
   users: AdminUser[];
-  total: number;
-  page: number;
+  pagination: {
+    page: number;
+    pages: number;
+    total: number;
+  };
   limit: number;
 }
 
 export interface AdminTodosResponse {
   todos: Todo[];
-  total: number;
-  page: number;
+  pagination: {
+    page: number;
+    pages: number;
+    total: number;
+  };
   limit: number;
 }
 
