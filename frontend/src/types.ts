@@ -6,7 +6,6 @@ export interface User {
   bio?: string;
 }
 
-// Extend existing Todo type if needed
 export type TodoCategory = 'work' | 'personal' | 'shopping' | 'health' | 'other';
 export type TodoPriority = 'low' | 'medium' | 'high';
 
@@ -26,9 +25,71 @@ export interface Todo {
     name: string;
     avatar?: string;
   }>;
+  user?: {
+    _id: string;
+    displayName?: string;
+    email: string;
+  };
 }
 
-// Admin types (basic interfaces to unblock build)
+export type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password';
+
+export interface ProfileUpdateData {
+  displayName?: string;
+  bio?: string;
+  avatar?: string;
+}
+
+export type MessageType = 'success' | 'error' | 'warning' | 'info' | 'idle' | 'loading' | 'primary' | 'pending' | 'accent' | 'attention' | 'system' | 'personal';
+
+export interface Todo {
+  _id: string;
+  text: string;
+  completed: boolean;
+  category: TodoCategory;
+  priority: TodoPriority;
+  tags?: string[];
+  dueDate?: string | null;
+  order?: number;
+  createdAt: string;
+  updatedAt?: string;
+  participants?: Array<{
+    id: string;
+    name: string;
+    avatar?: string;
+  }>;
+  user?: {
+    _id: string;
+    displayName?: string;
+    email: string;
+  };
+  displayText?: string;
+  decryptionError?: boolean;
+}
+
+export interface ApiError {
+  message: string;
+  code: string;
+  error?: string;
+  retryAfter?: number;
+}
+
+export type TodoWithExtras = Todo & {
+  displayText?: string;
+  decryptionError?: boolean;
+};
+
+
+
+export interface AdminStats {
+  totalUsers: number;
+  activeUsers: number;
+  totalTodos: number;
+  completedTodos: number;
+  pendingTodos: number;
+  completionRate: number;
+}
+
 export interface AdminUser {
   _id: string;
   id: string;
@@ -41,15 +102,7 @@ export interface AdminUser {
   completionRate: number;
   createdAt: string;
   lastLogin?: string;
-}
-
-export interface AdminStats {
-  totalUsers: number;
-  activeUsers: number;
-  totalTodos: number;
-  completedTodos: number;
-  pendingTodos: number;
-  completionRate: number;
+  lastLoginAt?: string;
 }
 
 export interface SystemHealth {
@@ -89,23 +142,30 @@ export interface AdminTodosResponse {
   limit: number;
 }
 
-// Add other types as needed
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
-export type MessageType = 'success' | 'error' | 'warning' | 'info' | 'idle' | 'loading' | 'primary' | 'pending' | 'accent';
-
-export type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password';
-
-export interface ProfileUpdateData {
-  displayName?: string;
-  bio?: string;
-  avatar?: string;
+export interface AuthResponse {
+  user: User;
+  encryptionSalt: string;
+  isAdmin: boolean;
 }
 
-export type TodoWithExtras = Todo & {
-  displayText?: string;
-  decryptionError?: boolean;
-};
+export interface ApiError {
+  message: string;
+  code: string;
+}
+
+export interface AdminProfile {
+  _id: string;
+  email: string;
+  todoCount: number;
+}
+
+export interface BatchSyncInput {
+  creates: Partial<Todo>[];
+  updates: Array<{ id: string; data: Partial<Todo> }>;
+  deletes: string[];
+}
+
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export const LED_COLORS: Partial<Record<MessageType, { bg: string; glow: string; border: string }>> = {
   success: { bg: '#10b981', glow: '#34d399', border: '#059669' },
@@ -117,11 +177,8 @@ export const LED_COLORS: Partial<Record<MessageType, { bg: string; glow: string;
   primary: { bg: '#4f46e5', glow: '#6366f1', border: '#3730a3' },
   pending: { bg: '#f59e0b', glow: '#fbbf24', border: '#d97706' },
   accent: { bg: '#ec4899', glow: '#f472b6', border: '#be185d' },
+  attention: { bg: '#f59e0b', glow: '#fbbf24', border: '#d97706' },
+  system: { bg: '#6b7280', glow: '#9ca3af', border: '#6b7280' },
+  personal: { bg: '#8b5cf6', glow: '#a78bfa', border: '#7c3aed' },
 };
-
-export interface BatchSyncInput {
-  creates: Partial<Todo>[];
-  updates: Array<{ id: string; data: Partial<Todo> }>;
-  deletes: string[];
-}
 

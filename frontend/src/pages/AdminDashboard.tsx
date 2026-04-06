@@ -575,7 +575,7 @@ export function AdminDashboard({ onClose }: AdminDashboardProps) {
               </div>
               <div className="mt-4 pt-4 border-t border-gray-700">
                 <p className="text-gray-400 text-sm">
-                  Last checked: {formatDate(systemHealth.timestamp)}
+                  Last checked: {formatDate(systemHealth.timestamp.toString())}
                 </p>
               </div>
             </Card>

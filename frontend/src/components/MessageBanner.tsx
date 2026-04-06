@@ -15,7 +15,7 @@ const MessageBanner: React.FC<MessageBannerProps> = ({
 }) => {
   if (!message) return null;
   
-  const colors = LED_COLORS[messageType];
+  const colors = LED_COLORS[messageType] || { bg: '#6b7280', glow: '#9ca3af', border: '#6b7280' };
   
   const getIcon = () => {
     switch (messageType) {
@@ -41,15 +41,15 @@ const MessageBanner: React.FC<MessageBannerProps> = ({
         padding: '0.75rem 1rem',
         marginBottom: '1rem',
         borderRadius: '8px',
-        backgroundColor: colors.bg,
+        backgroundColor: colors?.bg ?? '#6b7280',
         color: 'white',
         fontWeight: 500,
         fontSize: '0.9rem',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        boxShadow: `0 2px 8px ${colors.glow}`,
-        border: `1px solid ${colors.border}`,
+        boxShadow: `0 2px 8px ${colors?.glow ?? '#9ca3af'}`,
+        border: `1px solid ${colors?.border ?? '#6b7280'}`,
         animation: 'fadeIn 0.3s ease',
       }}
     >

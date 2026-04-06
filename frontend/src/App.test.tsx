@@ -16,7 +16,7 @@ vi.mock('../hooks/useAuth')
 
 const mockUseTheme = vi.fn()
 vi.mocked(mockUseTheme).mockReturnValue({
-  currentTheme: { isDark: false },
+  currentTheme: { isDark: false, icon: '🌙' },
   themeId: 'system',
   setThemeId: vi.fn(),
   customColors: {},
@@ -26,12 +26,12 @@ vi.mocked(mockUseTheme).mockReturnValue({
 })
 
 vi.mock('../theme', () => ({
-  ThemeProvider: ({ children }) => <div>{children}</div>,
+  ThemeProvider: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   useTheme: mockUseTheme
 }))
 
 vi.mock('../components/ErrorBoundary', () => ({
-  ErrorBoundary: ({ children }) => <>{children}</>
+  ErrorBoundary: ({ children }: { children?: React.ReactNode }) => <>{children}</>
 }))
 
 vi.mock('../components', () => ({
@@ -46,14 +46,29 @@ vi.mock('../components', () => ({
 }))
 
 vi.mock('../pages/AdminDashboard', () => ({
-  AdminDashboard: () => null
+  AdminDashboard: vi.fn(() => null)
 }))
 
 vi.mock('axios', () => ({
   default: {
-    get: vi.fn()
-      .mockResolvedValueOnce({ data: { user: null, isAdmin: false, encryptionSalt: '' } })
-      .mockResolvedValueOnce({ data: [] }),
+    create: vi.fn(() => ({
+      get: vi.fn()
+        .mockResolvedValueOnce({ data: { user: null, isAdmin: false, encryptionSalt: '' } })
+        .mockResolvedValueOnce({ data: [] }),
+      post: vi.fn(),
+      put: vi.fn(),
+      delete: vi.fn(),
+      interceptors: {
+        response: {
+          use: vi.fn(),
+          eject: vi.fn()
+        }
+      }
+    })),
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn()
   }
 }))
 

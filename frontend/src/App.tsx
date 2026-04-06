@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useTheme } from './theme';
-import type { Todo, User, MessageType, TodoCategory, TodoPriority } from './types';
+import type { Todo, User, TodoCategory, TodoPriority } from './types';
 import { API_URL } from './types';
 import { encrypt, decrypt, decryptAllTodosWithFallback } from './utils/crypto';
 import { AdminDashboard } from './pages/AdminDashboard';
@@ -28,7 +28,7 @@ import SmartTodoList from './components/SmartTodoList';
 import { onboardingService } from './services/onboarding';
 import { offlineStorage, addSyncListener, type SyncStatus } from './services/offlineStorage';
 import { todoApi } from './services/api';
-import { timestamp } from './utils/console';
+
 import { ArrowRight } from 'lucide-react';
 import { Button } from './components/ui';
 
@@ -81,7 +81,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState<MessageType>('idle');
+  const [messageType, setMessageType] = useState<'success' | 'error' | 'warning' | 'loading' | 'idle' | 'primary' | 'pending' | 'accent'>('idle');
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -172,7 +172,7 @@ function App() {
       }
       await offlineStorage.saveTodos(sortTodosByOrder(todosData));
       setShowWelcomeBackModal(false);
-      setMessage('Ready to go!');
+      setMessage('Tasks Loaded Successfully');
       setMessageType('success');
     } catch (err: any) {
       setMessage('Error loading your tasks');
@@ -259,7 +259,7 @@ function App() {
           await offlineStorage.saveTodos(decryptedTodos);
           
           setIsLoading(false);
-          setMessage('Welcome back!');
+          setMessage('Welcome Back');
           setMessageType('success');
         } catch (err) {
           console.error('Google OAuth auth check failed:', err);
@@ -310,14 +310,14 @@ function App() {
           const currentSalt = encryptionSalt || serverSalt;
           
           // Use password from storage OR from server response to decrypt
-      if (currentPassword && currentSalt) {
-        const decryptedTodos = await decryptAllTodos(todosData, currentPassword, currentSalt);
+          if (currentPassword && currentSalt) {
+            const decryptedTodos = await decryptAllTodos(todosData, currentPassword, currentSalt);
             setTodos(decryptedTodos);
             await offlineStorage.saveTodos(todosData); // Save raw encrypted todos
-      } else {
-        setTodos(todosData);
-        await offlineStorage.saveTodos(todosData);
-      }
+          } else {
+            setTodos(todosData);
+            await offlineStorage.saveTodos(todosData);
+          }
           
           // Only show welcome modal on first visit (no todos in offline storage AND no userPassword)
           if (0 === 0 && !currentPassword) {
@@ -328,7 +328,7 @@ function App() {
             // User already has todos or password, show them normally
             setShowWelcomeBackModal(false);
             if (currentPassword) {
-              setMessage('Welcome back!');
+              setMessage('Welcome Back');
               setMessageType('success');
             }
           }
@@ -367,7 +367,7 @@ function App() {
   }, []);
 
   const handleLogin = async (loginEmail: string, loginPassword: string) => {
-    setMessage('Logging in...');
+    setMessage('Authenticating...');
     setMessageType('loading');
     try {
       const response = await axios.post(
@@ -422,7 +422,7 @@ function App() {
       }
       
       // Only set loading to false AFTER everything is done
-      setMessage('Login successful');
+      setMessage('Login Successful');
       setMessageType('success');
       setIsLoading(false);
     } catch (err: any) {
@@ -454,7 +454,7 @@ function App() {
       return;
     }
 
-    setMessage('Creating account...');
+    setMessage('Creating Account...');
     setMessageType('loading');
     try {
       const response = await axios.post(
@@ -509,7 +509,7 @@ function App() {
       }
       
       // Only set loading to false AFTER everything is done
-      setMessage('Account created and logged in! Please check your email to verify your account.');
+      setMessage('Account Created Successfully. Please Verify Your Email.');
       setMessageType('success');
       setIsLoading(false);
     } catch (err: any) {
@@ -521,7 +521,7 @@ function App() {
   };
 
 const handleLogout = async () => {
-    setMessage('🔄 Saving your todos before logout...');
+    setMessage('Saving Changes Before Logout...');
     setMessageType('loading');
 
     try {
@@ -537,7 +537,7 @@ const handleLogout = async () => {
       const rawTodos = await offlineStorage.getRawTodos();
       await offlineStorage.saveTodos(rawTodos);
       
-      setMessage('✅ Todos saved! Logging out...');
+      setMessage('Changes Saved. Logging Out...');
       
       // 3. Server logout
       try {
@@ -553,7 +553,7 @@ const handleLogout = async () => {
       try {
         const rawTodos = await offlineStorage.getRawTodos();
         await offlineStorage.saveTodos(rawTodos);
-        setMessage('💾 Local save complete! Logging out...');
+        setMessage('Local Save Complete. Logging Out...');
       } catch (saveError) {
         console.error('Local save failed:', saveError);
       }
@@ -628,7 +628,7 @@ const handleLogout = async () => {
       const decryptedNewTodo = await decryptTodo(newTodo, encryptionPassword, encryptionSalt);
       setTodos(prev => sortTodosByOrder([decryptedNewTodo, ...prev.filter(t => t._id !== newTodo._id)]));
       
-      setMessage('Todo added ✓ (syncing...)');
+      setMessage('Task Added and Syncing');
       setMessageType('primary');
       
       // Quick-start
@@ -653,7 +653,7 @@ const handleLogout = async () => {
     const decryptedTodo = await decryptTodo(updatedTodo, encryptionPassword, encryptionSalt);
     setTodos(prev => sortTodosByOrder(prev.map(t => t._id === todo._id ? decryptedTodo : t)));
     
-    setMessage(todo.completed ? 'Task marked as pending ✓' : 'Task completed ✓');
+    setMessage('Task Updated');
     setMessageType(todo.completed ? 'pending' : 'success');
   };
 
@@ -669,7 +669,7 @@ const handleLogout = async () => {
     try {
       await offlineStorage.performLocalAction('delete', { _id: deleteConfirm.todoId });
       setTodos(prev => sortTodosByOrder(prev.filter(t => t._id !== deleteConfirm.todoId)));
-      setMessage('Todo deleted ✓');
+      setMessage('Task Deleted Successfully');
       setMessageType('accent');
     } catch (err: any) {
       setMessage('Local delete failed: ' + err.message);
@@ -685,28 +685,22 @@ const handleLogout = async () => {
 
   const handleReorder = async (reorderedTodos: Todo[]) => {
     try {
-// timestamp('[REORDER]', `Starting - auth=${!!user}, crypto=${!!(encryptionPassword && encryptionSalt)}, local=${todos.length}`);
-      
       // 1. Optimistic UI (with order preservation)
       const optimisticTodos = sortTodosByOrder([...reorderedTodos]);
       setTodos(optimisticTodos);
       
       if (!user) {
-        timestamp('[REORDER]', 'SKIPPING SERVER - not authenticated (local save only)');
         await offlineStorage.saveTodos(optimisticTodos);
-        setMessage('Local reorder saved (login to sync)');
+        setMessage('Order Saved Locally. Login to Sync.');
         setMessageType('warning');
         return;
       }
       
       if (!encryptionPassword || !encryptionSalt) {
-        timestamp('[REORDER]', 'No password/salt - using optimistic only');
-        setMessage('Local reorder saved (no encryption)');
+        setMessage('Order Saved Locally. Encryption Required.');
         setMessageType('warning');
         return;
       }
-      
-// timestamp('[REORDER]', `Sending to server: ${reorderedTodos.length} todos (optimistic ready)`);
       
       // 2. Server sync (authoritative but with fallback)
       const reorderData = {
@@ -716,11 +710,9 @@ const handleLogout = async () => {
       const response = await todoApi.reorderTodos(reorderData);
 
       const serverTodosRaw: Todo[] = Array.isArray(response) ? response : (response as any)?.data || [];
-// timestamp('[REORDER]', `Server response: ${serverTodosRaw.length} todos (IDs: ${serverTodosRaw.map(t=>t._id.slice(-4)).join(', ')})`);
       
       if (serverTodosRaw.length === 0) {
-        timestamp('[REORDER]', 'Empty server response - keeping optimistic');
-        setMessage('Local reorder saved (server empty)');
+        setMessage('Order Saved Locally. Server Unavailable.');
         setMessageType('warning');
         return;
       }
@@ -736,14 +728,10 @@ const handleLogout = async () => {
                       optimisticTodos.every(t1 => serverTodos.some(t2 => t1._id === t2._id));
       const orderMatch = Math.abs(clientOrderSum - serverOrderSum) < 10;
       
-// timestamp('[REORDER]', `Validation: IDs=${idMatch?'✓':'✗'} sums(client=${clientOrderSum} server=${serverOrderSum}) match=${orderMatch}`);
-      
       if (orderMatch && idMatch) {
-// timestamp('[REORDER]', 'Server authoritative - applying');
         setTodos(sortTodosByOrder(serverTodos));
-        setMessage('✅ Reorder synced');
+        setMessage('Order Updated Successfully');
       } else {
-// timestamp('[REORDER]', `Mismatch! Using hybrid fallback (IDs:${optimisticTodos.length}/${serverTodos.length})`);
         const hybridTodos = serverTodos.map((serverTodo, i) => {
           const optimisticTodo = optimisticTodos.find(t => t._id === serverTodo._id);
           return {
@@ -752,18 +740,16 @@ const handleLogout = async () => {
           };
         });
         setTodos(sortTodosByOrder(hybridTodos));
-setMessage('Reorder saved ✓');
+        setMessage('Order Saved Successfully');
       }
       setMessageType('success');
 
       
     } catch (err: any) {
-      timestamp('[REORDER]', `FAILED: ${err.message}`);
       console.error('[REORDER ERROR]', err);
-      setMessage('Local reorder saved');
+      setMessage('Order Saved Locally');
       setMessageType('warning');
     }
-
   };
 
   const handleTourComplete = async () => {
@@ -897,7 +883,7 @@ setMessage('Reorder saved ✓');
                       className="w-8 h-8 rounded-full object-cover flex-shrink-0 relative z-0 border-2 border-[var(--border-primary)] shadow-sm hover:shadow-md transition-all duration-200"
                     />
                   ) : (
-                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-secondary)] text-[var(--bg-primary)] font-bold text-sm flex-shrink-0 relative z-0 border-2 border-[var(--border-primary)] shadow-sm hover:shadow-md transition-all duration-200">
+                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-[var(--accent-primary)] to-[var(--accent-secondary)] text-[var(--bg-primary)] font-bold text-sm flex-shrink-0 relative z-0 border-2 border-[var(--border-primary)] shadow-sm hover:shadow-md transition-all duration-200">
                       {(user.displayName || user.email.split('@')[0]).charAt(0).toUpperCase()}
                     </span>
                   )}
@@ -995,7 +981,7 @@ setMessage('Reorder saved ✓');
           onDeleteAccount={handleDeleteAccount}
           onMessage={(msg, type) => {
             setMessage(msg);
-            setMessageType(type);
+            setMessageType(type as any);
           }}
         />
       )}

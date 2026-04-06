@@ -11,7 +11,7 @@ interface LEDIndicatorProps {
 const LEDIndicator: React.FC<LEDIndicatorProps> = memo(({ message, messageType, variant = 'default' }) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const [showAutoMessage, setShowAutoMessage] = useState(false);
-  const colors = LED_COLORS[messageType];
+const colors = LED_COLORS[messageType] || { bg: '#6b7280', glow: '#9ca3af', border: '#6b7280' };
 
   useEffect(() => {
     if (message) {
@@ -39,9 +39,9 @@ const LEDIndicator: React.FC<LEDIndicatorProps> = memo(({ message, messageType, 
       <div
         className={`w-3 h-3 rounded-full transition-all duration-300 ${message ? 'animate-pulse' : ''}`}
         style={{
-          backgroundColor: colors.bg,
-          boxShadow: `0 0 15px ${colors.glow}, 0 0 8px ${colors.glow}, 0 0 4px ${colors.bg}`,
-          border: `2px solid ${colors.border}`,
+          backgroundColor: colors?.bg ?? '#6b7280',
+          boxShadow: `0 0 15px ${colors?.glow ?? '#9ca3af'}, 0 0 8px ${colors?.glow ?? '#9ca3af'}, 0 0 4px ${colors?.bg ?? '#6b7280'}`,
+          border: `2px solid ${colors?.border ?? '#6b7280'}`,
         }}
       />
 
@@ -52,7 +52,7 @@ const LEDIndicator: React.FC<LEDIndicatorProps> = memo(({ message, messageType, 
             backgroundColor: 'var(--bg-secondary)',
             color: 'var(--text-primary)',
             boxShadow: 'var(--shadow)',
-            border: `1px solid ${colors.border}`,
+            border: `1px solid ${colors?.border ?? '#6b7280'}`,
           }}
         >
           {message}
@@ -60,8 +60,8 @@ const LEDIndicator: React.FC<LEDIndicatorProps> = memo(({ message, messageType, 
             className="absolute -top-1.5 right-3 rotate-45 w-2.5 h-2.5"
             style={{
               backgroundColor: 'var(--bg-secondary)',
-              borderLeft: `1px solid ${colors.border}`,
-              borderTop: `1px solid ${colors.border}`,
+              borderLeft: `1px solid ${colors?.border ?? '#6b7280'}`,
+              borderTop: `1px solid ${colors?.border ?? '#6b7280'}`,
             }}
           />
         </div>

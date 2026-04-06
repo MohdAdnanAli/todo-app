@@ -98,7 +98,7 @@ api.interceptors.response.use(
     }
 
     if (error.response?.status === 429) {
-      const retryAfter = error.response.data?.retryAfter || 60;
+    const retryAfter = (error.response?.data as any)?.retryAfter || 60;
       const customError = new Error('Rate limit exceeded') as Error & { retryAfter?: number; isRateLimit?: boolean };
       customError.retryAfter = retryAfter;
       customError.isRateLimit = true;
@@ -380,13 +380,9 @@ export const adminApi = {
     return {
       totalUsers: users.pagination.total,
       profiles: users.users.map((u) => ({
-        id: u.id,
+        _id: u._id || u.id,
         email: u.email,
-        displayName: u.displayName,
-        bio: u.bio,
-        avatar: u.avatar,
         todoCount: u.todoCount,
-        createdAt: u.createdAt,
       })),
     };
   },
@@ -397,8 +393,8 @@ export const adminApi = {
 export const getApiErrorMessage = (error: unknown): string => {
   if (axios.isAxiosError(error)) {
     const axiosError = error as AxiosError<ApiError>;
-    if (axiosError.response?.data?.error) {
-      return axiosError.response.data.error;
+    if (axiosError.response?.data && 'error' in axiosError.response.data) {
+      return (axiosError.response.data as any).error;
     }
     if (axiosError.response?.status === 429) {
       return 'Too many requests. Please try again later.';
